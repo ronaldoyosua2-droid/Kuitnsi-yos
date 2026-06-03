@@ -650,6 +650,7 @@ function doConfirmLoadCloud(){ if(typeof confirmLoadCloud==='function') confirmL
       <div class="tab" onclick="switchTab('modalAwal')">&#128176; Kas Awal Harian</div>
       <div class="tab" onclick="switchTab('pengeluaran')">&#128184; Pengeluaran</div>
       <div class="tab" onclick="switchTab('pinjaman')">&#129309; Pinjaman</div>
+      <div class="tab" onclick="switchTab('kasTunai')">&#128181; Kas Tunai</div>
     </div>
 
     <!-- TAB: TARIF -->
@@ -1055,6 +1056,61 @@ function doConfirmLoadCloud(){ if(typeof confirmLoadCloud==='function') confirmL
         <button class="btn" style="font-size:12px" onclick="doConfirmLoadCloud()">&#8681; Muat dari Cloud</button>
         <span id="last-sync-label" style="font-size:11px;color:var(--text2);align-self:center"></span>
       </div>
+
+    <!-- TAB: KAS TUNAI -->
+    <div class="tab-content" id="tab-kasTunai">
+      <div class="card">
+        <div class="card-title">&#128181; Rekap Kas Tunai Harian</div>
+        <p style="font-size:13px;color:var(--text2);margin-bottom:16px">Hitung fisik uang kas di tangan. Harus balance dengan Kas Harian.</p>
+        <div class="field">
+          <label>Tanggal</label>
+          <input type="date" id="kt-tanggal" onchange="onKtTanggalChange()" style="width:auto;padding:8px;border:1px solid var(--border);border-radius:7px;outline:none">
+        </div>
+        <div style="background:var(--blue-light);border-radius:10px;padding:14px;margin-bottom:12px">
+          <div style="font-size:12px;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">💵 Uang Lembaran Besar (Rp 50.000 & Rp 100.000)</div>
+          <div class="row2">
+            <div class="field" style="margin-bottom:0">
+              <label>Total Uang Rp 100.000 (Rp)</label>
+              <input type="number" id="kt-100" placeholder="0" oninput="hitungKasTunai()" style="width:100%;padding:8px;font-size:14px;font-weight:600;border:1px solid #93c5fd;border-radius:7px;outline:none">
+              <div style="font-size:11px;color:var(--text2);margin-top:3px" id="kt-100-hint"></div>
+            </div>
+            <div class="field" style="margin-bottom:0">
+              <label>Total Uang Rp 50.000 (Rp)</label>
+              <input type="number" id="kt-50" placeholder="0" oninput="hitungKasTunai()" style="width:100%;padding:8px;font-size:14px;font-weight:600;border:1px solid #93c5fd;border-radius:7px;outline:none">
+              <div style="font-size:11px;color:var(--text2);margin-top:3px" id="kt-50-hint"></div>
+            </div>
+          </div>
+          <div style="margin-top:8px;text-align:right;font-size:13px;color:var(--blue);font-weight:600">Subtotal Lembaran Besar: <span id="kt-sub-besar">Rp 0</span></div>
+        </div>
+        <div style="background:var(--green-light);border-radius:10px;padding:14px;margin-bottom:12px">
+          <div style="font-size:12px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">🪙 Uang Pecahan (Rp 1.000 — Rp 20.000)</div>
+          <div class="row3">
+            <div class="field" style="margin-bottom:8px"><label>Rp 20.000</label><input type="number" id="kt-20" placeholder="0" oninput="hitungKasTunai()" style="width:100%;padding:8px;font-size:13px;border:1px solid #86efac;border-radius:7px;outline:none"></div>
+            <div class="field" style="margin-bottom:8px"><label>Rp 10.000</label><input type="number" id="kt-10" placeholder="0" oninput="hitungKasTunai()" style="width:100%;padding:8px;font-size:13px;border:1px solid #86efac;border-radius:7px;outline:none"></div>
+            <div class="field" style="margin-bottom:8px"><label>Rp 5.000</label><input type="number" id="kt-5" placeholder="0" oninput="hitungKasTunai()" style="width:100%;padding:8px;font-size:13px;border:1px solid #86efac;border-radius:7px;outline:none"></div>
+            <div class="field" style="margin-bottom:0"><label>Rp 2.000</label><input type="number" id="kt-2" placeholder="0" oninput="hitungKasTunai()" style="width:100%;padding:8px;font-size:13px;border:1px solid #86efac;border-radius:7px;outline:none"></div>
+            <div class="field" style="margin-bottom:0"><label>Rp 1.000</label><input type="number" id="kt-1" placeholder="0" oninput="hitungKasTunai()" style="width:100%;padding:8px;font-size:13px;border:1px solid #86efac;border-radius:7px;outline:none"></div>
+            <div class="field" style="margin-bottom:0"><label>Koin (Total Rp)</label><input type="number" id="kt-koin" placeholder="0" oninput="hitungKasTunai()" style="width:100%;padding:8px;font-size:13px;border:1px solid #86efac;border-radius:7px;outline:none"></div>
+          </div>
+          <div style="margin-top:8px;text-align:right;font-size:13px;color:var(--green);font-weight:600">Subtotal Pecahan: <span id="kt-sub-kecil">Rp 0</span></div>
+        </div>
+        <div id="kt-balance-card" style="border-radius:10px;padding:16px;margin-bottom:14px;background:var(--gray-light);border:2px solid var(--border)">
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;text-align:center;margin-bottom:12px">
+            <div><div style="font-size:11px;color:var(--text2);margin-bottom:4px">💵 Total Kas Tunai</div><div style="font-size:18px;font-weight:700;color:var(--text)" id="kt-total-tunai">Rp 0</div></div>
+            <div><div style="font-size:11px;color:var(--text2);margin-bottom:4px">📋 Kas Harian (Target)</div><div style="font-size:18px;font-weight:700;color:var(--blue)" id="kt-target">Rp 0</div></div>
+            <div><div style="font-size:11px;color:var(--text2);margin-bottom:4px">⚖️ Selisih</div><div style="font-size:18px;font-weight:700" id="kt-selisih">—</div></div>
+          </div>
+          <div id="kt-status-bar" style="text-align:center;padding:10px;border-radius:8px;font-size:14px;font-weight:600;background:var(--gray-light)">Isi nominal uang di atas</div>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-primary" onclick="simpanKasTunai()">&#128190; Simpan Rekap</button>
+          <button class="btn" onclick="resetKasTunai()">&#8635; Reset</button>
+          <button class="btn btn-green" onclick="downloadKasTunaiExcel()">&#128190; Download Excel</button>
+        </div>
+        <div style="margin-top:20px" id="kt-riwayat-wrap"></div>
+      </div>
+    </div>
+
       <button class="btn btn-danger" style="font-size:12px" onclick="logoutAdmin()">&#128274; Keluar Admin</button>
     </div>
   </div>
@@ -3831,6 +3887,176 @@ function downloadPinjamanExcel(){
   if(wb)saveXlsx(wb,'Pinjaman_'+new Date().toLocaleDateString('id-ID').replace(/\//g,'-')+'.xlsx');
 }
 
+
+// ===================== KAS TUNAI =====================
+function getKasTunai(){ return lsGet('ya_kas_tunai')||{}; }
+function setKasTunai(v){ lsSet('ya_kas_tunai',v); }
+
+function initKasTunai(){
+  document.getElementById('kt-tanggal').value=today();
+  loadKasTunaiForDate(today());
+  renderKasTunaiRiwayat();
+}
+
+function onKtTanggalChange(){
+  const tgl=document.getElementById('kt-tanggal').value;
+  if(tgl) loadKasTunaiForDate(tgl);
+}
+
+function loadKasTunaiForDate(tgl){
+  const all=getKasTunai();
+  const d=all[tgl]||{};
+  document.getElementById('kt-100').value=d.n100||'';
+  document.getElementById('kt-50').value=d.n50||'';
+  document.getElementById('kt-20').value=d.n20||'';
+  document.getElementById('kt-10').value=d.n10||'';
+  document.getElementById('kt-5').value=d.n5||'';
+  document.getElementById('kt-2').value=d.n2||'';
+  document.getElementById('kt-1').value=d.n1||'';
+  document.getElementById('kt-koin').value=d.koin||'';
+  hitungKasTunai();
+}
+
+function getKasHarianTarget(tgl){
+  // Get kas awal harian for this date
+  const allKas=lsGet('ya_kas_awal_harian')||{};
+  const kasAwal=(allKas[tgl]||{nominal:0}).nominal||0;
+  // Get all kas transactions for this date
+  const rw=getRiwayat();
+  const kasmasuk=rw.filter(r=>r.tanggal===tgl&&(!r.metode||r.metode==='Kas')).reduce((a,r)=>a+(r.nominalBayar||0),0);
+  // Get pengeluaran for this date
+  const pgr=getPengeluaran().filter(p=>p.tanggal===tgl).reduce((a,p)=>a+p.nominal,0);
+  // Get pinjaman for this date
+  const pjm=getPinjaman().filter(p=>p.tanggal===tgl).reduce((a,p)=>a+p.nominal,0);
+  return kasAwal+kasmasuk+pjm-pgr;
+}
+
+function hitungKasTunai(){
+  const n100=parseInt(document.getElementById('kt-100').value)||0;
+  const n50=parseInt(document.getElementById('kt-50').value)||0;
+  const n20=parseInt(document.getElementById('kt-20').value)||0;
+  const n10=parseInt(document.getElementById('kt-10').value)||0;
+  const n5=parseInt(document.getElementById('kt-5').value)||0;
+  const n2=parseInt(document.getElementById('kt-2').value)||0;
+  const n1=parseInt(document.getElementById('kt-1').value)||0;
+  const koin=parseInt(document.getElementById('kt-koin').value)||0;
+
+  // Hints for lembaran besar
+  const h100=document.getElementById('kt-100-hint');
+  const h50=document.getElementById('kt-50-hint');
+  if(h100) h100.textContent=n100>0?Math.round(n100/100000)+' lembar @Rp100.000':'';
+  if(h50) h50.textContent=n50>0?Math.round(n50/50000)+' lembar @Rp50.000':'';
+
+  const subBesar=n100+n50;
+  const subKecil=n20+n10+n5+n2+n1+koin;
+  const total=subBesar+subKecil;
+
+  document.getElementById('kt-sub-besar').textContent=fmt(subBesar);
+  document.getElementById('kt-sub-kecil').textContent=fmt(subKecil);
+  document.getElementById('kt-total-tunai').textContent=fmt(total);
+
+  // Get target from kas harian
+  const tgl=document.getElementById('kt-tanggal').value||today();
+  const target=getKasHarianTarget(tgl);
+  document.getElementById('kt-target').textContent=fmt(target);
+
+  // Calculate balance
+  const selisih=total-target;
+  const selEl=document.getElementById('kt-selisih');
+  const statusEl=document.getElementById('kt-status-bar');
+  const card=document.getElementById('kt-balance-card');
+
+  if(total===0&&target===0){
+    selEl.textContent='—';selEl.style.color='var(--text2)';
+    statusEl.textContent='Isi nominal uang di atas';
+    statusEl.style.background='var(--gray-light)';statusEl.style.color='var(--text2)';
+    card.style.borderColor='var(--border)';
+    return;
+  }
+
+  if(selisih===0){
+    selEl.textContent='Rp 0';selEl.style.color='var(--green)';
+    statusEl.innerHTML='✅ BALANCE — Kas tunai sesuai dengan kas harian!';
+    statusEl.style.background='var(--green-light)';statusEl.style.color='var(--green)';
+    card.style.borderColor='#86efac';
+  } else if(selisih>0){
+    selEl.textContent='+'+fmt(selisih);selEl.style.color='var(--blue)';
+    statusEl.innerHTML='🔼 OVER — Kas tunai lebih banyak '+fmt(selisih)+' dari kas harian';
+    statusEl.style.background='var(--blue-light)';statusEl.style.color='var(--blue)';
+    card.style.borderColor='#93c5fd';
+  } else {
+    selEl.textContent='-'+fmt(Math.abs(selisih));selEl.style.color='var(--danger)';
+    statusEl.innerHTML='🔽 MINUS — Kas tunai kurang '+fmt(Math.abs(selisih)+' dari kas harian');
+    statusEl.style.background='var(--danger-light)';statusEl.style.color='var(--danger)';
+    card.style.borderColor='#fca5a5';
+  }
+}
+
+function simpanKasTunai(){
+  const tgl=document.getElementById('kt-tanggal').value||today();
+  const n100=parseInt(document.getElementById('kt-100').value)||0;
+  const n50=parseInt(document.getElementById('kt-50').value)||0;
+  const n20=parseInt(document.getElementById('kt-20').value)||0;
+  const n10=parseInt(document.getElementById('kt-10').value)||0;
+  const n5=parseInt(document.getElementById('kt-5').value)||0;
+  const n2=parseInt(document.getElementById('kt-2').value)||0;
+  const n1=parseInt(document.getElementById('kt-1').value)||0;
+  const koin=parseInt(document.getElementById('kt-koin').value)||0;
+  const total=n100+n50+n20+n10+n5+n2+n1+koin;
+  const target=getKasHarianTarget(tgl);
+  const selisih=total-target;
+  const all=getKasTunai();
+  all[tgl]={n100,n50,n20,n10,n5,n2,n1,koin,total,target,selisih,savedAt:new Date().toLocaleString('id-ID')};
+  setKasTunai(all);
+  renderKasTunaiRiwayat();
+  alert('✅ Rekap kas tunai tersimpan!');
+}
+
+function resetKasTunai(){
+  ['kt-100','kt-50','kt-20','kt-10','kt-5','kt-2','kt-1','kt-koin'].forEach(id=>{
+    document.getElementById(id).value='';
+  });
+  hitungKasTunai();
+}
+
+function renderKasTunaiRiwayat(){
+  const all=getKasTunai();
+  const wrap=document.getElementById('kt-riwayat-wrap');
+  if(!wrap)return;
+  const entries=Object.entries(all).sort((a,b)=>b[0].localeCompare(a[0]));
+  if(!entries.length){wrap.innerHTML='';return;}
+  wrap.innerHTML=`<div style="font-size:13px;font-weight:600;color:var(--text2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">Riwayat Rekap</div>
+  <table class="hist-table">
+    <thead><tr><th>Tanggal</th><th>Lembaran Besar</th><th>Pecahan</th><th>Total Tunai</th><th>Target Kas</th><th>Status</th><th>Aksi</th></tr></thead>
+    <tbody>`+entries.map(([tgl,d])=>{
+      const status=d.selisih===0?'✅ Balance':d.selisih>0?'🔼 Over +'+fmt(d.selisih):'🔽 Minus -'+fmt(Math.abs(d.selisih));
+      const color=d.selisih===0?'var(--green)':d.selisih>0?'var(--blue)':'var(--danger)';
+      return `<tr>
+        <td>${fmtTgl(tgl)}</td>
+        <td>${fmt((d.n100||0)+(d.n50||0))}</td>
+        <td>${fmt((d.n20||0)+(d.n10||0)+(d.n5||0)+(d.n2||0)+(d.n1||0)+(d.koin||0))}</td>
+        <td style="font-weight:600">${fmt(d.total||0)}</td>
+        <td>${fmt(d.target||0)}</td>
+        <td style="color:${color};font-weight:600">${status}</td>
+        <td><button class="btn" style="font-size:11px;padding:2px 7px" onclick="loadKasTunaiForDate('${tgl}');document.getElementById('kt-tanggal').value='${tgl}'">&#128065;</button></td>
+      </tr>`;
+    }).join('')+`</tbody></table>`;
+}
+
+function downloadKasTunaiExcel(){
+  const all=getKasTunai();
+  const entries=Object.entries(all).sort((a,b)=>b[0].localeCompare(a[0]));
+  if(!entries.length){alert('Belum ada rekap kas tunai.');return;}
+  const headers=['Tanggal','Rp100.000','Rp50.000','Rp20.000','Rp10.000','Rp5.000','Rp2.000','Rp1.000','Koin','Total Tunai','Target Kas','Selisih','Status'];
+  const rows=entries.map(([tgl,d])=>[
+    fmtTgl(tgl),d.n100||0,d.n50||0,d.n20||0,d.n10||0,d.n5||0,d.n2||0,d.n1||0,d.koin||0,
+    d.total||0,d.target||0,d.selisih||0,
+    d.selisih===0?'Balance':d.selisih>0?'Over':'Minus'
+  ]);
+  const wb=buildXlsx('Kas Tunai',headers,rows);
+  if(wb)saveXlsx(wb,'KasTunai_'+new Date().toLocaleDateString('id-ID').replace(/\//g,'-')+'.xlsx');
+}
+
 // ===================== ADMIN =====================
 function initAdmin(){
   const loggedIn=sessionStorage.getItem('ya_admin');
@@ -3934,6 +4160,7 @@ function switchTab(t){
   if(t==='modalAwal')initModalAwal();
   if(t==='pengeluaran')initPengeluaran();
   if(t==='pinjaman')initPinjaman();
+  if(t==='kasTunai')initKasTunai();
 }
 
 // TARIF GRID
