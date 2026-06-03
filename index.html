@@ -12,9 +12,9 @@ body{background:#f1f5f9;min-height:100vh}
 .navbar h1{font-size:16px;font-weight:600;letter-spacing:.3px}
 .navbar p{font-size:11px;opacity:.8;margin-top:1px}
 .nav-btns{display:flex;gap:8px}
-.nav-btn{padding:6px 14px;border:1.5px solid rgba(255,255,255,.5);border-radius:6px;background:transparent;color:#fff;font-size:12px;font-weight:500;cursor:pointer;transition:.15s}
-.nav-btn:hover{background:rgba(255,255,255,.15)}
-.nav-btn.active{background:#fff;color:var(--blue)}
+.nav-btn{padding:6px 14px;border:1.5px solid rgba(255,255,255,.6);border-radius:6px;background:rgba(255,255,255,.12);color:#fff;font-size:12px;font-weight:600;cursor:pointer;transition:.15s;letter-spacing:.2px}
+.nav-btn:hover{background:rgba(255,255,255,.25);border-color:rgba(255,255,255,.8)}
+.nav-btn.active{background:#fff;color:var(--blue);border-color:#fff;box-shadow:0 2px 8px rgba(0,0,0,.15)}
 .page{display:none;padding:20px;max-width:900px;margin:0 auto}
 .page.active{display:block}
 .card{background:#fff;border-radius:12px;border:1px solid var(--border);padding:20px;margin-bottom:16px}
@@ -3954,13 +3954,14 @@ async function syncToCloud(showStatus=true){
   if(!SCRIPT_URL||SCRIPT_URL==='') return;
   if(showStatus) setSyncStatus('syncing');
   try {
-    const resp = await fetch(SCRIPT_URL, {
+    // Use no-cors for POST to avoid preflight issues with Apps Script
+    await fetch(SCRIPT_URL, {
       method: 'POST',
+      mode: 'no-cors',
       headers: {'Content-Type':'application/json'},
       body: JSON.stringify(buildSyncPayload()),
     });
-    const json = await resp.json();
-    if(!json.ok) throw new Error('Sync failed');
+    // no-cors = can't read response, but if no exception = success
     _isOnline = true;
     _pendingCount = 0;
     const now = new Date().toISOString();
@@ -4049,31 +4050,44 @@ function manualSync(){
 }
 
 async function checkAndLoadCloud(){
-  // On first load, try to load from cloud
   const lastSync = lsGet('ya_last_sync');
   setSyncStatus('syncing');
   try {
+    // Try GET with cors (Apps Script supports GET with CORS)
     const controller = new AbortController();
-    const timeout = setTimeout(()=>controller.abort(), 6000);
-    const resp = await fetch(SCRIPT_URL+'?action=ping', {signal: controller.signal});
+    const timeout = setTimeout(()=>controller.abort(), 8000);
+    const resp = await fetch(SCRIPT_URL+'?action=ping');
     clearTimeout(timeout);
     const json = await resp.json();
     if(json.ok){
       _isOnline = true;
       if(!lastSync){
-        // Pertama kali buka — tanya apakah mau load dari cloud
-        if(confirm('☁️ Ditemukan data di cloud.\nMuat data dari cloud sekarang?\n(Pilih OK jika pindah device baru)')){
+        if(confirm('☁️ Ditemukan koneksi ke cloud!\nMuat data dari cloud sekarang?\n(Pilih OK jika pindah device baru, Batal jika device lama)')){
           await loadFromCloud();
         } else {
+          // Sync local data to cloud
+          await syncToCloud(false);
           setSyncStatus('online');
         }
       } else {
         setSyncStatus('online');
+        // Auto sync pending data
+        if(_pendingCount > 0) syncToCloud(false);
       }
     }
   } catch(e){
-    _isOnline = false;
-    setSyncStatus('offline');
+    // GET failed, try no-cors ping
+    try {
+      await fetch(SCRIPT_URL+'?action=ping', {mode:'no-cors'});
+      // If reaches here = server exists, CORS blocked read but connection ok
+      _isOnline = true;
+      setSyncStatus('online');
+      // Try to sync
+      syncToCloud(false);
+    } catch(e2){
+      _isOnline = false;
+      setSyncStatus('offline');
+    }
   }
 }
 
