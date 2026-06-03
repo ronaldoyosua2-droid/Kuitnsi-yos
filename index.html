@@ -12,9 +12,9 @@ body{background:#f1f5f9;min-height:100vh}
 .navbar h1{font-size:16px;font-weight:600;letter-spacing:.3px}
 .navbar p{font-size:11px;opacity:.8;margin-top:1px}
 .nav-btns{display:flex;gap:8px}
-.nav-btn{padding:6px 14px;border:1.5px solid rgba(255,255,255,.6);border-radius:6px;background:rgba(255,255,255,.12);color:#fff;font-size:12px;font-weight:600;cursor:pointer;transition:.15s;letter-spacing:.2px}
-.nav-btn:hover{background:rgba(255,255,255,.25);border-color:rgba(255,255,255,.8)}
-.nav-btn.active{background:#fff;color:var(--blue);border-color:#fff;box-shadow:0 2px 8px rgba(0,0,0,.15)}
+.nav-btn{padding:7px 16px;border:none;border-radius:6px;background:rgba(0,0,0,.25);color:#fff;font-size:12px;font-weight:600;cursor:pointer;transition:.15s}
+.nav-btn:hover{background:rgba(0,0,0,.4)}
+.nav-btn.active{background:#fff;color:#1a56a0;font-weight:700;box-shadow:0 2px 6px rgba(0,0,0,.2)}
 .page{display:none;padding:20px;max-width:900px;margin:0 auto}
 .page.active{display:block}
 .card{background:#fff;border-radius:12px;border:1px solid var(--border);padding:20px;margin-bottom:16px}
@@ -3982,13 +3982,16 @@ async function loadFromCloud(){
   if(!SCRIPT_URL) return false;
   setSyncStatus('syncing');
   try {
-    const resp = await fetch(SCRIPT_URL+'?action=load_all');
+    const resp = await Promise.race([
+      fetch(SCRIPT_URL+'?action=load_all'),
+      new Promise((_,r)=>setTimeout(()=>r(new Error('timeout')),10000))
+    ]);
+    if(!resp.ok) throw new Error('HTTP '+resp.status);
     const json = await resp.json();
-    if(!json.ok||!json.data) throw new Error('No data');
+    if(!json.ok||!json.data) throw new Error('No data in response');
     const d = json.data;
-    // Only overwrite if cloud has data
-    if(d.riwayat)     setRiwayat(d.riwayat);
-    if(d.siswa)       setSiswa(d.siswa);
+    if(d.riwayat)     lsSet('ya_riwayat', d.riwayat);
+    if(d.siswa)       lsSet('ya_siswa', d.siswa);
     if(d.tarif){
       if(d.tarif.spp)    setSPP(d.tarif.spp);
       if(d.tarif.pgm)    setPGM(d.tarif.pgm);
@@ -3996,15 +3999,22 @@ async function loadFromCloud(){
       if(d.tarif.diskon) setDiskon(d.tarif.diskon);
     }
     if(d.kasHarian)   lsSet('ya_kas_awal_harian', d.kasHarian);
-    if(d.pengeluaran) setPengeluaran(d.pengeluaran);
-    if(d.pinjaman)    setPinjaman(d.pinjaman);
+    if(d.pengeluaran) lsSet('ya_pengeluaran', d.pengeluaran);
+    if(d.pinjaman)    lsSet('ya_pinjaman', d.pinjaman);
     _isOnline = true;
-    lsSet('ya_last_sync', new Date().toISOString());
+    const now = new Date().toISOString();
+    lsSet('ya_last_sync', now);
+    const lsEl = document.getElementById('last-sync-label');
+    if(lsEl) lsEl.textContent = 'Terakhir sync: '+new Date(now).toLocaleString('id-ID');
     setSyncStatus('online');
     return true;
   } catch(err) {
+    console.error('Load from cloud error:', err.message);
     _isOnline = false;
     setSyncStatus('offline');
+    alert('❌ Gagal muat dari cloud: '+err.message+'
+
+Pastikan Apps Script sudah di-deploy dengan akses "Anyone".');
     return false;
   }
 }
@@ -4052,42 +4062,44 @@ function manualSync(){
 async function checkAndLoadCloud(){
   const lastSync = lsGet('ya_last_sync');
   setSyncStatus('syncing');
+  // Try multiple methods to connect
+  let connected = false;
+
+  // Method 1: Normal fetch GET (works if CORS ok)
   try {
-    // Try GET with cors (Apps Script supports GET with CORS)
-    const controller = new AbortController();
-    const timeout = setTimeout(()=>controller.abort(), 8000);
-    const resp = await fetch(SCRIPT_URL+'?action=ping');
-    clearTimeout(timeout);
+    const resp = await Promise.race([
+      fetch(SCRIPT_URL+'?action=ping'),
+      new Promise((_,r)=>setTimeout(()=>r(new Error('timeout')),8000))
+    ]);
     const json = await resp.json();
-    if(json.ok){
-      _isOnline = true;
-      if(!lastSync){
-        if(confirm('☁️ Ditemukan koneksi ke cloud!\nMuat data dari cloud sekarang?\n(Pilih OK jika pindah device baru, Batal jika device lama)')){
-          await loadFromCloud();
-        } else {
-          // Sync local data to cloud
-          await syncToCloud(false);
-          setSyncStatus('online');
-        }
-      } else {
-        setSyncStatus('online');
-        // Auto sync pending data
-        if(_pendingCount > 0) syncToCloud(false);
-      }
-    }
-  } catch(e){
-    // GET failed, try no-cors ping
+    if(json.ok) connected = true;
+  } catch(e1){ console.log('Method 1 failed:', e1.message); }
+
+  // Method 2: no-cors fallback
+  if(!connected){
     try {
       await fetch(SCRIPT_URL+'?action=ping', {mode:'no-cors'});
-      // If reaches here = server exists, CORS blocked read but connection ok
-      _isOnline = true;
+      connected = true; // no-cors = can't read but connection made
+    } catch(e2){ console.log('Method 2 failed:', e2.message); }
+  }
+
+  if(connected){
+    _isOnline = true;
+    if(!lastSync){
+      if(confirm('☁️ Terhubung ke cloud!\nMuat data dari cloud?\n(OK = ambil data cloud, Batal = simpan data lokal ke cloud)')){
+        await loadFromCloud();
+      } else {
+        syncToCloud(false);
+        setSyncStatus('online');
+      }
+    } else {
       setSyncStatus('online');
-      // Try to sync
-      syncToCloud(false);
-    } catch(e2){
-      _isOnline = false;
-      setSyncStatus('offline');
+      if(_pendingCount > 0) syncToCloud(false);
     }
+  } else {
+    _isOnline = false;
+    setSyncStatus('offline');
+    console.log('Could not connect to cloud');
   }
 }
 
