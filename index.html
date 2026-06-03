@@ -2557,9 +2557,7 @@ async function loadFromCloud(){
     console.error('Load from cloud error:', err.message);
     _isOnline = false;
     setSyncStatus('offline');
-    alert('❌ Gagal muat dari cloud: '+err.message+'
-
-Pastikan Apps Script sudah di-deploy dengan akses "Anyone".');
+    alert('Gagal muat dari cloud: '+err.message);
     return false;
   }
 }
