@@ -24,6 +24,8 @@ body{background:#f1f5f9;min-height:100vh}
 .field{margin-bottom:13px}
 label{display:block;font-size:12px;font-weight:500;color:var(--text2);margin-bottom:4px}
 input[type=text],input[type=date],input[type=number],input[type=password],select{width:100%;padding:8px 11px;font-size:14px;border:1px solid var(--border);border-radius:7px;outline:none;background:#fff;color:var(--text);transition:.15s}
+input[type=number]{-moz-appearance:textfield}
+input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 input:focus,select:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(26,86,160,.1)}
 input[readonly]{background:var(--gray-light);color:var(--gray)}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
@@ -2597,8 +2599,7 @@ function confirmLoadCloud(){
   if(confirm('⚠️ Muat data dari cloud akan MENGGANTI data lokal saat ini.\nLanjutkan?')){
     loadFromCloud().then(ok=>{
       if(ok){
-        alert('✅ Data berhasil dimuat dari cloud! Halaman akan direfresh.');
-        location.reload();
+        alert('✅ Data berhasil dimuat dari cloud!');
       } else {
         alert('❌ Gagal memuat dari cloud. Pastikan terhubung internet.');
       }
@@ -2618,28 +2619,17 @@ function manualSync(){
 }
 
 async function checkAndLoadCloud(){
-  const lastSync = lsGet('ya_last_sync');
   setSyncStatus('syncing');
   let connected = false;
   try {
-    // JSONP ping — bypass CORS sepenuhnya
     const result = await jsonpFetch(SCRIPT_URL+'?action=ping', 8000);
     if(result && result.ok) connected = true;
-  } catch(e){ console.log('JSONP ping failed:', e.message); }
+  } catch(e){ console.log('Ping failed:', e.message); }
 
   if(connected){
     _isOnline = true;
-    if(!lastSync){
-      if(confirm('☁️ Terhubung ke cloud!\nMuat data dari cloud?\n(OK = ambil data cloud, Batal = simpan data lokal ke cloud)')){
-        await loadFromCloud();
-      } else {
-        syncToCloud(false);
-        setSyncStatus('online');
-      }
-    } else {
-      setSyncStatus('online');
-      if(_pendingCount > 0) syncToCloud(false);
-    }
+    // Always load from cloud on startup — keeps all devices in sync
+    await loadFromCloud();
   } else {
     _isOnline = false;
     setSyncStatus('offline');
@@ -2660,6 +2650,13 @@ window.addEventListener('DOMContentLoaded',function(){
     const syncBtn = document.getElementById('sync-btn');
     if(syncBtn) syncBtn.addEventListener('click', doManualSync);
   }, 500);
+  // Prevent scroll wheel from changing number input values
+  document.addEventListener('wheel', function(){
+    if(document.activeElement && document.activeElement.type==='number'){
+      document.activeElement.blur();
+    }
+  }, {passive:true});
+
   document.getElementById('sb-tanggal').value=today();
   document.getElementById('sp-tanggal').value=today();
   renderSpItems();
