@@ -2430,8 +2430,8 @@ window.addEventListener('DOMContentLoaded',function(){
   const ls=lsGet('ya_last_sync');
   const lsEl=document.getElementById('last-sync-label');
   if(ls&&lsEl) lsEl.textContent='Terakhir sync: '+new Date(ls).toLocaleString('id-ID');
-  // Check cloud connection
-  checkAndLoadCloud();
+  // Check cloud connection — delay so all functions are defined first
+  setTimeout(()=>{ if(typeof checkAndLoadCloud==='function') checkAndLoadCloud(); }, 500);
   document.getElementById('sb-tanggal').value=today();
   document.getElementById('sp-tanggal').value=today();
   renderSpItems();
