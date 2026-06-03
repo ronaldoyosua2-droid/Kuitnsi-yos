@@ -138,10 +138,15 @@ input[readonly]{background:var(--gray-light);color:var(--gray)}
 </head>
 <body>
 
+<script>
+// Safe wrappers defined early to avoid "not defined" errors
+function doManualSync(){ if(typeof manualSync==='function') manualSync(); }
+function doConfirmLoadCloud(){ if(typeof confirmLoadCloud==='function') confirmLoadCloud(); }
+</script>
 <div class="navbar">
   <div style="display:flex;align-items:center;gap:10px">
     <h1>&#127979; Sekolah Swasta Yos Anugerah</h1>
-    <div id="sync-indicator" title="Status sinkronisasi" style="display:flex;align-items:center;gap:5px;font-size:11px;padding:3px 10px;border-radius:20px;background:rgba(255,255,255,.15);cursor:pointer" onclick="if(typeof manualSync!=='undefined')manualSync()">
+    <div id="sync-indicator" title="Status sinkronisasi" style="display:flex;align-items:center;gap:5px;font-size:11px;padding:3px 10px;border-radius:20px;background:rgba(255,255,255,.15);cursor:pointer" onclick="doManualSync()">
       <span id="sync-dot" style="width:8px;height:8px;border-radius:50%;background:#9ca3af;display:inline-block"></span>
       <span id="sync-label">Offline</span>
     </div>
@@ -1043,8 +1048,8 @@ input[readonly]{background:var(--gray-light);color:var(--gray)}
 
     <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;flex-wrap:wrap;gap:8px">
       <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button class="btn btn-primary" style="font-size:12px" onclick="if(typeof manualSync!=='undefined')manualSync()">&#9729; Sync ke Cloud</button>
-        <button class="btn" style="font-size:12px" onclick="confirmLoadCloud()">&#8681; Muat dari Cloud</button>
+        <button class="btn btn-primary" style="font-size:12px" onclick="doManualSync()">&#9729; Sync ke Cloud</button>
+        <button class="btn" style="font-size:12px" onclick="doConfirmLoadCloud()">&#8681; Muat dari Cloud</button>
         <span id="last-sync-label" style="font-size:11px;color:var(--text2);align-self:center"></span>
       </div>
       <button class="btn btn-danger" style="font-size:12px" onclick="logoutAdmin()">&#128274; Keluar Admin</button>
@@ -2636,7 +2641,12 @@ window.addEventListener('DOMContentLoaded',function(){
   const lsEl=document.getElementById('last-sync-label');
   if(ls&&lsEl) lsEl.textContent='Terakhir sync: '+new Date(ls).toLocaleString('id-ID');
   // Check cloud connection — delay so all functions are defined first
-  setTimeout(()=>{ if(typeof checkAndLoadCloud==='function') checkAndLoadCloud(); }, 500);
+  setTimeout(()=>{
+    if(typeof checkAndLoadCloud==='function') checkAndLoadCloud();
+    // Attach sync button click
+    const syncBtn = document.getElementById('sync-btn');
+    if(syncBtn) syncBtn.addEventListener('click', doManualSync);
+  }, 500);
   document.getElementById('sb-tanggal').value=today();
   document.getElementById('sp-tanggal').value=today();
   renderSpItems();
