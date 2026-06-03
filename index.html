@@ -2567,7 +2567,7 @@ function triggerAutoSync(){
   _pendingCount++;
   setSyncStatus('pending');
   clearTimeout(_syncTimer);
-  _syncTimer = setTimeout(()=>syncToCloud(true), 30000);
+  _syncTimer = setTimeout(()=>syncToCloud(true), 5000);
 }
 
 // Intercept all setRiwayat etc to trigger sync
