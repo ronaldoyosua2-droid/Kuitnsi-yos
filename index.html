@@ -9,14 +9,15 @@
 :root{--blue:#1a56a0;--blue-light:#e8f0fb;--green:#15803d;--green-light:#dcfce7;--orange:#c2410c;--orange-light:#fff7ed;--gray:#6b7280;--gray-light:#f3f4f6;--border:#d1d5db;--white:#fff;--text:#111827;--text2:#6b7280;--danger:#dc2626;--danger-light:#fee2e2}
 body{background:#f1f5f9;min-height:100vh}
 .page-tabs{background:#fff;border-bottom:1px solid var(--border);padding:0 20px;position:sticky;top:57px;z-index:99;box-shadow:0 1px 4px rgba(0,0,0,.06)}
-.navbar{background:var(--blue);color:#fff;padding:14px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.2)}
+.navbar{background:var(--blue);color:#fff;padding:12px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.2)}
+.navbar-top{display:flex;align-items:center;justify-content:space-between;width:100%}
 .navbar h1{font-size:16px;font-weight:600;letter-spacing:.3px}
 .navbar p{font-size:11px;opacity:.8;margin-top:1px}
-.nav-btns{display:flex;gap:8px}
-.nav-btn{padding:7px 16px;border:none;border-radius:6px;background:rgba(0,0,0,.25);color:#fff;font-size:12px;font-weight:600;cursor:pointer;transition:.15s}
-.nav-btn:hover{background:rgba(0,0,0,.4)}
-.nav-btn.active{background:#fff;color:#1a56a0;font-weight:700;box-shadow:0 2px 6px rgba(0,0,0,.2)}
-.page{display:none;padding:24px 20px;max-width:900px;margin:0 auto}
+.nav-btns{display:flex;gap:4px;align-items:center;background:rgba(255,255,255,.15);padding:4px;border-radius:10px}
+.nav-btn{padding:7px 16px;border:none;border-radius:7px;background:rgba(0,0,0,.3);color:#fff;font-size:12px;font-weight:700;cursor:pointer;transition:.15s}
+.nav-btn:hover{background:rgba(0,0,0,.5);color:#fff}
+.nav-btn.active{background:#fff;color:#1a56a0;font-weight:700;box-shadow:0 1px 4px rgba(0,0,0,.2)}
+.page{display:none;padding:28px 20px;max-width:900px;margin:0 auto}
 .page.active{display:block}
 .card{background:#fff;border-radius:12px;border:1px solid var(--border);padding:20px;margin-bottom:16px}
 .card-title{font-size:13px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:14px;display:flex;align-items:center;gap:6px}
@@ -220,7 +221,19 @@ function doConfirmLoadCloud(){ if(typeof confirmLoadCloud==='function') confirmL
   <div id="multi-preview" style="display:none">
     <div class="card" style="margin-bottom:8px">
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
-        <div style="font-size:14px;font-weight:600" id="multi-preview-label"></div>
+        <div>
+          <div style="font-size:14px;font-weight:600" id="multi-preview-label"></div>
+          <div style="display:flex;gap:8px;margin-top:6px">
+            <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer">
+              <input type="radio" name="kw-mode" value="pisah" checked onchange="toggleKwitansiMode(this.value)" style="accent-color:var(--blue)">
+              Kwitansi terpisah per siswa
+            </label>
+            <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer">
+              <input type="radio" name="kw-mode" value="gabung" onchange="toggleKwitansiMode(this.value)" style="accent-color:var(--blue)">
+              1 kwitansi gabungan
+            </label>
+          </div>
+        </div>
         <div class="btn-row" style="margin:0">
           <button class="btn btn-primary" onclick="printKwitansi('portrait')">&#128438; Cetak HVS</button>
           <button class="btn btn-primary" onclick="printKwitansi('landscape')">&#128438; Cetak NCR</button>
@@ -1202,6 +1215,9 @@ let _acTarget = null; // which input is active for autocomplete
 // ---- SISWA FORM ----
 function tambahSiswaForm(){
   siswaList.push({nama:'', kelas:''});  // kelas boleh kosong
+  // Update selectedSiswa for all existing items to include new siswa
+  const newIdx = siswaList.length-1;
+  itemList.forEach(it=>{ if(it.selectedSiswa) it.selectedSiswa.push(newIdx); });
   renderSiswaForms();
   setTimeout(()=>{
     const inputs = document.querySelectorAll('.sf-nama');
@@ -1211,7 +1227,16 @@ function tambahSiswaForm(){
 
 function hapusSiswaRow(i){
   siswaList.splice(i,1);
+  // Remove from selectedSiswa and reindex
+  itemList.forEach(it=>{
+    if(it.selectedSiswa){
+      it.selectedSiswa=it.selectedSiswa
+        .filter(s=>s!==i)
+        .map(s=>s>i?s-1:s);
+    }
+  });
   renderSiswaForms();
+  renderItemForms();
 }
 
 function renderSiswaForms(){
@@ -1365,12 +1390,70 @@ function renderItemForms(){
         <div class="dropdown" id="if-dd-${i}"></div>
       </div>`;
 
+    // Build per-siswa checkbox selector for SPP
+    let perSiswaBreakdown = '';
+    if(siswaList.length > 0 && siswaList.some(s=>s.nama.trim()) && !isSPPKustom){
+      const spp=getSPP();
+      // Get selected siswa for this item (default: all selected)
+      if(!it.selectedSiswa) it.selectedSiswa = siswaList.map((_,si)=>si);
+      const rows=siswaList.map((s,si)=>{
+        let nom=0;
+        if(isSPP) nom=s.kelas?getSppNominal(s.kelas,spp):0;
+        else if(it.tipe==='Pengembangan') nom=s.kelas?getPgmNominal(s.kelas,getPGM()):0;
+        else if(isCustom){
+          // Custom: use perSiswaNominal if set, else customNominal
+          nom=(it.perSiswaNominal&&it.perSiswaNominal[si]!==undefined)?parseInt(it.perSiswaNominal[si])||0:(it.customNominal||0);
+        } else {
+          nom=it.nominal||0;
+        }
+        const subtotalSiswa=nom*(it.qty||1);
+        const isSelected=it.selectedSiswa.includes(si);
+        const qtyLabel=(it.qty||1)>1?` × ${it.qty||1} bulan`:'';
+        const nomLabel=nom>0?`${fmt(nom)}${qtyLabel}`:'—';
+        return `<label style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;border-bottom:1px solid rgba(255,255,255,.3);cursor:pointer;background:${isSelected?'':'rgba(0,0,0,.03)'}">
+          <div style="display:flex;align-items:center;gap:8px">
+            <input type="checkbox" ${isSelected?'checked':''} 
+              onchange="onItemSiswaCheck(${i},${si},this.checked)"
+              style="width:15px;height:15px;cursor:pointer;accent-color:var(--blue)">
+            <div>
+              <span style="font-weight:600;font-size:13px;color:${isSelected?'var(--text)':'var(--text2)'}">${s.nama||'—'}</span>
+              <span style="font-size:11px;color:var(--text2);margin-left:6px">${s.kelas||''}</span>
+              ${isSelected&&nom>0?`<span style="font-size:11px;color:var(--text2);margin-left:4px">(${nomLabel})</span>`:''}
+            </div>
+          </div>
+          <span style="font-weight:700;color:${isSelected?'var(--blue)':'var(--text2)'};font-size:13px">${isSelected&&nom>0?fmt(subtotalSiswa):'—'}</span>
+        </label>`;
+      }).join('');
+      const totalSelected=siswaList.reduce((a,s,si)=>{
+        if(!it.selectedSiswa.includes(si)) return a;
+        let nom=0;
+        if(isSPP) nom=s.kelas?getSppNominal(s.kelas,spp):0;
+        else if(it.tipe==='Pengembangan') nom=s.kelas?getPgmNominal(s.kelas,getPGM()):0;
+        else if(isCustom){
+          nom=(it.perSiswaNominal&&it.perSiswaNominal[si]!==undefined)?parseInt(it.perSiswaNominal[si])||0:(it.customNominal||0);
+        } else nom=it.nominal||0;
+        return a+nom*(it.qty||1);
+      },0);
+      perSiswaBreakdown=`<div style="background:var(--blue-light);border-radius:7px;margin-bottom:8px;overflow:hidden;border:1px solid #93c5fd">
+        <div style="font-size:11px;font-weight:700;color:var(--blue);padding:6px 8px;background:rgba(26,86,160,.1);border-bottom:1px solid #93c5fd;display:flex;justify-content:space-between">
+          <span>✅ Pilih siswa yang bayar item ini</span>
+          <span>${it.selectedSiswa.length}/${siswaList.length} siswa</span>
+        </div>
+        ${rows}
+        <div style="display:flex;justify-content:space-between;padding:6px 8px;font-size:12px;font-weight:700;color:var(--blue);border-top:2px solid #93c5fd;background:rgba(26,86,160,.08)">
+          <span>Total (${it.selectedSiswa.length} siswa)</span>
+          <span>${fmt(totalSelected)}</span>
+        </div>
+      </div>`;
+    }
+    const multiSiswaWarning = '';
     return `
     <div style="background:var(--gray-light);border-radius:8px;padding:12px;margin-bottom:10px;border:1px solid var(--border)">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
         <span style="font-size:12px;font-weight:600;color:var(--text2)">ITEM ${i+1}</span>
         <button class="btn btn-danger" style="padding:3px 9px;font-size:12px" onclick="hapusItemRow(${i})">&#10005; Hapus</button>
       </div>
+      ${perSiswaBreakdown}
       <div class="row2" style="margin-bottom:0">
         <div class="field" style="margin-bottom:8px">
           <label>Jenis</label>
@@ -1384,6 +1467,59 @@ function renderItemForms(){
         </div>
         <div style="margin-bottom:8px">${keteranganField}</div>
       </div>
+      ${isSPP&&siswaList.length>1&&!isSPPKustom?`
+      <div class="row2" style="margin-bottom:8px">
+        <div class="field" style="margin-bottom:0">
+          <label>Qty (Bulan)</label>
+          <input type="number" min="1" value="${qty}"
+            oninput="onItemQty(${i},this.value)"
+            readonly style="width:100%;padding:8px;font-size:13px;border:1px solid var(--border);border-radius:7px;background:var(--gray-light)">
+        </div>
+        <div class="field" style="margin-bottom:0">
+          <label>Kas Diterima (Rp) <span style="font-size:10px;color:var(--text2)">— kosongkan jika lunas semua</span></label>
+          <input type="number" placeholder="Full (total semua siswa)" value="${it.kasInput||''}"
+            oninput="onItemKas(${i},this.value)"
+            style="width:100%;padding:8px;font-size:13px;border:1px solid var(--border);border-radius:7px;outline:none">
+        </div>
+      </div>
+      `:(isCustom||it.tipe==='Pengembangan')&&siswaList.length>1?`
+      <div style="background:var(--orange-light);border-radius:7px;margin-bottom:8px;overflow:hidden;border:1px solid #fed7aa">
+        <div style="font-size:11px;font-weight:700;color:var(--orange);padding:6px 8px;background:rgba(194,65,12,.08);border-bottom:1px solid #fed7aa;display:flex;justify-content:space-between">
+          <span>💰 Nominal per Siswa</span>
+          <span style="font-weight:400">ketik nominal masing-masing</span>
+        </div>
+        ${siswaList.map((s,si)=>{
+          if(!it.selectedSiswa||it.selectedSiswa.includes(si)){
+            if(!it.perSiswaNominal) it.perSiswaNominal={};
+            // For Pengembangan: use fixed nominal per kelas
+            let nomFixed=0;
+            if(it.tipe==='Pengembangan') nomFixed=s.kelas?getPgmNominal(s.kelas,getPGM()):0;
+            const nomSiswa=it.perSiswaNominal[si]||'';
+            return `<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-bottom:1px solid #fed7aa">
+              <div style="flex:1">
+                <span style="font-weight:600;font-size:13px">${s.nama||'—'}</span>
+                <span style="font-size:11px;color:var(--text2);margin-left:6px">${s.kelas||''}</span>
+              </div>
+              ${it.tipe==='Pengembangan'
+                ? `<span style="font-weight:700;font-size:13px;color:var(--orange)">${nomFixed>0?fmt(nomFixed):'Gratis'}</span>`
+                : `<div style="display:flex;align-items:center;gap:6px">
+                    <span style="font-size:11px;color:var(--text2)">Rp</span>
+                    <input type="number" placeholder="0" value="${nomSiswa}"
+                      oninput="onItemPerSiswaNominal(${i},${si},this.value)"
+                      style="width:130px;padding:6px 8px;font-size:13px;font-weight:600;border:1.5px solid #fed7aa;border-radius:6px;outline:none;text-align:right;color:var(--orange)">
+                  </div>`
+              }
+            </div>`;
+          } return '';
+        }).join('')}
+        <div style="display:flex;justify-content:space-between;padding:6px 8px;font-size:12px;font-weight:700;color:var(--orange);border-top:2px solid #fed7aa;background:rgba(194,65,12,.08)">
+          <span>Total (${it.selectedSiswa?it.selectedSiswa.length:siswaList.length} siswa)</span>
+          <span>${fmt(it.tipe==='Pengembangan'
+            ? siswaList.filter((_,si)=>!it.selectedSiswa||it.selectedSiswa.includes(si)).reduce((a,s)=>a+(s.kelas?getPgmNominal(s.kelas,getPGM()):0),0)
+            : Object.values(it.perSiswaNominal||{}).reduce((a,v)=>a+(parseInt(v)||0),0))}</span>
+        </div>
+      </div>
+      `:`
       <div class="row3" style="margin-bottom:8px">
         <div class="field" style="margin-bottom:0">
           <label>${isSPPKustom?'Tarif Standar / Bulan':'Nominal / Bulan'}</label>
@@ -1391,7 +1527,7 @@ function renderItemForms(){
             ? `<input type="number" placeholder="Masukkan nominal..." value="${it.customNominal||''}"
                 oninput="onItemCustomNominal(${i},this.value)"
                 style="width:100%;padding:8px;font-size:13px;border:1px solid var(--border);border-radius:7px;outline:none">`
-            : `<div style="padding:8px;font-size:13px;font-weight:600;color:${it.nominal>0?'var(--green)':'var(--gray)'};background:#fff;border:1px solid var(--border);border-radius:7px">
+            : `<div style="padding:8px;font-size:13px;font-weight:600;background:#fff;border:1px solid var(--border);border-radius:7px;color:var(--green)">
                 ${it.nominal>0?fmt(it.nominal):'—'}
                 ${isSPPKustom&&it.nominal>0?`<span style="font-size:10px;color:var(--text2);font-weight:400;display:block">Standar: ${fmt(it.nominal*qty)}</span>`:''}
               </div>`
@@ -1430,6 +1566,7 @@ function renderItemForms(){
         </div>
       </div>`}
       ${it.diskonPct>0?`<div style="margin-top:6px;font-size:11px;color:var(--orange);font-weight:500">↳ Diskon ${it.diskonPct}% (-${fmt(it.diskonAmt)})</div>`:''}
+      `}
     </div>`;
   }).join('');
 }
@@ -1443,6 +1580,45 @@ function onSppBulanDari(i, val){
 function onSppBulanSampai(i, val){
   itemList[i].sppSampai = val===''?undefined:parseInt(val);
   updateSppRange(i);
+}
+
+function onItemPerSiswaNominal(itemIdx, siswaIdx, val){
+  if(!itemList[itemIdx].perSiswaNominal) itemList[itemIdx].perSiswaNominal={};
+  itemList[itemIdx].perSiswaNominal[siswaIdx] = parseInt(val)||0;
+  // Update total display without re-render
+  const totalPerSiswa = Object.values(itemList[itemIdx].perSiswaNominal).reduce((a,v)=>a+(parseInt(v)||0),0);
+  // Find total display in this item's section and update
+  const allItems = document.querySelectorAll('#item-list-form > div');
+  if(allItems[itemIdx]){
+    const totEls = allItems[itemIdx].querySelectorAll('[style*="border-top:2px solid #fed7aa"] span:last-child');
+    if(totEls.length) totEls[0].textContent = fmt(totalPerSiswa);
+  }
+}
+
+function onItemSiswaCheck(itemIdx, siswaIdx, checked){
+  if(!itemList[itemIdx].selectedSiswa) itemList[itemIdx].selectedSiswa=siswaList.map((_,si)=>si);
+  if(checked){
+    if(!itemList[itemIdx].selectedSiswa.includes(siswaIdx))
+      itemList[itemIdx].selectedSiswa.push(siswaIdx);
+  } else {
+    itemList[itemIdx].selectedSiswa=itemList[itemIdx].selectedSiswa.filter(s=>s!==siswaIdx);
+  }
+  renderItemForms();
+}
+
+function checkItemDuplicateSpp(i){
+  if(!itemList[i]||!itemList[i].label) return;
+  const label=itemList[i].label;
+  const dupe=itemList.findIndex((it,idx)=>idx!==i&&it.label===label&&it.tipe==='SPP');
+  if(dupe>=0){
+    // Show warning
+    const al=document.getElementById('alert-form');
+    al.textContent=`⚠️ Item #${i+1} dan Item #${dupe+1} sama-sama "${label}". Hapus salah satu!`;
+    al.classList.add('show');
+  } else {
+    const al=document.getElementById('alert-form');
+    if(al.textContent.includes('sama-sama')) al.classList.remove('show');
+  }
 }
 
 function updateSppRange(i){
@@ -1510,6 +1686,8 @@ function onItemTipeChange(i, tipe){
   itemList[i].sppKustomNominal = 0;
   itemList[i].sppDari = undefined;
   itemList[i].sppSampai = undefined;
+  itemList[i].selectedSiswa = siswaList.map((_,si)=>si); // reset: all selected
+  itemList[i].perSiswaNominal = {}; // reset per-siswa nominal
   renderItemForms();
   // Show/hide nama+kelas wajib hint
   const adaWajib = itemList.some(it=>it.tipe==='SPP'||it.tipe==='Pengembangan'||it.tipe==='Pendaftaran');
@@ -2814,12 +2992,28 @@ function buatKwitansi(){
   }
   // Validate items
   if(!itemList.length){ al.textContent='Tambahkan minimal 1 item pembayaran.'; al.classList.add('show'); return; }
+  // Cek duplikat dalam itemList sendiri (item yang sama tidak boleh dobel)
+  const itemLabels=[];
   for(let i=0;i<itemList.length;i++){
     if(!itemList[i].tipe){ al.textContent=`Jenis item #${i+1} belum dipilih.`; al.classList.add('show'); return; }
     if(!itemList[i].label.trim()){ al.textContent=`Keterangan item #${i+1} belum diisi.`; al.classList.add('show'); return; }
     const isCustom=itemList[i].tipe==='Pendaftaran'||itemList[i].tipe==='Lainnya';
-    if(isCustom && !itemList[i].customNominal){ al.textContent=`Nominal item #${i+1} belum diisi.`; al.classList.add('show'); return; }
-    // Cek duplikat per siswa
+    if(isCustom){
+      // Check perSiswaNominal first (multi-siswa), then customNominal (single)
+      const hasPerSiswa = itemList[i].perSiswaNominal &&
+        Object.values(itemList[i].perSiswaNominal).some(v=>parseInt(v)>0);
+      if(!hasPerSiswa && !itemList[i].customNominal){
+        al.textContent=`Nominal item #${i+1} belum diisi.`; al.classList.add('show'); return;
+      }
+    }
+    // Cek item dobel dalam list yang sama
+    const itemKey=itemList[i].tipe+'|'+itemList[i].label;
+    if(itemLabels.includes(itemKey)){
+      al.textContent=`⛔ Item #${i+1} "${itemList[i].label}" sudah ada di daftar pembayaran ini! Hapus salah satunya.`;
+      al.classList.add('show'); return;
+    }
+    itemLabels.push(itemKey);
+    // Cek duplikat per siswa (sudah lunas sebelumnya)
     for(let si=0;si<siswaList.length;si++){
       const dup=cekDuplikat(siswaList[si].nama, itemList[i].tipe, itemList[i].label);
       if(dup){ al.textContent=`⛔ ${siswaList[si].nama}: "${itemList[i].label}" sudah LUNAS dibayar (No. ${dup.no}). Pembayaran ditolak.`; al.classList.add('show'); return; }
@@ -2838,15 +3032,29 @@ function buatKwitansi(){
   const htmlParts = [];
 
   siswaList.forEach((siswa,si)=>{
-    // Build items for this siswa (re-calc nominal per kelas)
-    const recItems = itemList.map(it=>{
+    // Skip siswa if not selected for any item
+    const hasAnyItem = itemList.some(it=>{
+      if(!it.selectedSiswa) return true; // default: all selected
+      return it.selectedSiswa.includes(si);
+    });
+    if(!hasAnyItem) return; // skip this siswa entirely
+
+    // Build items for this siswa (only items where this siswa is selected)
+    const recItems = itemList.filter(it=>{
+      if(!it.selectedSiswa) return true;
+      return it.selectedSiswa.includes(si);
+    }).map(it=>{
       let nom = it.nominal;
       let dPct = it.diskonPct||0, dAmt = it.diskonAmt||0;
       const qty = it.qty||1;
       if(!it.isCustom){
         const spp=getSPP(), pgm=getPGM(), daftar=getDaftar(), diskon=getDiskon();
         if(it.tipe==='SPP') nom=getSppNominal(siswa.kelas,spp);
-        else if(it.tipe==='Pengembangan') nom=getPgmNominal(siswa.kelas,pgm);
+        else if(it.tipe==='Pengembangan'){
+          // Check if only selected siswa
+          if(it.selectedSiswa&&!it.selectedSiswa.includes(si)) nom=0;
+          else nom=getPgmNominal(siswa.kelas,pgm);
+        }
         else if(it.tipe==='Pendaftaran'){
           const j=JENJANG_MAP[siswa.kelas]||'SD';
           nom=daftar[j]||0;
@@ -2855,7 +3063,12 @@ function buatKwitansi(){
           if(dPct>0){dAmt=Math.round(nom*dPct/100);nom=nom-dAmt;}
         }
       } else {
-        nom=it.customNominal||0;
+        // Check per-siswa nominal first
+        if(it.perSiswaNominal&&it.perSiswaNominal[si]!==undefined){
+          nom = parseInt(it.perSiswaNominal[si])||0;
+        } else {
+          nom=it.customNominal||0;
+        }
       }
       // SPP Kustom: no sisa, nominal per bulan × qty
       if(it.tipe==='SPP'&&it.sppKustom){
@@ -2893,13 +3106,105 @@ function buatKwitansi(){
   // Save all to riwayat
   newRecs.forEach(r=>rw.unshift(r));
   setRiwayat(rw);
+  window._lastNewRecs = newRecs;
 
   // Show multi preview
   document.getElementById('multi-preview-label').textContent =
-    siswaList.length+' kwitansi dibuat · '+itemList.length+' jenis pembayaran';
+    siswaList.length+' kwitansi · '+itemList.length+' jenis pembayaran';
+  // Reset to pisah mode
+  document.querySelectorAll('input[name="kw-mode"]').forEach(r=>r.checked=r.value==='pisah');
   document.getElementById('kwitansi-pages').innerHTML = htmlParts.join('');
   document.getElementById('multi-preview').style.display='block';
   document.getElementById('multi-preview').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function toggleKwitansiMode(mode){
+  const pagesEl = document.getElementById('kwitansi-pages');
+  if(!pagesEl || !window._lastNewRecs) return;
+  const logoHTML = getLogoHTML(56);
+  const namaSekolah = 'Sekolah Swasta Yos Anugerah';
+  const alamat = 'kmp. Durian Blok B no.36, Kel.Sadai, Kec.Bengkong, Batam';
+  const telp = '81372928540';
+
+  if(mode === 'pisah'){
+    pagesEl.innerHTML = window._lastNewRecs.map(rec=>buildKwitansiHTML(rec,logoHTML,namaSekolah,alamat,telp)).join('');
+  } else {
+    // Build 1 gabungan kwitansi
+    pagesEl.innerHTML = buildGabunganKwitansi(window._lastNewRecs, logoHTML, namaSekolah, alamat, telp);
+  }
+}
+
+function buildGabunganKwitansi(recs, logoHTML, namaSekolah, alamat, telepon){
+  if(!recs||!recs.length) return '';
+  const tglFmtStr = recs[0].tglFmt;
+  const waktu = recs[0].waktu;
+  const noGab = recs.map(r=>r.no).join(' / ');
+  const totalDibayar = recs.reduce((a,r)=>a+r.totalDibayar,0);
+  const totalSisa = recs.reduce((a,r)=>a+r.totalSisa,0);
+
+  // Build rows per siswa
+  const siswaRows = recs.map(rec=>`
+    <tr style="background:#f0f7ff">
+      <td colspan="4" style="padding:6px 4px;font-size:13px;font-weight:700;color:var(--blue)">
+        ${rec.nama} <span style="font-size:11px;font-weight:400;color:var(--text2)">(${rec.kelas})</span>
+      </td>
+    </tr>
+    ${rec.items.map(it=>`
+    <tr>
+      <td style="padding:3px 4px 3px 16px;color:#6b7280;font-size:12px">${it.tipe}</td>
+      <td style="padding:3px 4px;font-size:12px">${it.label}</td>
+      <td style="padding:3px 4px;font-size:12px;text-align:right">${fmt(it.tagihan)}</td>
+      <td style="padding:3px 4px;font-size:12px;text-align:right;font-weight:500;color:${it.sisa>0?'var(--danger)':'var(--green)'}">${fmt(it.dibayar)}</td>
+    </tr>
+    ${it.sisa>0?`<tr><td colspan="2" style="padding:1px 4px 1px 16px;font-size:11px;color:var(--danger)">↳ Sisa: ${fmt(it.sisa)}</td><td colspan="2"></td></tr>`:''}`).join('')}
+    <tr style="border-top:1px solid #ddd">
+      <td colspan="2" style="padding:4px 4px 4px 16px;font-size:12px;font-weight:600">Subtotal ${rec.nama.split(' ')[0]}</td>
+      <td style="text-align:right;font-size:12px;padding:4px">${fmt(rec.items.reduce((a,it)=>a+it.tagihan,0))}</td>
+      <td style="text-align:right;font-size:13px;font-weight:700;color:var(--blue);padding:4px">${fmt(rec.totalDibayar)}</td>
+    </tr>`).join('');
+
+  return `<div class="kw-page" style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:24px;margin-bottom:16px">
+    <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+      <div style="font-size:11px;color:var(--text2)">No. ${noGab}</div>
+      <div style="font-size:11px;color:var(--text2)">${waktu}</div>
+    </div>
+    <div style="text-align:center;margin-bottom:14px;padding-bottom:12px;border-bottom:2px solid var(--blue)">
+      <div style="margin-bottom:6px">${logoHTML}</div>
+      <div style="font-size:15px;font-weight:700;color:var(--blue);text-transform:uppercase">${namaSekolah}</div>
+      <div style="font-size:11px;color:var(--text2)">${alamat} · Telp. ${telepon}</div>
+      <div style="font-size:12px;font-weight:600;color:var(--blue);margin-top:4px">KWITANSI PEMBAYARAN</div>
+    </div>
+    <table style="width:100%;font-size:13px;margin-bottom:10px;border-collapse:collapse">
+      <tr><td style="color:var(--text2);width:38%;padding:4px 2px">Tanggal</td><td style="padding:4px 2px">${tglFmtStr}</td></tr>
+      <tr><td style="color:var(--text2);padding:4px 2px">Jumlah Siswa</td><td style="padding:4px 2px;font-weight:600">${recs.length} siswa</td></tr>
+    </table>
+    <div style="background:var(--gray-light);border-radius:7px;padding:10px 12px;margin-bottom:12px">
+      <div style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;margin-bottom:6px">Rincian Pembayaran</div>
+      <table style="width:100%;border-collapse:collapse">
+        <thead><tr>
+          <th style="font-size:11px;color:var(--text2);font-weight:500;text-align:left;padding:2px;width:18%">Jenis</th>
+          <th style="font-size:11px;color:var(--text2);font-weight:500;text-align:left;padding:2px">Keterangan</th>
+          <th style="font-size:11px;color:var(--text2);font-weight:500;text-align:right;padding:2px;width:18%">Tagihan</th>
+          <th style="font-size:11px;color:var(--text2);font-weight:500;text-align:right;padding:2px;width:18%">Kas</th>
+        </tr></thead>
+        <tbody>${siswaRows}</tbody>
+      </table>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;padding-top:12px;border-top:2px solid var(--blue)">
+      <span style="font-size:13px;color:var(--text2)">Total Diterima</span>
+      <span style="font-size:22px;font-weight:700;color:var(--blue)">${fmt(totalDibayar)}</span>
+    </div>
+    ${totalSisa>0?`<div style="text-align:right;font-size:12px;color:var(--danger);font-weight:600;margin-top:4px">Total Sisa: ${fmt(totalSisa)}</div>`:''}
+    <div style="margin-top:18px;display:flex;justify-content:flex-end">
+      <div style="text-align:center">
+        <div style="font-size:12px;color:var(--text2)">Batam, ${tglFmtStr}</div>
+        <div style="font-size:12px;color:var(--text2);margin-top:3px">Bendahara Sekolah</div>
+        <div style="width:130px;border-top:1px solid #374151;margin-top:42px"></div>
+        <div style="font-size:12px;color:var(--text2);margin-top:4px">( _________________ )</div>
+      </div>
+    </div>
+    <p style="font-size:10px;color:var(--text2);font-style:italic;margin-top:14px">Simpan kwitansi ini sebagai bukti pembayaran. Terima kasih.</p>
+  </div>`;
 }
 
 function resetForm(){
