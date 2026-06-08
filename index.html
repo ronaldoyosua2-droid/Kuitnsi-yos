@@ -2792,6 +2792,21 @@ async function loadFromCloud(){
     const json = await resp.json();
     if(!json.ok||!json.data) throw new Error('No data in response');
     const d = json.data;
+    // SAFETY: jangan timpa data lokal kalau cloud lebih sedikit
+    const localRw = getRiwayat();
+    const cloudRw = Array.isArray(d.riwayat) ? d.riwayat : (d.riwayat ? JSON.parse(d.riwayat) : []);
+    if(localRw.length > 0 && cloudRw.length < localRw.length){
+      const ok = confirm(
+        '⚠️ Data lokal ('+ localRw.length +' transaksi) lebih banyak dari cloud ('+ cloudRw.length +' transaksi).\n\n'+
+        'Muat dari cloud akan menghapus data lokal yang lebih banyak.\n\n'+
+        'Lanjutkan? Pilih Batal untuk tetap pakai data lokal.'
+      );
+      if(!ok){
+        setSyncStatus('online');
+        syncToCloud(false); // upload data lokal ke cloud sebagai gantinya
+        return false;
+      }
+    }
     if(d.riwayat)     lsSet('ya_riwayat', d.riwayat);
     if(d.siswa)       lsSet('ya_siswa', d.siswa);
     if(d.tarif){
@@ -2868,8 +2883,18 @@ async function checkAndLoadCloud(){
 
   if(connected){
     _isOnline = true;
-    // Always load from cloud on startup — keeps all devices in sync
-    await loadFromCloud();
+    setSyncStatus('online');
+    // Auto sync local data to cloud (NOT load from cloud)
+    // Only load from cloud if local data is empty
+    const localRw = getRiwayat();
+    if(!localRw || localRw.length === 0){
+      // Local kosong — aman untuk load dari cloud
+      console.log('Local empty, loading from cloud...');
+      await loadFromCloud();
+    } else {
+      // Ada data lokal — simpan ke cloud, jangan timpa
+      syncToCloud(false);
+    }
   } else {
     _isOnline = false;
     setSyncStatus('offline');
