@@ -3650,18 +3650,27 @@ function rwTable(data,tableId,showKelas=true){
   if(!data.length){wrap.innerHTML='<div class="hist-empty">Tidak ada transaksi pada periode ini</div>';return;}
   const kelasCol=showKelas?'<th>Kelas</th>':'';
   wrap.innerHTML=`<table class="hist-table">
-    <thead><tr><th>No. Kwitansi</th><th>Nama</th>${kelasCol}<th>Jenis</th><th>Keterangan</th><th>Tanggal</th><th>Dibayar</th><th>Sisa</th><th>Aksi</th></tr></thead>
-    <tbody>`+data.map(r=>`<tr>
-      <td><span class="badge badge-blue">${r.no}</span></td>
-      <td>${r.nama}</td>
-      ${showKelas?`<td><span class="badge ${r.kelas&&r.kelas.includes('Plus')?'badge-orange':'badge-blue'}">${r.kelas||'—'}</span></td>`:''}
-      <td><span class="badge ${r.tipe==='SPP'?'badge-blue':r.tipe==='Pengembangan'?'badge-green':'badge-orange'}">${r.tipe}</span></td>
-      <td>${r.bayarLabel}</td>
-      <td>${fmtTgl(r.tanggal)}</td>
-      <td style="color:var(--green);font-weight:500">${fmt(r.nominalBayar)}</td>
-      <td style="color:${r.sisa>0?'var(--danger)':'var(--green)'};font-weight:500">${r.sisa>0?fmt(r.sisa):'Lunas'}</td>
-      <td><button class="btn btn-danger" style="font-size:11px;padding:2px 7px" onclick="hapusSatuRiwayat(${r.id});renderHarian()">&#128465;</button></td>
-    </tr>`).join('')+`</tbody></table>`;
+    <thead><tr><th>No. Kwitansi</th><th>Nama</th>${kelasCol}<th>Metode</th><th>Jenis</th><th>Keterangan</th><th>Tanggal</th><th>Dibayar</th><th>Sisa</th><th>Aksi</th></tr></thead>
+    <tbody>`+data.map(r=>{
+      const isTrf=r.metode==='Transfer';
+      return `<tr style="background:${isTrf?'#eff6ff':''}">
+        <td><span class="badge badge-blue">${r.no}</span></td>
+        <td>${r.nama}</td>
+        ${showKelas?`<td><span class="badge ${r.kelas&&r.kelas.includes('Plus')?'badge-orange':'badge-blue'}">${r.kelas||'—'}</span></td>`:''}
+        <td>
+          <span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;white-space:nowrap;
+            background:${isTrf?'#dbeafe':'#dcfce7'};color:${isTrf?'#1d4ed8':'#15803d'}">
+            ${isTrf?'🏦 TF':'💵 Kas'}
+          </span>
+        </td>
+        <td><span class="badge ${r.tipe==='SPP'?'badge-blue':r.tipe==='Pengembangan'?'badge-green':'badge-orange'}">${r.tipe}</span></td>
+        <td>${r.bayarLabel}</td>
+        <td>${fmtTgl(r.tanggal)}</td>
+        <td style="color:${isTrf?'#1d4ed8':'var(--green)'};font-weight:500">${fmt(r.nominalBayar)}</td>
+        <td style="color:${r.sisa>0?'var(--danger)':'var(--green)'};font-weight:500">${r.sisa>0?fmt(r.sisa):'Lunas'}</td>
+        <td><button class="btn btn-danger" style="font-size:11px;padding:2px 7px" onclick="hapusSatuRiwayat(${r.id});renderHarian()">&#128465;</button></td>
+      </tr>`;
+    }).join('')+`</tbody></table>`;
 }
 
 let _harianData = []; // store for filter
