@@ -163,6 +163,7 @@ function doConfirmLoadCloud(){ if(typeof confirmLoadCloud==='function') confirmL
     <button class="nav-btn" onclick="showPage('siswaPindah')">&#128661; Siswa Pindah</button>
     <button class="nav-btn" onclick="showPage('riwayat')">Riwayat</button>
     <button class="nav-btn" onclick="showPage('admin')">Admin</button>
+    <button class="nav-btn" id="nav-preview-btn" onclick="showPage('preview')" style="display:none;background:var(--orange);color:#fff">&#128196; Preview</button>
   </div>
 </div>
 
@@ -242,7 +243,7 @@ function doConfirmLoadCloud(){ if(typeof confirmLoadCloud==='function') confirmL
         </div>
       </div>
     </div>
-    <div id="kwitansi-pages"></div>
+    <div id="kwitansi-pages-old"></div>
   </div>
 
   <!-- HIDDEN SINGLE PREVIEW (kept for print CSS targeting) -->
@@ -345,6 +346,35 @@ function doConfirmLoadCloud(){ if(typeof confirmLoadCloud==='function') confirmL
       <button class="btn" onclick="document.getElementById('preview').classList.remove('show')">&#10005; Tutup</button>
     </div>
   </div>
+</div>
+
+<!-- ==================== PAGE: PREVIEW ==================== -->
+<div class="page" id="page-preview">
+  <div class="card" style="margin-bottom:12px">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+      <div>
+        <div style="font-size:16px;font-weight:700" id="preview-title">Preview Kwitansi</div>
+        <div style="font-size:12px;color:var(--text2);margin-top:2px" id="preview-subtitle"></div>
+        <div id="preview-mode-wrap" style="display:none;margin-top:8px">
+          <label style="font-size:12px;cursor:pointer;margin-right:12px">
+            <input type="radio" name="kw-mode" value="pisah" checked onchange="toggleKwitansiMode(this.value)"> Terpisah per siswa
+          </label>
+          <label style="font-size:12px;cursor:pointer">
+            <input type="radio" name="kw-mode" value="gabung" onchange="toggleKwitansiMode(this.value)"> 1 kwitansi gabungan
+          </label>
+        </div>
+      </div>
+      <div class="btn-row" style="margin:0;flex-wrap:wrap">
+        <button class="btn btn-primary" onclick="printKwitansi('portrait')">&#128438; Cetak HVS</button>
+        <button class="btn btn-primary" onclick="printKwitansi('landscape')">&#128438; Cetak NCR</button>
+        <button class="btn btn-green" onclick="downloadExcel()">&#128190; Excel</button>
+        <button class="btn" style="background:var(--orange);color:#fff;border-color:var(--orange)" onclick="editKwitansi()">&#9998; Edit</button>
+        <button class="btn btn-danger" onclick="resetDariPreview()">&#8635; Reset</button>
+        <button class="btn" onclick="tutupPreview()">&#10005; Tutup</button>
+      </div>
+    </div>
+  </div>
+  <div id="kwitansi-pages"></div>
 </div>
 
 <!-- ==================== PAGE: SISWA BARU ==================== -->
@@ -835,6 +865,7 @@ function doConfirmLoadCloud(){ if(typeof confirmLoadCloud==='function') confirmL
           <option value="Lainnya">Lainnya</option>
         </select>
         <div id="rekord-detail-table"></div>
+        <div id="tunggakan-editor" style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border)"></div>
       </div>
     </div>
 
@@ -1202,7 +1233,10 @@ function showPage(p){
   document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(x=>x.classList.remove('active'));
   document.getElementById('page-'+p).classList.add('active');
-  event.target.classList.add('active');
+  // Highlight matching nav btn without relying on event.target
+  document.querySelectorAll('.nav-btn').forEach(function(btn){
+    if(btn.getAttribute('onclick')&&btn.getAttribute('onclick').includes("'"+p+"'")) btn.classList.add('active');
+  });
   if(p==='riwayat')renderAllRiwayat();
   if(p==='admin')initAdmin();
 }
@@ -1345,6 +1379,12 @@ function renderItemForms(){
       <div style="margin-bottom:8px">
         <label style="display:block;font-size:12px;font-weight:500;color:var(--text2);margin-bottom:4px">Bulan SPP</label>
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <select onchange="onSppTahun(${i},this.value)"
+            style="width:90px;padding:8px;font-size:13px;border:1px solid var(--border);border-radius:7px;font-weight:600;color:var(--blue)">
+            ${[new Date().getFullYear()-1,new Date().getFullYear(),new Date().getFullYear()+1].map(y=>
+              `<option value="${y}" ${(it.sppTahun||new Date().getFullYear())===y?'selected':''}>${y}</option>`
+            ).join('')}
+          </select>
           <select onchange="onSppBulanDari(${i},this.value)"
             style="flex:1;min-width:100px;padding:8px;font-size:13px;border:1px solid var(--border);border-radius:7px">
             <option value="">— Dari —</option>
@@ -1578,8 +1618,13 @@ function renderItemForms(){
 }
 
 // SPP dual picker handlers
+function onSppTahun(i, val){
+  itemList[i].sppTahun = parseInt(val)||new Date().getFullYear();
+  updateSppRange(i);
+}
 function onSppBulanDari(i, val){
   itemList[i].sppDari = val===''?undefined:parseInt(val);
+  if(!itemList[i].sppTahun) itemList[i].sppTahun = new Date().getFullYear();
   updateSppRange(i);
 }
 
@@ -1645,7 +1690,8 @@ function updateSppRange(i){
   // Dari diisi, Sampai kosong → 1 bulan
   if(sampai===undefined){
     itemList[i].qty=1;
-    itemList[i].label=`SPP ${BULAN[dari]}`;
+    const thn1=itemList[i].sppTahun||new Date().getFullYear();
+  itemList[i].label=`SPP ${BULAN[dari]} ${thn1}`;
     renderItemForms();
     updateItemDisplay(i);
     return;
@@ -1654,7 +1700,8 @@ function updateSppRange(i){
   // Dari == Sampai → 12 bulan (1 tahun penuh)
   if(dari===sampai){
     itemList[i].qty=12;
-    itemList[i].label=`SPP ${BULAN[dari]} (12 Bulan / 1 Tahun)`;
+    const thn12=itemList[i].sppTahun||new Date().getFullYear();
+  itemList[i].label=`SPP ${BULAN[dari]} ${thn12} (12 Bulan / 1 Tahun)`;
     renderItemForms();
     updateItemDisplay(i);
     return;
@@ -1664,7 +1711,8 @@ function updateSppRange(i){
   if(sampai>dari){
     const qty=sampai-dari+1;
     itemList[i].qty=qty;
-    itemList[i].label=`SPP ${BULAN[dari]} - ${BULAN[sampai]}`;
+    const thnR=itemList[i].sppTahun||new Date().getFullYear();
+  itemList[i].label=`SPP ${BULAN[dari]} - ${BULAN[sampai]} ${thnR}`;
     renderItemForms();
     updateItemDisplay(i);
     return;
@@ -1674,7 +1722,8 @@ function updateSppRange(i){
   if(sampai<dari){
     const qty=(12-dari)+sampai+1;
     itemList[i].qty=qty;
-    itemList[i].label=`SPP ${BULAN[dari]} - ${BULAN[sampai]} (${qty} bulan)`;
+    const thnW=itemList[i].sppTahun||new Date().getFullYear();
+  itemList[i].label=`SPP ${BULAN[dari]} - ${BULAN[sampai]} ${thnW} (${qty} bulan)`;
     renderItemForms();
     updateItemDisplay(i);
   }
@@ -3015,6 +3064,123 @@ function buildKwitansiHTML(rec, logoHTML, namaSekolah, alamat, telepon){
   </div>`;
 }
 
+// ===================== TUNGGAKAN SPP =====================
+function getSppHistory(nama){
+  var rw=getRiwayat(), paid=new Set();
+  rw.filter(function(r){return r.nama===nama&&r.tipe==='SPP'&&r.sisa===0;}).forEach(function(r){
+    var labels=r.items?r.items.map(function(it){return it.label||'';}):[r.bayarLabel||r.label||''];
+    labels.forEach(function(label){
+      var m2=label.match(/SPP\s+(\w+)\s*-\s*(\w+)\s+(\d{4})/);
+      var m1=label.match(/SPP\s+(\w+)\s+(\d{4})/);
+      if(m2){
+        var dari=BULAN.indexOf(m2[1]),sampai=BULAN.indexOf(m2[2]),thn=m2[3];
+        if(dari>=0&&sampai>=0) for(var b=dari;b<=sampai;b++) paid.add(BULAN[b]+' '+thn);
+      } else if(m1){ paid.add(m1[1]+' '+m1[2]); }
+    });
+  });
+  return paid;
+}
+
+function getTunggakanSPP(nama, targetLabel){
+  var manual=(getSiswa().find(function(s){return s.nama===nama;})||{}).tunggakanSPP||[];
+  var paid=getSppHistory(nama);
+  if(paid.size===0&&manual.length===0) return [];
+  var label=targetLabel||'';
+  var m2=label.match(/SPP\s+(\w+)\s*-\s*(\w+)\s+(\d{4})/);
+  var m1=label.match(/SPP\s+(\w+)\s+(\d{4})/);
+  var targetBln,targetThn;
+  if(m2){targetBln=BULAN.indexOf(m2[1]);targetThn=parseInt(m2[3]);}
+  else if(m1){targetBln=BULAN.indexOf(m1[1]);targetThn=parseInt(m1[2]);}
+  else return [];
+  if(targetBln<0||!targetThn) return [];
+  var earliest=null;
+  paid.forEach(function(m){
+    var p=m.split(' '),b=BULAN.indexOf(p[0]),t=parseInt(p[1])||0;
+    if(b<0)return;
+    if(!earliest||(t<earliest.t)||(t===earliest.t&&b<earliest.b)) earliest={b:b,t:t};
+  });
+  manual.forEach(function(m){
+    var p=m.split(' '),b=BULAN.indexOf(p[0]),t=parseInt(p[1])||0;
+    if(b<0)return;
+    if(!earliest||(t<earliest.t)||(t===earliest.t&&b<earliest.b)) earliest={b:b,t:t};
+  });
+  if(!earliest) return [];
+  var tunggakan=[],b=earliest.b,t=earliest.t,iter=0;
+  while((t<targetThn||(t===targetThn&&b<targetBln))&&iter<60){
+    var key=BULAN[b]+' '+t;
+    if(!paid.has(key)&&!manual.includes(key)) tunggakan.push(key);
+    b++;if(b>11){b=0;t++;}iter++;
+  }
+  return tunggakan;
+}
+
+function getTunggakanManual(nama){
+  return (getSiswa().find(function(s){return s.nama===nama;})||{}).tunggakanSPP||[];
+}
+function saveTunggakanManual(nama,list){
+  var siswa=getSiswa(),idx=siswa.findIndex(function(x){return x.nama===nama;});
+  if(idx<0)return;
+  siswa[idx].tunggakanSPP=list;
+  setSiswa(siswa);
+}
+function onTunggakanCheck(namaEnc,bulan,checked){
+  var nama=decodeURIComponent(namaEnc);
+  var list=getTunggakanManual(nama);
+  if(checked&&!list.includes(bulan))list.push(bulan);
+  else if(!checked){var i=list.indexOf(bulan);if(i>=0)list.splice(i,1);}
+  saveTunggakanManual(nama,list);
+  renderTunggakanEditor(nama);
+}
+function renderTunggakanEditor(nama){
+  var wrap=document.getElementById('tunggakan-editor');
+  if(!wrap)return;
+  var manual=getTunggakanManual(nama);
+  var paid=getSppHistory(nama);
+  var thn=new Date().getFullYear();
+  var allBulan=[];
+  for(var y=thn-1;y<=thn+1;y++) BULAN.forEach(function(b){allBulan.push(b+' '+y);});
+  var autoTunggakan=[];
+  if(paid.size>0){
+    var minB=11,minT=9999,maxB=0,maxT=0;
+    paid.forEach(function(m){
+      var p=m.split(' '),b=BULAN.indexOf(p[0]),t=parseInt(p[1])||0;
+      if(b<0)return;
+      if(t<minT||(t===minT&&b<minB)){minT=t;minB=b;}
+      if(t>maxT||(t===maxT&&b>maxB)){maxT=t;maxB=b;}
+    });
+    var cb=minB,ct=minT,it2=0;
+    while((ct<maxT||(ct===maxT&&cb<=maxB))&&it2<60){
+      var key=BULAN[cb]+' '+ct;
+      if(!paid.has(key)&&!manual.includes(key)) autoTunggakan.push(key);
+      cb++;if(cb>11){cb=0;ct++;}it2++;
+    }
+  }
+  var html='<div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px">TUNGGAKAN SPP</div>'
+    +'<div style="font-size:11px;color:var(--text2);margin-bottom:8px">'
+    +'<span style="background:var(--green-light);padding:2px 6px;border-radius:4px;margin-right:4px">Lunas</span>'
+    +'<span style="background:#fff3cd;padding:2px 6px;border-radius:4px;margin-right:4px">Belum bayar</span>'
+    +'<span style="background:var(--danger-light);padding:2px 6px;border-radius:4px">Manual</span>'
+    +'</div><div style="display:flex;flex-wrap:wrap;gap:3px">';
+  allBulan.forEach(function(m){
+    var isPaid=paid.has(m),isManual=manual.includes(m),isAuto=autoTunggakan.includes(m);
+    var bg=isPaid?'var(--green-light)':isAuto?'#fff3cd':isManual?'var(--danger-light)':'var(--gray-light)';
+    var bc=isPaid?'#86efac':isAuto?'#ffc107':isManual?'#fca5a5':'var(--border)';
+    var col=isPaid?'var(--green)':isAuto?'#856404':isManual?'var(--danger)':'var(--text)';
+    var enc=encodeURIComponent(nama);
+    html+='<label style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:6px;'
+      +'cursor:'+(isPaid?'not-allowed':'pointer')+';background:'+bg+';border:1px solid '+bc+';font-size:11px;margin:2px">'
+      +'<input type="checkbox"'+(isManual||isAuto?' checked':'')+(isPaid?' disabled':'')
+      +' data-nama="'+enc+'" data-bulan="'+m+'"'
+      +' onchange="onTunggakanCheck(this.dataset.nama,this.dataset.bulan,this.checked)"'
+      +' style="width:13px;height:13px">'
+      +'<span style="color:'+col+'">'+m+(isPaid?' ✅':isAuto?' ⚠':'')+'</span>'
+      +'</label>';
+  });
+  html+='</div>';
+  wrap.innerHTML=html;
+}
+
+
 function buatKwitansi(){
   const al = document.getElementById('alert-form');
   al.classList.remove('show');
@@ -3070,6 +3236,24 @@ function buatKwitansi(){
   const tanggal = document.getElementById('inp-tanggal').value;
   const metode = document.querySelector('input[name="inp-metode"]:checked')?.value || 'Kas';
   const tglFmtStr = tglFmt(tanggal);
+
+  // Cek tunggakan SPP
+  const warningList = [];
+  siswaList.forEach((siswa,si)=>{
+    itemList.forEach(it=>{
+      if(it.tipe!=='SPP') return;
+      if(it.selectedSiswa&&!it.selectedSiswa.includes(si)) return;
+      if(!it.label) return;
+      const tunggakan = getTunggakanSPP(siswa.nama, it.label);
+      if(tunggakan.length>0){
+        warningList.push('* '+siswa.nama+': belum bayar '+tunggakan.join(', '));
+      }
+    });
+  });
+  if(warningList.length>0){
+    const lanjut = confirm('PERINGATAN TUNGGAKAN SPP\n\n'+warningList.join('\n')+'\n\nTetap buat kuitansi?');
+    if(!lanjut) return;
+  }
   const now = new Date();
   const jamStr = now.toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'});
   const waktu = tglFmtStr+' · '+jamStr;
@@ -3156,19 +3340,23 @@ function buatKwitansi(){
   window._lastNewRecs = newRecs;
 
   // Show multi preview
-  document.getElementById('multi-preview-label').textContent =
-    siswaList.length+' kwitansi · '+itemList.length+' jenis pembayaran';
+  // multi-preview-label removed
   // Reset to pisah mode
   document.querySelectorAll('input[name="kw-mode"]').forEach(r=>r.checked=r.value==='pisah');
   document.getElementById('kwitansi-pages').innerHTML = htmlParts.join('');
-  document.getElementById('multi-preview').style.display='block';
-  document.getElementById('multi-preview').scrollIntoView({behavior:'smooth',block:'start'});
+  // Navigate to preview tab
+  var prevBtn=document.getElementById('nav-preview-btn');
+  if(prevBtn) prevBtn.style.display='';
+  var prevTitle=document.getElementById('preview-title');
+  var prevSub=document.getElementById('preview-subtitle');
+  var modeWrap=document.getElementById('preview-mode-wrap');
+  if(prevTitle) prevTitle.textContent=newRecs.length>1?newRecs.length+' Kwitansi':'Kwitansi - '+newRecs[0].nama;
+  if(prevSub) prevSub.textContent=newRecs.length+' kwitansi dibuat';
+  if(modeWrap) modeWrap.style.display=newRecs.length>1?'block':'none';
+  document.querySelectorAll('input[name="kw-mode"]').forEach(function(r){r.checked=r.value==='pisah';});
+  showPage('preview');
+  window.scrollTo({top:0,behavior:'smooth'});
 
-  // Show reset dialog
-  setTimeout(()=>{
-    const doReset = confirm('✅ Kuitansi berhasil dibuat!\n\nReset form sekarang untuk input kuitansi baru?\n(OK = Reset, Batal = Tetap di halaman ini)');
-    if(doReset) resetForm();
-  }, 800);
 }
 
 function toggleKwitansiMode(mode){
@@ -3265,7 +3453,7 @@ function resetForm(){
   renderSiswaForms();renderItemForms();
   document.getElementById('inp-tanggal').value=today();
   document.getElementById('alert-form').classList.remove('show');
-  document.getElementById('multi-preview').style.display='none';
+  // multi-preview removed (now using preview tab)
   tambahSiswaForm();tambahItemForm();
 }
 
@@ -3594,6 +3782,7 @@ function bukaRekordSiswa(encNama,encKelas){
   document.getElementById('rekord-detail-card').style.display='block';
   document.getElementById('rekord-detail-card').scrollIntoView({behavior:'smooth',block:'start'});
   renderRekordDetail();
+  setTimeout(function(){renderTunggakanEditor(nama);},100);
 }
 
 function renderRekordDetail(){
@@ -4430,8 +4619,7 @@ function loginAdmin(){
 }
 
 function printKwitansi(orientation){
-  const mp=document.getElementById('multi-preview');
-  if(!mp||mp.style.display==='none'){alert('Buat kwitansi dulu sebelum mencetak.');return}
+    // multi-preview removed
   let styleEl=document.getElementById('print-orient-style');
   if(!styleEl){styleEl=document.createElement('style');styleEl.id='print-orient-style';document.head.appendChild(styleEl);}
   styleEl.textContent=orientation==='landscape'?'@page{size:A4 landscape;margin:8mm}':'@page{size:A4 portrait;margin:10mm}';
@@ -4704,8 +4892,24 @@ function renderTunggakan(){
 </script>
 <div id="print-area" style="display:none"></div>
 <script>
+
+// ===================== PREVIEW TAB =====================
+function editKwitansi(){ showPage('kwitansi'); }
+function tutupPreview(){
+  var btn=document.getElementById('nav-preview-btn');
+  if(btn) btn.style.display='none';
+  showPage('kwitansi');
+}
+function resetDariPreview(){
+  var btn=document.getElementById('nav-preview-btn');
+  if(btn) btn.style.display='none';
+  resetForm();
+  showPage('kwitansi');
+}
+
 </script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js">
+
 </script>
 </body>
 </html>
