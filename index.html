@@ -1564,6 +1564,12 @@ function renderItemForms(){
             ${it.kasInput&&it.kasInput<subtotal?fmt(subtotal-it.kasInput):'Lunas'}
           </div>
         </div>
+        <div class="field" id="item-kembal-${i}" style="margin-bottom:0;display:${(it.kasInput||0)>subtotal?'block':'none'}">
+          <label>💰 Kembalian</label>
+          <div style="padding:8px;font-size:14px;font-weight:700;border:2px solid var(--orange);border-radius:7px;background:var(--orange-light);color:var(--orange)">
+            <span>${(it.kasInput||0)>subtotal?fmt((it.kasInput||0)-subtotal):''}</span>
+          </div>
+        </div>
       </div>`}
       ${it.diskonPct>0?`<div style="margin-top:6px;font-size:11px;color:var(--orange);font-weight:500">↳ Diskon ${it.diskonPct}% (-${fmt(it.diskonAmt)})</div>`:''}
       `}
@@ -1815,7 +1821,19 @@ function onItemQty(i, val){
 function onItemKas(i, val){
   itemList[i].kasInput = parseInt(val)||0;
   updateItemDisplay(i);
+  // Update kembalian display directly without re-render
+  const it = itemList[i];
+  const qty = it.qty||1;
+  const subtotal = isSPPItem(it) ? (it.sppKustom?(it.sppKustomNominal||0)*qty:(it.nominal||0)*qty) : (it.customNominal||it.nominal||0)*qty;
+  const kembal = (it.kasInput||0) - subtotal;
+  const kembalEl = document.getElementById('item-kembal-'+i);
+  if(kembalEl){
+    kembalEl.style.display = kembal>0 ? 'block' : 'none';
+    kembalEl.querySelector('span').textContent = kembal>0 ? fmt(kembal) : '';
+  }
 }
+
+function isSPPItem(it){ return it.tipe==='SPP'||it.tipe==='Pengembangan'; }
 
 // Update only the computed display fields, without re-rendering the whole form
 function updateItemDisplay(i){
@@ -2981,6 +2999,10 @@ function buildKwitansiHTML(rec, logoHTML, namaSekolah, alamat, telepon){
       <span style="font-size:22px;font-weight:700;color:var(--blue)">${fmt(rec.totalDibayar)}</span>
     </div>
     ${rec.totalSisa>0?`<div style="text-align:right;font-size:12px;color:var(--danger);font-weight:600;margin-top:4px">Total Sisa: ${fmt(rec.totalSisa)}</div>`:''}
+    ${rec.kembalian>0?`<div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding:8px 12px;background:var(--orange-light);border-radius:7px;border:1.5px solid var(--orange)">
+      <span style="font-size:13px;color:var(--orange);font-weight:600">💰 Kembalian</span>
+      <span style="font-size:18px;font-weight:700;color:var(--orange)">${fmt(rec.kembalian)}</span>
+    </div>`:''}
     <div style="margin-top:18px;display:flex;justify-content:flex-end">
       <div style="text-align:center">
         <div style="font-size:12px;color:var(--text2)">Batam, ${rec.tglFmt}</div>
@@ -3141,6 +3163,12 @@ function buatKwitansi(){
   document.getElementById('kwitansi-pages').innerHTML = htmlParts.join('');
   document.getElementById('multi-preview').style.display='block';
   document.getElementById('multi-preview').scrollIntoView({behavior:'smooth',block:'start'});
+
+  // Show reset dialog
+  setTimeout(()=>{
+    const doReset = confirm('✅ Kuitansi berhasil dibuat!\n\nReset form sekarang untuk input kuitansi baru?\n(OK = Reset, Batal = Tetap di halaman ini)');
+    if(doReset) resetForm();
+  }, 800);
 }
 
 function toggleKwitansiMode(mode){
