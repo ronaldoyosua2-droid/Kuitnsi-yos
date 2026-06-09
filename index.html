@@ -3070,12 +3070,26 @@ function getSppHistory(nama){
   rw.filter(function(r){return r.nama===nama&&r.tipe==='SPP'&&r.sisa===0;}).forEach(function(r){
     var labels=r.items?r.items.map(function(it){return it.label||'';}):[r.bayarLabel||r.label||''];
     labels.forEach(function(label){
+      var curYear=new Date().getFullYear();
+      // Match with year: "SPP April - Juni 2026" or "SPP Juni 2026"
       var m2=label.match(/SPP\s+(\w+)\s*-\s*(\w+)\s+(\d{4})/);
       var m1=label.match(/SPP\s+(\w+)\s+(\d{4})/);
+      // Match WITHOUT year (old format): "SPP Juni" or "SPP April - Juni"
+      var m2old=label.match(/SPP\s+(\w+)\s*-\s*(\w+)(?!\s*\d)/);
+      var m1old=label.match(/SPP\s+(\w+)(?!\s*\d)(?:\s|$)/);
       if(m2){
         var dari=BULAN.indexOf(m2[1]),sampai=BULAN.indexOf(m2[2]),thn=m2[3];
         if(dari>=0&&sampai>=0) for(var b=dari;b<=sampai;b++) paid.add(BULAN[b]+' '+thn);
-      } else if(m1){ paid.add(m1[1]+' '+m1[2]); }
+      } else if(m1){
+        paid.add(m1[1]+' '+m1[2]);
+      } else if(m2old){
+        // Old format without year — assume current year
+        var dari=BULAN.indexOf(m2old[1]),sampai=BULAN.indexOf(m2old[2]);
+        if(dari>=0&&sampai>=0) for(var b=dari;b<=sampai;b++) paid.add(BULAN[b]+' '+curYear);
+      } else if(m1old){
+        var b=BULAN.indexOf(m1old[1]);
+        if(b>=0) paid.add(BULAN[b]+' '+curYear);
+      }
     });
   });
   return paid;
