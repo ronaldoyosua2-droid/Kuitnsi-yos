@@ -1942,17 +1942,58 @@ function getSisaDisplay(r, rwSiswa){
   return { sisa: r.sisa, label: r.sisa > 0 ? fmt(r.sisa) : 'Lunas' };
 }
 
+function stripLabelExtra(lbl){
+  return (lbl||'').replace(/\s*\([^)]*\)/g,'').trim().toLowerCase();
+}
+
+function parseSppMonths(label){
+  // Returns Set of "Bulan Tahun" strings covered by this label
+  var clean = label.replace(/\s*\([^)]*\)/g,'').trim();
+  var months = new Set();
+  var m2 = clean.match(/SPP\s+(\w+)\s*-\s*(\w+)\s+(\d{4})/i);
+  var m1 = !m2 && clean.match(/SPP\s+(\w+)\s+(\d{4})/i);
+  var m2old = !m2&&!m1&&clean.match(/SPP\s+(\w+)\s*-\s*(\w+)/i);
+  var m1old = !m2&&!m1&&!m2old&&clean.match(/SPP\s+(\w+)/i);
+  var curY = new Date().getFullYear();
+  if(m2){
+    var dari=BULAN.indexOf(m2[1]),sampai=BULAN.indexOf(m2[2]),thn=m2[3];
+    if(dari>=0&&sampai>=0) for(var b=dari;b<=sampai;b++) months.add(BULAN[b]+' '+thn);
+  } else if(m1){ months.add(m1[1]+' '+m1[2]); }
+  else if(m2old){
+    var dari=BULAN.indexOf(m2old[1]),sampai=BULAN.indexOf(m2old[2]);
+    if(dari>=0&&sampai>=0) for(var b=dari;b<=sampai;b++) months.add(BULAN[b]+' '+curY);
+  } else if(m1old){ months.add(m1old[1]+' '+curY); }
+  return months;
+}
+
 function cekDuplikat(nama, tipe, label){
-  // Only check SPP and Pengembangan for duplicate
   if(tipe!=='SPP'&&tipe!=='Pengembangan') return null;
   const rw = getRiwayat();
-  const existing = rw.find(r=>
-    r.nama.toLowerCase()===nama.toLowerCase() &&
-    r.tipe===tipe &&
-    r.bayarLabel.toLowerCase()===label.toLowerCase() &&
-    (r.sisa===0)
-  );
-  return existing||null;
+  // For SPP: check month overlap
+  if(tipe==='SPP'){
+    var newMonths = parseSppMonths(label);
+    if(newMonths.size===0){
+      // Fallback: exact label match
+      return rw.find(r=>r.nama.toLowerCase()===nama.toLowerCase()&&r.tipe===tipe&&
+        stripLabelExtra(r.bayarLabel)===stripLabelExtra(label)&&r.sisa===0)||null;
+    }
+    var dup = null;
+    rw.forEach(function(r){
+      if(dup) return;
+      if(r.nama.toLowerCase()!==nama.toLowerCase()) return;
+      if(r.tipe!=='SPP') return;
+      // Check if any months overlap
+      var existMonths = parseSppMonths(r.bayarLabel||'');
+      if(existMonths.size===0 && r.items){
+        r.items.forEach(function(it){ parseSppMonths(it.label||'').forEach(function(m){existMonths.add(m);}); });
+      }
+      existMonths.forEach(function(m){ if(newMonths.has(m)) dup=r; });
+    });
+    return dup;
+  }
+  // For Pengembangan: exact label match
+  return rw.find(r=>r.nama.toLowerCase()===nama.toLowerCase()&&r.tipe===tipe&&
+    stripLabelExtra(r.bayarLabel)===stripLabelExtra(label)&&r.sisa===0)||null;
 }
 
 
@@ -3066,39 +3107,43 @@ function buildKwitansiHTML(rec, logoHTML, namaSekolah, alamat, telepon){
 
 // ===================== TUNGGAKAN SPP =====================
 function getSppHistory(nama){
-  var rw=getRiwayat(), paid=new Set();
-  rw.filter(function(r){return r.nama===nama&&r.tipe==='SPP'&&r.sisa===0;}).forEach(function(r){
+  var rw=getRiwayat(), paid=new Set(), partial=new Set();
+  // paid = fully paid (sisa=0), partial = paid but still has sisa
+  rw.filter(function(r){return r.nama===nama&&r.tipe==='SPP';}).forEach(function(r){
+    var target = r.sisa===0 ? paid : partial;
     var labels=r.items?r.items.map(function(it){return it.label||'';}):[r.bayarLabel||r.label||''];
+    // Use transaction year as fallback for old labels without year
+    var recYear = r.tanggal ? r.tanggal.substring(0,4) : String(new Date().getFullYear());
     labels.forEach(function(label){
-      var curYear=new Date().getFullYear();
       // Match with year: "SPP April - Juni 2026" or "SPP Juni 2026"
       var m2=label.match(/SPP\s+(\w+)\s*-\s*(\w+)\s+(\d{4})/);
       var m1=label.match(/SPP\s+(\w+)\s+(\d{4})/);
       // Match WITHOUT year (old format): "SPP Juni" or "SPP April - Juni"
-      var m2old=label.match(/SPP\s+(\w+)\s*-\s*(\w+)(?!\s*\d)/);
-      var m1old=label.match(/SPP\s+(\w+)(?!\s*\d)(?:\s|$)/);
+      var m2old=!m2&&!m1&&label.match(/SPP\s+(\w+)\s*-\s*(\w+)/);
+      var m1old=!m2&&!m1&&!m2old&&label.match(/SPP\s+(\w+)/);
       if(m2){
         var dari=BULAN.indexOf(m2[1]),sampai=BULAN.indexOf(m2[2]),thn=m2[3];
         if(dari>=0&&sampai>=0) for(var b=dari;b<=sampai;b++) paid.add(BULAN[b]+' '+thn);
       } else if(m1){
         paid.add(m1[1]+' '+m1[2]);
       } else if(m2old){
-        // Old format without year — assume current year
+        // Old format — use transaction year
         var dari=BULAN.indexOf(m2old[1]),sampai=BULAN.indexOf(m2old[2]);
-        if(dari>=0&&sampai>=0) for(var b=dari;b<=sampai;b++) paid.add(BULAN[b]+' '+curYear);
+        if(dari>=0&&sampai>=0) for(var b=dari;b<=sampai;b++) paid.add(BULAN[b]+' '+recYear);
       } else if(m1old){
         var b=BULAN.indexOf(m1old[1]);
-        if(b>=0) paid.add(BULAN[b]+' '+curYear);
+        if(b>=0) paid.add(BULAN[b]+' '+recYear);
       }
     });
   });
-  return paid;
+  return {paid:paid, partial:partial};
 }
 
 function getTunggakanSPP(nama, targetLabel){
   var manual=(getSiswa().find(function(s){return s.nama===nama;})||{}).tunggakanSPP||[];
-  var paid=getSppHistory(nama);
-  if(paid.size===0&&manual.length===0) return [];
+  var hist=getSppHistory(nama);
+  var paid=hist.paid, partial=hist.partial;
+  if(paid.size===0&&partial.size===0&&manual.length===0) return [];
   var label=targetLabel||'';
   var m2=label.match(/SPP\s+(\w+)\s*-\s*(\w+)\s+(\d{4})/);
   var m1=label.match(/SPP\s+(\w+)\s+(\d{4})/);
@@ -3113,6 +3158,11 @@ function getTunggakanSPP(nama, targetLabel){
     if(b<0)return;
     if(!earliest||(t<earliest.t)||(t===earliest.t&&b<earliest.b)) earliest={b:b,t:t};
   });
+  partial.forEach(function(m){
+    var p=m.split(' '),b=BULAN.indexOf(p[0]),t=parseInt(p[1])||0;
+    if(b<0)return;
+    if(!earliest||(t<earliest.t)||(t===earliest.t&&b<earliest.b)) earliest={b:b,t:t};
+  });
   manual.forEach(function(m){
     var p=m.split(' '),b=BULAN.indexOf(p[0]),t=parseInt(p[1])||0;
     if(b<0)return;
@@ -3122,7 +3172,7 @@ function getTunggakanSPP(nama, targetLabel){
   var tunggakan=[],b=earliest.b,t=earliest.t,iter=0;
   while((t<targetThn||(t===targetThn&&b<targetBln))&&iter<60){
     var key=BULAN[b]+' '+t;
-    if(!paid.has(key)&&!manual.includes(key)) tunggakan.push(key);
+    if(!paid.has(key)&&!partial.has(key)&&!manual.includes(key)) tunggakan.push(key);
     b++;if(b>11){b=0;t++;}iter++;
   }
   return tunggakan;
@@ -3145,52 +3195,179 @@ function onTunggakanCheck(namaEnc,bulan,checked){
   saveTunggakanManual(nama,list);
   renderTunggakanEditor(nama);
 }
+
+// ===================== TAHUN AJARAN HELPER =====================
+const KELAS_URUTAN = [
+  'TK','1 SD','1 SD Plus','2 SD','2 SD Plus','3 SD','4 SD','5 SD','6 SD',
+  '7 SMP','7 SMP Plus','8 SMP','8 SMP Plus','9 SMP',
+  '10 SMK','11 SMK','12 SMK'
+];
+
+// Get kelas at a specific tahun ajaran offset from mulai
+function getKelasAtTA(kelasAwal, mulaiTA, targetTA){
+  // mulaiTA and targetTA = "2024/2025" format
+  var mulaiY = parseInt(mulaiTA.split('/')[0]);
+  var targetY = parseInt(targetTA.split('/')[0]);
+  var diff = targetY - mulaiY; // years difference
+  if(diff < 0) return null;
+  
+  // Find kelas awal in urutan
+  var idxAwal = KELAS_URUTAN.indexOf(kelasAwal);
+  if(idxAwal < 0) return kelasAwal; // unknown kelas
+  
+  // But we need to find kelas AWAL (when they first entered)
+  // If now kelas 3 SD and mulai 2024/2025, then at mulai they were kelas 1 SD
+  // So kelas at mulai = current_kelas - (currentTA - mulaiTA)
+  var currentTA = getTAAktif(); // current active TA
+  var currentY = parseInt(currentTA.split('/')[0]);
+  var yearsSinceMulai = currentY - mulaiY;
+  var idxSaatMulai = KELAS_URUTAN.indexOf(kelasAwal) - yearsSinceMulai;
+  if(idxSaatMulai < 0) idxSaatMulai = 0;
+  
+  var idxTarget = idxSaatMulai + diff;
+  if(idxTarget < 0 || idxTarget >= KELAS_URUTAN.length) return null;
+  return KELAS_URUTAN[idxTarget];
+}
+
+// Get current active tahun ajaran (Juli-Juni system)
+function getTAAktif(){
+  var now = new Date();
+  var y = now.getFullYear();
+  var m = now.getMonth(); // 0=Jan, 6=Jul
+  if(m >= 6) return y+'/'+(y+1); // Juli-Des → TA y/y+1
+  return (y-1)+'/'+y;            // Jan-Jun → TA y-1/y
+}
+
+// Get all tahun ajaran from mulai to now
+function getAllTA(mulaiPendidikan){
+  if(!mulaiPendidikan) return [];
+  var parts = mulaiPendidikan.split('-');
+  var mulaiY = parseInt(parts[0]);
+  var mulaiB = parseInt(parts[1])-1; // 0-indexed
+  // TA where mulai falls
+  var mulaiTA = mulaiB >= 6 ? mulaiY+'/'+(mulaiY+1) : (mulaiY-1)+'/'+mulaiY;
+  var currentTA = getTAAktif();
+  var result = [];
+  var y = parseInt(mulaiTA.split('/')[0]);
+  var endY = parseInt(currentTA.split('/')[0]);
+  while(y <= endY){
+    result.push(y+'/'+(y+1));
+    y++;
+  }
+  return result;
+}
+
+function getTahunAjaran(thn,bln){
+  if(bln>=6) return thn+'/'+(thn+1);
+  return (thn-1)+'/'+thn;
+}
+
+function setTunggakanView(namaEnc,mode){
+  var nama=decodeURIComponent(namaEnc);
+  var wrap=document.getElementById('tunggakan-editor');
+  if(wrap) wrap.dataset.viewMode=mode;
+  renderTunggakanEditor(nama);
+}
+
 function renderTunggakanEditor(nama){
   var wrap=document.getElementById('tunggakan-editor');
   if(!wrap)return;
   var manual=getTunggakanManual(nama);
-  var paid=getSppHistory(nama);
+  var hist=getSppHistory(nama);
+  var paid=hist.paid, partial=hist.partial;
+  var siswaData=getSiswa().find(function(s){return s.nama===nama;})||{};
+  var mulai=siswaData.mulaiPendidikan;
   var thn=new Date().getFullYear();
+  var startY,startB;
+  if(mulai){
+    startY=parseInt(mulai.split('-')[0]);
+    startB=parseInt(mulai.split('-')[1])-1;
+  } else {
+    startY=thn-1; startB=6;
+  }
+  var endY=thn+1,endB=5;
   var allBulan=[];
-  for(var y=thn-1;y<=thn+1;y++) BULAN.forEach(function(b){allBulan.push(b+' '+y);});
+  var cy=startY,cb=startB,iter=0;
+  while((cy<endY||(cy===endY&&cb<=endB))&&iter<60){
+    allBulan.push(BULAN[cb]+' '+cy);
+    cb++;if(cb>11){cb=0;cy++;}iter++;
+  }
   var autoTunggakan=[];
-  if(paid.size>0){
+  var allPaidOrPartial = new Set([...paid, ...partial]);
+  if(allPaidOrPartial.size>0){
     var minB=11,minT=9999,maxB=0,maxT=0;
-    paid.forEach(function(m){
+    allPaidOrPartial.forEach(function(m){
       var p=m.split(' '),b=BULAN.indexOf(p[0]),t=parseInt(p[1])||0;
       if(b<0)return;
       if(t<minT||(t===minT&&b<minB)){minT=t;minB=b;}
       if(t>maxT||(t===maxT&&b>maxB)){maxT=t;maxB=b;}
     });
-    var cb=minB,ct=minT,it2=0;
-    while((ct<maxT||(ct===maxT&&cb<=maxB))&&it2<60){
-      var key=BULAN[cb]+' '+ct;
-      if(!paid.has(key)&&!manual.includes(key)) autoTunggakan.push(key);
-      cb++;if(cb>11){cb=0;ct++;}it2++;
+    var cb2=minB,ct=minT,it2=0;
+    while((ct<maxT||(ct===maxT&&cb2<=maxB))&&it2<60){
+      var key=BULAN[cb2]+' '+ct;
+      if(!paid.has(key)&&!partial.has(key)&&!manual.includes(key)) autoTunggakan.push(key);
+      cb2++;if(cb2>11){cb2=0;ct++;}it2++;
     }
   }
-  var html='<div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px">TUNGGAKAN SPP</div>'
+  var viewMode=wrap.dataset.viewMode||'tahunAjaran';
+  var enc=encodeURIComponent(nama);
+  var html='<div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px;display:flex;justify-content:space-between;align-items:center">'
+    +'<span>TUNGGAKAN SPP'+(mulai?' <span style="font-size:10px;font-weight:400">mulai '+BULAN[startB]+' '+startY+'</span>':'')+'</span>'
+    +'<div style="display:flex;gap:4px">'
+    +'<button data-enc="'+enc+'" data-mode="tahunAjaran" onclick="setTunggakanView(this.dataset.enc,this.dataset.mode)" style="font-size:10px;padding:2px 8px;border-radius:4px;border:1px solid var(--border);cursor:pointer;background:'+(viewMode==='tahunAjaran'?'var(--blue)':'#fff')+';color:'+(viewMode==='tahunAjaran'?'#fff':'var(--text)')+'">Tahun Ajaran</button>'
+    +'<button data-enc="'+enc+'" data-mode="semester" onclick="setTunggakanView(this.dataset.enc,this.dataset.mode)" style="font-size:10px;padding:2px 8px;border-radius:4px;border:1px solid var(--border);cursor:pointer;background:'+(viewMode==='semester'?'var(--blue)':'#fff')+';color:'+(viewMode==='semester'?'#fff':'var(--text)')+'">Semester</button>'
+    +'</div></div>'
     +'<div style="font-size:11px;color:var(--text2);margin-bottom:8px">'
-    +'<span style="background:var(--green-light);padding:2px 6px;border-radius:4px;margin-right:4px">Lunas</span>'
-    +'<span style="background:#fff3cd;padding:2px 6px;border-radius:4px;margin-right:4px">Belum bayar</span>'
-    +'<span style="background:var(--danger-light);padding:2px 6px;border-radius:4px">Manual</span>'
-    +'</div><div style="display:flex;flex-wrap:wrap;gap:3px">';
-  allBulan.forEach(function(m){
-    var isPaid=paid.has(m),isManual=manual.includes(m),isAuto=autoTunggakan.includes(m);
-    var bg=isPaid?'var(--green-light)':isAuto?'#fff3cd':isManual?'var(--danger-light)':'var(--gray-light)';
-    var bc=isPaid?'#86efac':isAuto?'#ffc107':isManual?'#fca5a5':'var(--border)';
-    var col=isPaid?'var(--green)':isAuto?'#856404':isManual?'var(--danger)':'var(--text)';
-    var enc=encodeURIComponent(nama);
-    html+='<label style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:6px;'
-      +'cursor:'+(isPaid?'not-allowed':'pointer')+';background:'+bg+';border:1px solid '+bc+';font-size:11px;margin:2px">'
-      +'<input type="checkbox"'+(isManual||isAuto?' checked':'')+(isPaid?' disabled':'')
-      +' data-nama="'+enc+'" data-bulan="'+m+'"'
-      +' onchange="onTunggakanCheck(this.dataset.nama,this.dataset.bulan,this.checked)"'
-      +' style="width:13px;height:13px">'
-      +'<span style="color:'+col+'">'+m+(isPaid?' ✅':isAuto?' ⚠':'')+'</span>'
-      +'</label>';
+    +'<span style="background:var(--green-light);padding:2px 6px;border-radius:4px;margin-right:4px">✅ Lunas</span>'
+    +'<span style="background:#fef9c3;padding:2px 6px;border-radius:4px;margin-right:4px">💛 Ada sisa</span>'
+    +'<span style="background:#fff3cd;padding:2px 6px;border-radius:4px;margin-right:4px">⚠ Belum bayar</span>'
+    +'<span style="background:var(--danger-light);padding:2px 6px;border-radius:4px">🔴 Manual</span>'
+    +'</div>';
+  // Get kelas per tahun ajaran
+  var taList = getAllTA(mulai);
+  var kelasPerTA = {};
+  taList.forEach(function(ta){
+    kelasPerTA[ta] = getKelasAtTA(siswaData.kelas, ta, ta) || siswaData.kelas || '';
   });
-  html+='</div>';
+
+  var groups={};
+  allBulan.forEach(function(m){
+    var parts=m.split(' '),b=BULAN.indexOf(parts[0]),y=parseInt(parts[1]);
+    var gk=viewMode==='semester'
+      ?(b>=6?'Semester 1 '+y+' (TA '+y+'/'+(y+1)+')':'Semester 2 '+y+' (TA '+(y-1)+'/'+y+')')
+      :(b>=6?'TA '+y+'/'+(y+1):'TA '+(y-1)+'/'+y);
+    if(!groups[gk]) groups[gk]=[];
+    groups[gk].push(m);
+  });
+  Object.keys(groups).forEach(function(gk){
+    var months=groups[gk];
+    var gPaid=months.filter(function(m){return paid.has(m);}).length;
+    // Get kelas for this TA
+    var taKey=gk.replace('TA ','').replace(/Semester \d+ \d+ \(TA /,'').replace('\)','');
+    var taMatch=gk.match(/TA (\d+\/\d+)/);
+    var taForKelas=taMatch?taMatch[1]:null;
+    var kelasTA=taForKelas&&kelasPerTA[taForKelas]?(' · '+kelasPerTA[taForKelas]):'';
+    html+='<div style="margin-bottom:10px">'
+      +'<div style="font-size:11px;font-weight:700;color:var(--blue);margin-bottom:4px;display:flex;justify-content:space-between">'
+      +'<span>'+gk+'<span style="font-weight:400;color:var(--text2);font-size:10px">'+kelasTA+'</span></span>'
+      +'<span style="font-weight:400;color:var(--text2)">'+gPaid+'/'+months.length+' lunas</span></div>'
+      +'<div style="display:flex;flex-wrap:wrap;gap:3px">';
+    months.forEach(function(m){
+      var isPaid=paid.has(m),isManual=manual.includes(m),isAuto=autoTunggakan.includes(m);
+      var bg=isPaid?'var(--green-light)':isAuto?'#fff3cd':isManual?'var(--danger-light)':'var(--gray-light)';
+      var bc=isPaid?'#86efac':isAuto?'#ffc107':isManual?'#fca5a5':'var(--border)';
+      var col=isPaid?'var(--green)':isAuto?'#856404':isManual?'var(--danger)':'var(--text)';
+      html+='<label style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:6px;'
+        +'cursor:'+(isPaid?'not-allowed':'pointer')+';background:'+bg+';border:1px solid '+bc+';font-size:11px;margin:2px">'
+        +'<input type="checkbox"'+(isManual||isAuto?' checked':'')+(isPaid?' disabled':'')
+        +' data-nama="'+enc+'" data-bulan="'+m+'"'
+        +' onchange="onTunggakanCheck(this.dataset.nama,this.dataset.bulan,this.checked)"'
+        +' style="width:13px;height:13px">'
+        +'<span style="color:'+col+'">'+m+(isPaid?' ✅':isAuto?' ⚠':'')+'</span>'
+        +'</label>';
+    });
+    html+='</div></div>';
+  });
   wrap.innerHTML=html;
 }
 
