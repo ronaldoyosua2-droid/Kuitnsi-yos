@@ -2630,6 +2630,12 @@ function getBayarOptions(tipe,kelas,q){
   return opts;
 }
 
+function getSppNominalSiswa(nama, kelas, spp){
+  var siswaData = getSiswa().find(function(s){return s.nama===nama;});
+  if(siswaData && siswaData.sppKhusus) return siswaData.sppKhusus;
+  return getSppNominal(kelas, spp);
+}
+
 function getSppNominal(kelas,spp){
   if(kelas==='TK')return spp['TK']||145000;
   if(kelas==='1 SD')return spp['SD (kelas 1)']||145000;
@@ -4961,6 +4967,8 @@ function openTambahSiswa(){
   editSiswaIdx=null;
   document.getElementById('fs-nama').value='';
   document.getElementById('fs-kelas').value='';
+  document.getElementById('fs-mulai').value='';
+  document.getElementById('fs-spp-khusus').value='';
   document.getElementById('form-siswa-title').textContent='Tambah Siswa Baru';
   document.getElementById('fs-alert').classList.remove('show');
   document.getElementById('form-siswa-card').style.display='block';
@@ -4972,6 +4980,8 @@ function editSiswa(idx){
   editSiswaIdx=idx;
   document.getElementById('fs-nama').value=s.nama;
   document.getElementById('fs-kelas').value=s.kelas;
+  document.getElementById('fs-mulai').value=s.mulaiPendidikan||'';
+  document.getElementById('fs-spp-khusus').value=s.sppKhusus||'';
   document.getElementById('form-siswa-title').textContent='Edit Siswa';
   document.getElementById('fs-alert').classList.remove('show');
   document.getElementById('form-siswa-card').style.display='block';
@@ -4980,12 +4990,14 @@ function editSiswa(idx){
 function saveSiswa(){
   const nama=document.getElementById('fs-nama').value.trim();
   const kelas=document.getElementById('fs-kelas').value;
+  const mulaiPendidikan=document.getElementById('fs-mulai').value||null;
+  const sppKhusus=document.getElementById('fs-spp-khusus').value?parseInt(document.getElementById('fs-spp-khusus').value):null;
   const al=document.getElementById('fs-alert');
   if(!nama){al.textContent='Nama tidak boleh kosong.';al.classList.add('show');return}
   if(!kelas){al.textContent='Pilih kelas.';al.classList.add('show');return}
   const siswa=getSiswa();
-  if(editSiswaIdx!==null){siswa[editSiswaIdx]={nama,kelas}}
-  else{siswa.push({nama,kelas});siswa.sort((a,b)=>a.nama.localeCompare(b.nama))}
+  if(editSiswaIdx!==null){siswa[editSiswaIdx]={...siswa[editSiswaIdx],nama,kelas,mulaiPendidikan,sppKhusus}}
+  else{siswa.push({nama,kelas,mulaiPendidikan:mulaiPendidikan||null,sppKhusus:sppKhusus||null});siswa.sort((a,b)=>a.nama.localeCompare(b.nama))}
   setSiswa(siswa);
   document.getElementById('form-siswa-card').style.display='none';
   renderAdminSiswa();
