@@ -1438,7 +1438,7 @@ function renderItemForms(){
       if(!it.selectedSiswa) it.selectedSiswa = siswaList.map((_,si)=>si);
       const rows=siswaList.map((s,si)=>{
         let nom=0;
-        if(isSPP) nom=s.kelas?getSppNominal(s.kelas,spp):0;
+        if(isSPP) nom=s.kelas?getSppNominalSiswa(s.nama,s.kelas,spp):0;
         else if(it.tipe==='Pengembangan') nom=s.kelas?getPgmNominal(s.kelas,getPGM()):0;
         else if(isCustom){
           // Custom: use perSiswaNominal if set, else customNominal
@@ -1467,7 +1467,7 @@ function renderItemForms(){
       const totalSelected=siswaList.reduce((a,s,si)=>{
         if(!it.selectedSiswa.includes(si)) return a;
         let nom=0;
-        if(isSPP) nom=s.kelas?getSppNominal(s.kelas,spp):0;
+        if(isSPP) nom=s.kelas?getSppNominalSiswa(s.nama,s.kelas,spp):0;
         else if(it.tipe==='Pengembangan') nom=s.kelas?getPgmNominal(s.kelas,getPGM()):0;
         else if(isCustom){
           nom=(it.perSiswaNominal&&it.perSiswaNominal[si]!==undefined)?parseInt(it.perSiswaNominal[si])||0:(it.customNominal||0);
@@ -1677,7 +1677,8 @@ function updateSppRange(i){
   const dari = it.sppDari;
   const sampai = it.sppSampai;
   const kelas=siswaList.length?siswaList[0].kelas:null;
-  if(kelas) itemList[i].nominal=getSppNominal(kelas,getSPP());
+  const siswaNama=siswaList.length?siswaList[0].nama:null;
+  if(kelas) itemList[i].nominal=siswaNama?getSppNominalSiswa(siswaNama,kelas,getSPP()):getSppNominal(kelas,getSPP());
 
   // Dari kosong → reset
   if(dari===undefined){
@@ -3473,7 +3474,7 @@ function buatKwitansi(){
       const qty = it.qty||1;
       if(!it.isCustom){
         const spp=getSPP(), pgm=getPGM(), daftar=getDaftar(), diskon=getDiskon();
-        if(it.tipe==='SPP') nom=getSppNominal(siswa.kelas,spp);
+        if(it.tipe==='SPP') nom=getSppNominalSiswa(siswa.nama,siswa.kelas,spp);
         else if(it.tipe==='Pengembangan'){
           // Check if only selected siswa
           if(it.selectedSiswa&&!it.selectedSiswa.includes(si)) nom=0;
@@ -3969,8 +3970,9 @@ function bukaRekordSiswa(encNama,encKelas){
   const nama=decodeURIComponent(encNama);
   const kelas=decodeURIComponent(encKelas);
   rekordCurrentSiswa={nama,kelas};
+  const siswaData=getSiswa().find(s=>s.nama===nama)||{};
   document.getElementById('rekord-detail-nama').textContent=nama;
-  document.getElementById('rekord-detail-kelas').textContent=kelas;
+  document.getElementById('rekord-detail-kelas').textContent=kelas+(siswaData&&siswaData.sppKhusus?' · SPP Khusus: Rp'+siswaData.sppKhusus.toLocaleString('id-ID'):'');
   document.getElementById('rekord-detail-filter').value='';
   document.getElementById('rekord-detail-card').style.display='block';
   document.getElementById('rekord-detail-card').scrollIntoView({behavior:'smooth',block:'start'});
@@ -4484,7 +4486,7 @@ function renderRingkasanKas(){
   const rows=[
     {label:'💰 Kas Awal Harian',val:modal,color:'var(--text)'},
     {label:'📥 Pemasukan Kas (kwitansi)',val:kasmasuk,color:'var(--green)'},
-    {label:'🤝 Pinjaman Masuk',val:pinjaman,color:'var(--blue)'},
+    {label:'🤝 Pinjaman Masuk (belum dikembalikan)',val:pinjaman,color:'var(--blue)'},
     {label:'📤 Pengeluaran',val:-pengeluaran,color:'var(--danger)'},
   ];
   document.getElementById('ringkasan-rows').innerHTML=rows.map(r=>`
