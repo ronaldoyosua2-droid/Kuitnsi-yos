@@ -3108,36 +3108,38 @@ function buildKwitansiHTML(rec, logoHTML, namaSekolah, alamat, telepon){
 // ===================== TUNGGAKAN SPP =====================
 function getSppHistory(nama){
   var rw=getRiwayat(), paid=new Set(), partial=new Set();
-  // paid = fully paid (sisa=0), partial = paid but still has sisa
   rw.filter(function(r){return r.nama===nama&&r.tipe==='SPP';}).forEach(function(r){
-    var target = r.sisa===0 ? paid : partial;
-    var labels=r.items?r.items.map(function(it){return it.label||'';}):[r.bayarLabel||r.label||''];
-    // Use transaction year as fallback for old labels without year
     var recYear = r.tanggal ? r.tanggal.substring(0,4) : String(new Date().getFullYear());
-    labels.forEach(function(label){
-      // Match with year: "SPP April - Juni 2026" or "SPP Juni 2026"
+    // Use per-item sisa if available for accurate tracking
+    var items = r.items && r.items.length > 0
+      ? r.items
+      : [{label:r.bayarLabel||r.label||'', sisa:r.sisa||0}];
+    items.forEach(function(item){
+      var rawLabel = item.label||'';
+      var itemSisa = (item.sisa===undefined) ? (r.sisa||0) : (item.sisa||0);
+      var target = itemSisa===0 ? paid : partial;
+      var label = rawLabel.replace(/\s*\([^)]*\)/g,'').trim();
       var m2=label.match(/SPP\s+(\w+)\s*-\s*(\w+)\s+(\d{4})/);
-      var m1=label.match(/SPP\s+(\w+)\s+(\d{4})/);
-      // Match WITHOUT year (old format): "SPP Juni" or "SPP April - Juni"
+      var m1=!m2&&label.match(/SPP\s+(\w+)\s+(\d{4})/);
       var m2old=!m2&&!m1&&label.match(/SPP\s+(\w+)\s*-\s*(\w+)/);
       var m1old=!m2&&!m1&&!m2old&&label.match(/SPP\s+(\w+)/);
       if(m2){
         var dari=BULAN.indexOf(m2[1]),sampai=BULAN.indexOf(m2[2]),thn=m2[3];
-        if(dari>=0&&sampai>=0) for(var b=dari;b<=sampai;b++) paid.add(BULAN[b]+' '+thn);
+        if(dari>=0&&sampai>=0) for(var b=dari;b<=sampai;b++) target.add(BULAN[b]+' '+thn);
       } else if(m1){
-        paid.add(m1[1]+' '+m1[2]);
+        target.add(m1[1]+' '+m1[2]);
       } else if(m2old){
-        // Old format — use transaction year
         var dari=BULAN.indexOf(m2old[1]),sampai=BULAN.indexOf(m2old[2]);
-        if(dari>=0&&sampai>=0) for(var b=dari;b<=sampai;b++) paid.add(BULAN[b]+' '+recYear);
+        if(dari>=0&&sampai>=0) for(var b=dari;b<=sampai;b++) target.add(BULAN[b]+' '+recYear);
       } else if(m1old){
         var b=BULAN.indexOf(m1old[1]);
-        if(b>=0) paid.add(BULAN[b]+' '+recYear);
+        if(b>=0) target.add(BULAN[b]+' '+recYear);
       }
     });
   });
   return {paid:paid, partial:partial};
 }
+
 
 function getTunggakanSPP(nama, targetLabel){
   var manual=(getSiswa().find(function(s){return s.nama===nama;})||{}).tunggakanSPP||[];
