@@ -620,6 +620,7 @@ function doConfirmLoadCloud(){ if(typeof confirmLoadCloud==='function') confirmL
         <option value="Pengembangan">Pengembangan</option>
         <option value="Pendaftaran">Pendaftaran</option>
         <option value="Lainnya">Lainnya</option>
+      <option value="Koperasi">🛒 Koperasi</option>
       </select>
       <button class="btn" style="font-size:12px;padding:5px 12px" onclick="downloadRiwayatSiswa()">&#128190; Download Riwayat</button>
     </div>
@@ -638,6 +639,7 @@ function doConfirmLoadCloud(){ if(typeof confirmLoadCloud==='function') confirmL
         <option value="Pengembangan">Pengembangan</option>
         <option value="Pendaftaran">Pendaftaran</option>
         <option value="Lainnya">Lainnya</option>
+      <option value="Koperasi">🛒 Koperasi</option>
       </select>
       <select id="all-filter-metode" onchange="filterAllRiwayat()" style="width:auto">
         <option value="">Semua Metode</option>
@@ -1065,6 +1067,22 @@ function doConfirmLoadCloud(){ if(typeof confirmLoadCloud==='function') confirmL
       </div>
     </div>
 
+    <!-- TAB: KOPERASI -->
+    <div class="tab-content" id="tab-koperasi">
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+          <div style="font-size:14px;font-weight:600">🛒 Ringkasan Koperasi</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <input type="date" id="kop-dari" onchange="renderKoperasi()" style="padding:7px;border:1px solid var(--border);border-radius:7px;font-size:13px">
+            <input type="date" id="kop-sampai" onchange="renderKoperasi()" style="padding:7px;border:1px solid var(--border);border-radius:7px;font-size:13px">
+            <button class="btn btn-primary" onclick="renderKoperasi()">Filter</button>
+          </div>
+        </div>
+        <div id="koperasi-summary" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px"></div>
+        <div id="koperasi-table"></div>
+      </div>
+    </div>
+
     <!-- TAB: PINJAMAN -->
     <div class="tab-content" id="tab-pinjaman">
       <div class="card">
@@ -1379,7 +1397,7 @@ function renderItemForms(){
     return;
   }
   wrap.innerHTML = itemList.map((it,i) => {
-    const isCustom = it.tipe==='Pendaftaran'||it.tipe==='Lainnya';
+    const isCustom = it.tipe==='Pendaftaran'||it.tipe==='Lainnya'||it.tipe==='Koperasi';
     const isSPP = it.tipe==='SPP';
     const isSPPKustom = isSPP && !!it.sppKustom;
     const qty = it.qty||1;
@@ -1515,6 +1533,7 @@ function renderItemForms(){
             <option value="Pengembangan" ${it.tipe==='Pengembangan'?'selected':''}>Pengembangan</option>
             <option value="Pendaftaran" ${it.tipe==='Pendaftaran'?'selected':''}>Cicilan Pendaftaran</option>
             <option value="Lainnya" ${it.tipe==='Lainnya'?'selected':''}>Pembayaran Lainnya</option>
+            <option value="Koperasi" ${it.tipe==='Koperasi'?'selected':''}>🛒 Koperasi</option>
           </select>
         </div>
         <div style="margin-bottom:8px">${keteranganField}</div>
@@ -1746,7 +1765,7 @@ function onItemTipeChange(i, tipe){
   itemList[i].tipe = tipe;
   itemList[i].label = '';
   itemList[i].nominal = 0;
-  itemList[i].isCustom = tipe==='Pendaftaran'||tipe==='Lainnya';
+  itemList[i].isCustom = tipe==='Pendaftaran'||tipe==='Lainnya'||tipe==='Koperasi';
   itemList[i].customNominal = 0;
   itemList[i].diskonPct = 0;
   itemList[i].diskonAmt = 0;
@@ -2554,7 +2573,7 @@ function onTipeChange(){
   resetPaymentFields();
   const tipe=document.getElementById('sel-tipe').value;
   if(!tipe)return;
-  const isCustom=tipe==='Pendaftaran'||tipe==='Lainnya';
+  const isCustom=tipe==='Pendaftaran'||tipe==='Lainnya'||tipe==='Koperasi';
   document.getElementById('inp-bayar-nominal').style.display=isCustom?'block':'none';
   document.getElementById('box-bayar-nominal').style.display=isCustom?'none':'block';
   searchBayar();
@@ -2740,7 +2759,7 @@ function updateNominalDisplay(){
 
 function hitungSisa(){
   const tipe=document.getElementById('sel-tipe').value;
-  const isCustom=tipe==='Pendaftaran'||tipe==='Lainnya';
+  const isCustom=tipe==='Pendaftaran'||tipe==='Lainnya'||tipe==='Koperasi';
   if(!isCustom||!selectedTarif)return;
   const bayar=parseInt(document.getElementById('inp-bayar-nominal').value)||0;
   const box=document.getElementById('box-tagihan');
@@ -3422,7 +3441,7 @@ function buatKwitansi(){
   for(let i=0;i<itemList.length;i++){
     if(!itemList[i].tipe){ al.textContent=`Jenis item #${i+1} belum dipilih.`; al.classList.add('show'); return; }
     if(!itemList[i].label.trim()){ al.textContent=`Keterangan item #${i+1} belum diisi.`; al.classList.add('show'); return; }
-    const isCustom=itemList[i].tipe==='Pendaftaran'||itemList[i].tipe==='Lainnya';
+    const isCustom=itemList[i].tipe==='Pendaftaran'||itemList[i].tipe==='Lainnya'||itemList[i].tipe==='Koperasi';
     if(isCustom){
       // Check perSiswaNominal first (multi-siswa), then customNominal (single)
       const hasPerSiswa = itemList[i].perSiswaNominal &&
@@ -4075,7 +4094,6 @@ function filterRwByDate(dari,sampai){
 }
 
 function summaryCards(data,containerId){
-  // Kas only untuk perhitungan total
   const kasData=data.filter(r=>!r.metode||r.metode==='Kas');
   const transferData=data.filter(r=>r.metode==='Transfer');
   const totKas=kasData.reduce((a,r)=>a+(r.nominalBayar||0),0);
@@ -4085,30 +4103,44 @@ function summaryCards(data,containerId){
   const byPGM=kasData.filter(r=>r.tipe==='Pengembangan').reduce((a,r)=>a+(r.nominalBayar||0),0);
   const byDaftar=kasData.filter(r=>r.tipe==='Pendaftaran').reduce((a,r)=>a+(r.nominalBayar||0),0);
   const byLain=kasData.filter(r=>r.tipe==='Lainnya').reduce((a,r)=>a+(r.nominalBayar||0),0);
-  document.getElementById(containerId).innerHTML=[
+  const byKop=kasData.filter(r=>r.tipe==='Koperasi').reduce((a,r)=>a+(r.nominalBayar||0),0);
+  const cards=[
     {label:'Total Transaksi',val:data.length+' kwitansi',c:'var(--blue)'},
     {label:'💵 Total Kas',val:fmt(totKas),c:'var(--green)'},
-    {label:'🏦 Transfer (tidak dihitung)',val:fmt(totTransfer),c:'#92400e'},
-    {label:'SPP (Kas)',val:fmt(bySPP),c:'var(--blue)'},
-    {label:'Pengembangan (Kas)',val:fmt(byPGM),c:'var(--green)'},
-    {label:'Pendaftaran (Kas)',val:fmt(byDaftar),c:'var(--orange)'},
-    {label:'Lainnya (Kas)',val:fmt(byLain),c:'var(--gray)'},
+    {label:'🏦 Transfer',val:fmt(totTransfer),c:'#92400e'},
+    {label:'SPP',val:fmt(bySPP),c:'var(--blue)'},
+    {label:'Pengembangan',val:fmt(byPGM),c:'var(--green)'},
+    {label:'Pendaftaran',val:fmt(byDaftar),c:'var(--orange)'},
+    {label:'Lainnya',val:fmt(byLain),c:'var(--gray)'},
+    {label:'🛒 Koperasi',val:fmt(byKop),c:'var(--orange)',highlight:byKop>0},
     {label:'Sisa/Tunggakan',val:fmt(totSisa),c:'var(--danger)'},
-  ].map(x=>`<div style="background:var(--gray-light);border-radius:8px;padding:8px 12px;min-width:110px">
-    <div style="font-size:10px;color:var(--text2)">${x.label}</div>
-    <div style="font-size:13px;font-weight:600;color:${x.c};margin-top:2px">${x.val}</div>
-  </div>`).join('');
+  ];
+  document.getElementById(containerId).innerHTML=cards.map(x=>`
+    <div style="background:${x.highlight?'#fff7ed':'var(--gray-light)'};border-radius:8px;padding:8px 12px;min-width:110px;
+      ${x.highlight?'border:1.5px solid var(--orange)':''}">
+      <div style="font-size:10px;color:var(--text2)">${x.label}</div>
+      <div style="font-size:13px;font-weight:700;color:${x.c};margin-top:2px">${x.val}</div>
+    </div>`).join('');
 }
 
 function rwTable(data,tableId,showKelas=true){
   const wrap=document.getElementById(tableId);
   if(!data.length){wrap.innerHTML='<div class="hist-empty">Tidak ada transaksi pada periode ini</div>';return;}
   const kelasCol=showKelas?'<th>Kelas</th>':'';
-  wrap.innerHTML=`<table class="hist-table">
-    <thead><tr><th>No. Kwitansi</th><th>Nama</th>${kelasCol}<th>Metode</th><th>Jenis</th><th>Keterangan</th><th>Tanggal</th><th>Dibayar</th><th>Sisa</th><th>Aksi</th></tr></thead>
+  // Add selection total bar above table
+  const totalBar=`<div id="${tableId}-selbar" style="display:none;align-items:center;gap:12px;padding:8px 14px;background:#fff7ed;border:1.5px solid var(--orange);border-radius:8px;margin-bottom:8px;font-size:13px">
+    <span>☑ <strong id="${tableId}-selcount">0</strong> dipilih</span>
+    <span style="color:var(--orange);font-weight:700;font-size:15px" id="${tableId}-seltotal">Rp 0</span>
+    <button onclick="rwTableClearSel('${tableId}')" style="font-size:11px;padding:2px 8px;border-radius:5px;border:1px solid var(--border);cursor:pointer;background:#fff">✕ Batal pilih</button>
+  </div>`;
+  wrap.innerHTML=totalBar+`<table class="hist-table">
+    <thead><tr>
+      <th style="width:32px"><input type="checkbox" title="Pilih semua" onchange="rwTableSelectAll('${tableId}',this.checked)" style="width:14px;height:14px"></th>
+      <th>No. Kwitansi</th><th>Nama</th>${kelasCol}<th>Metode</th><th>Jenis</th><th>Keterangan</th><th>Tanggal</th><th>Dibayar</th><th>Sisa</th><th>Aksi</th></tr></thead>
     <tbody>`+data.map(r=>{
       const isTrf=r.metode==='Transfer';
-      return `<tr style="background:${isTrf?'#eff6ff':''}">
+      return `<tr style="background:${isTrf?'#eff6ff':''}" data-dibayar="${r.nominalBayar||0}">
+        <td><input type="checkbox" class="${tableId}-rowcheck" onchange="rwTableUpdateSel('${tableId}')" style="width:14px;height:14px;cursor:pointer"></td>
         <td><span class="badge badge-blue">${r.no}</span></td>
         <td>${r.nama}</td>
         ${showKelas?`<td><span class="badge ${r.kelas&&r.kelas.includes('Plus')?'badge-orange':'badge-blue'}">${r.kelas||'—'}</span></td>`:''}
@@ -4155,11 +4187,15 @@ function applyHarianFilter(){
   const tipe=document.getElementById('harian-filter-tipe').value;
   const metode=document.getElementById('harian-filter-metode').value;
   const kelas=document.getElementById('harian-filter-kelas').value;
+  const kopOnly=document.getElementById('harian-koperasi-only')?.checked;
   let filtered=_harianData;
-  if(q)filtered=filtered.filter(r=>r.nama.toLowerCase().includes(q));
-  if(tipe)filtered=filtered.filter(r=>r.tipe===tipe);
-  if(metode)filtered=filtered.filter(r=>(r.metode||'Kas')===metode);
-  if(kelas)filtered=filtered.filter(r=>r.kelas===kelas);
+  if(kopOnly){filtered=filtered.filter(r=>r.tipe==='Koperasi');}
+  else {
+    if(q)filtered=filtered.filter(r=>r.nama.toLowerCase().includes(q));
+    if(tipe)filtered=filtered.filter(r=>r.tipe===tipe);
+    if(metode)filtered=filtered.filter(r=>(r.metode||'Kas')===metode);
+    if(kelas)filtered=filtered.filter(r=>r.kelas===kelas);
+  }
   // Update result info
   const info=document.getElementById('harian-result-info');
   if(info){
@@ -4173,6 +4209,25 @@ function applyHarianFilter(){
     }
   }
   rwTable(filtered,'harian-table');
+}
+
+function rwTableUpdateSel(tableId){
+  const checks=[...document.querySelectorAll('.'+tableId+'-rowcheck:checked')];
+  const total=checks.reduce((a,cb)=>a+parseInt(cb.closest('tr').dataset.dibayar||0),0);
+  const bar=document.getElementById(tableId+'-selbar');
+  const countEl=document.getElementById(tableId+'-selcount');
+  const totalEl=document.getElementById(tableId+'-seltotal');
+  if(bar){bar.style.display=checks.length?'flex':'none';}
+  if(countEl)countEl.textContent=checks.length;
+  if(totalEl)totalEl.textContent=fmt(total);
+}
+function rwTableSelectAll(tableId,checked){
+  document.querySelectorAll('.'+tableId+'-rowcheck').forEach(cb=>{cb.checked=checked;});
+  rwTableUpdateSel(tableId);
+}
+function rwTableClearSel(tableId){
+  document.querySelectorAll('.'+tableId+'-rowcheck').forEach(cb=>{cb.checked=false;});
+  rwTableUpdateSel(tableId);
 }
 
 function resetHarianFilter(){
@@ -4491,12 +4546,13 @@ function renderRingkasanKas(){
   const modal=(all[tgl]||{nominal:0}).nominal||0;
   const rw=getRiwayat();
   // Only count today's kas transactions
-  const kasmasuk=rw.filter(r=>r.tanggal===tgl&&(!r.metode||r.metode==='Kas')).reduce((a,r)=>a+(r.nominalBayar||0),0);
+  const kasmasuk=rw.filter(r=>r.tanggal===tgl&&r.tipe!=='Koperasi'&&(!r.metode||r.metode==='Kas')).reduce((a,r)=>a+(r.nominalBayar||0),0);
   // Only today's pengeluaran
   const pengeluaran=getPengeluaran().filter(p=>p.tanggal===tgl).reduce((a,p)=>a+p.nominal,0);
   // Only today's pinjaman
-  const pinjaman=getPinjaman().filter(p=>p.tanggal===tgl).reduce((a,p)=>a+p.nominal,0);
-  const saldo=modal+kasmasuk+pinjaman-pengeluaran;
+  const pinjaman=getPinjaman().filter(p=>p.tanggal===tgl&&!p.lunas).reduce((a,p)=>a+p.nominal,0);
+  const koperasi=rw.filter(r=>r.tanggal===tgl&&r.tipe==='Koperasi'&&(!r.metode||r.metode==='Kas')).reduce((a,r)=>a+(r.nominalBayar||0),0);
+  const saldo=modal+kasmasuk+koperasi+pinjaman-pengeluaran;
   // Show date context
   const tglLabel=document.getElementById('ringkasan-tgl-label');
   if(tglLabel) tglLabel.textContent=fmtTgl(tgl);
@@ -4505,6 +4561,7 @@ function renderRingkasanKas(){
     {label:'💰 Kas Awal Harian',val:modal,color:'var(--text)'},
     {label:'📥 Pemasukan Kas (kwitansi)',val:kasmasuk,color:'var(--green)'},
     {label:'🤝 Pinjaman Masuk (belum dikembalikan)',val:pinjaman,color:'var(--blue)'},
+    {label:'🛒 Koperasi',val:koperasi,color:'var(--orange)'},
     {label:'📤 Pengeluaran',val:-pengeluaran,color:'var(--danger)'},
   ];
   document.getElementById('ringkasan-rows').innerHTML=rows.map(r=>`
@@ -4666,6 +4723,87 @@ function downloadPinjamanExcel(){
 // ===================== KAS TUNAI =====================
 function getKasTunai(){ return lsGet('ya_kas_tunai')||{}; }
 function setKasTunai(v){ lsSet('ya_kas_tunai',v); }
+
+function initKoperasi(){
+  const t = today();
+  const firstDay = t.substring(0,8)+'01';
+  if(!document.getElementById('kop-dari').value) document.getElementById('kop-dari').value=firstDay;
+  if(!document.getElementById('kop-sampai').value) document.getElementById('kop-sampai').value=t;
+  renderKoperasi();
+}
+
+function renderKoperasi(){
+  const dari = document.getElementById('kop-dari').value;
+  const sampai = document.getElementById('kop-sampai').value;
+  const rw = getRiwayat().filter(r=>{
+    if(r.tipe!=='Koperasi') return false;
+    if(dari && r.tanggal < dari) return false;
+    if(sampai && r.tanggal > sampai) return false;
+    return true;
+  });
+
+  const totalTagihan = rw.reduce((a,r)=>a+r.tagihan,0);
+  const totalBayar = rw.reduce((a,r)=>a+r.nominalBayar,0);
+  const totalSisa = rw.reduce((a,r)=>a+r.sisa,0);
+
+  // Summary cards
+  document.getElementById('koperasi-summary').innerHTML=`
+    <div class="stat-card"><div class="stat-label">Total Transaksi</div><div class="stat-val" style="color:var(--blue)">${rw.length} transaksi</div></div>
+    <div class="stat-card"><div class="stat-label">Total Tagihan</div><div class="stat-val">${fmt(totalTagihan)}</div></div>
+    <div class="stat-card"><div class="stat-label">Total Dibayar</div><div class="stat-val" style="color:var(--green)">${fmt(totalBayar)}</div></div>
+    ${totalSisa>0?`<div class="stat-card"><div class="stat-label">Total Sisa</div><div class="stat-val" style="color:var(--danger)">${fmt(totalSisa)}</div></div>`:''}
+  `;
+
+  if(rw.length===0){
+    document.getElementById('koperasi-table').innerHTML='<p style="color:var(--text2);text-align:center;padding:20px">Tidak ada transaksi koperasi di periode ini.</p>';
+    return;
+  }
+
+  // Group by keterangan/item
+  const byItem = {};
+  rw.forEach(r=>{
+    const items = r.items||[{label:r.bayarLabel,tagihan:r.tagihan,dibayar:r.nominalBayar,sisa:r.sisa,qty:1}];
+    items.filter(it=>it.tipe==='Koperasi'||r.tipe==='Koperasi').forEach(it=>{
+      const key = it.label||r.bayarLabel||'Koperasi';
+      if(!byItem[key]) byItem[key]={label:key,count:0,total:0,dibayar:0};
+      byItem[key].count++;
+      byItem[key].total+=it.tagihan||0;
+      byItem[key].dibayar+=it.dibayar||0;
+    });
+  });
+
+  let tableHtml = `<div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:8px">REKAPITULASI PER ITEM</div>
+    <table class="hist-table" style="margin-bottom:16px">
+    <thead><tr><th>Item</th><th>Qty Transaksi</th><th>Total</th><th>Dibayar</th></tr></thead><tbody>`;
+  Object.values(byItem).forEach(item=>{
+    tableHtml+=`<tr>
+      <td>${item.label}</td>
+      <td>${item.count}x</td>
+      <td>${fmt(item.total)}</td>
+      <td style="color:var(--green)">${fmt(item.dibayar)}</td>
+    </tr>`;
+  });
+  tableHtml+=`</tbody></table>`;
+
+  // Detail table
+  tableHtml+=`<div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:8px">DETAIL TRANSAKSI</div>
+    <table class="hist-table"><thead><tr>
+    <th>No. Kwitansi</th><th>Nama</th><th>Kelas</th><th>Keterangan</th><th>Tanggal</th><th>Dibayar</th><th>Sisa</th>
+    </tr></thead><tbody>`;
+  rw.forEach(r=>{
+    tableHtml+=`<tr>
+      <td><span class="badge badge-blue">${r.no}</span></td>
+      <td>${r.nama}</td>
+      <td><span class="badge badge-green">${r.kelas||'—'}</span></td>
+      <td>${r.bayarLabel||'—'}</td>
+      <td>${fmtTgl(r.tanggal)}</td>
+      <td style="color:var(--green);font-weight:500">${fmt(r.nominalBayar)}</td>
+      <td style="color:${r.sisa>0?'var(--danger)':'var(--green)'};font-weight:500">${r.sisa>0?fmt(r.sisa):'Lunas'}</td>
+    </tr>`;
+  });
+  tableHtml+=`</tbody></table>`;
+  document.getElementById('koperasi-table').innerHTML=tableHtml;
+}
 
 function initKasTunai(){
   document.getElementById('kt-tanggal').value=today();
@@ -4906,6 +5044,7 @@ function switchTab(t){
   if(t==='laporanJenjang'){document.getElementById('jenjang-dari').value=today();document.getElementById('jenjang-sampai').value=today();}
   if(t==='modalAwal')initModalAwal();
   if(t==='pengeluaran')initPengeluaran();
+  if(t==='koperasi')initKoperasi();
   if(t==='pinjaman')initPinjaman();
   if(t==='kasTunai')initKasTunai();
 }
@@ -4984,6 +5123,7 @@ function openTambahSiswa(){
   document.getElementById('form-siswa-title').textContent='Tambah Siswa Baru';
   document.getElementById('fs-alert').classList.remove('show');
   document.getElementById('form-siswa-card').style.display='block';
+  setTimeout(function(){document.getElementById('form-siswa-card').scrollIntoView({behavior:'smooth',block:'start'});},50);
   document.getElementById('fs-nama').focus();
 }
 
@@ -4997,6 +5137,7 @@ function editSiswa(idx){
   document.getElementById('form-siswa-title').textContent='Edit Siswa';
   document.getElementById('fs-alert').classList.remove('show');
   document.getElementById('form-siswa-card').style.display='block';
+  document.getElementById('form-siswa-card').scrollIntoView({behavior:'smooth',block:'start'});
 }
 
 function saveSiswa(){
