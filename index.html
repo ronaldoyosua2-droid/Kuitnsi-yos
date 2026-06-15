@@ -3997,7 +3997,7 @@ function renderRekordSiswa(){
         <td><span class="badge ${s.kelas.includes('Plus')?'badge-orange':'badge-blue'}">${s.kelas}</span></td>
         <td style="color:var(--green);font-weight:500">${sr.length?fmt(totBayar):'—'}</td>
         <td>${hasTung?`<span style="color:var(--danger);font-weight:600">${fmt(totSisa)}</span>`:'<span style="color:var(--green)">Lunas</span>'}</td>
-        <td><button class="btn" style="font-size:11px;padding:3px 10px" onclick="bukaRekordSiswa('${encodeURIComponent(s.nama)}','${encodeURIComponent(s.kelas)}')">&#128203; Lihat</button></td>
+        <td><button class="btn" style="font-size:11px;padding:3px 10px" onclick="bukaRekordModal('${encodeURIComponent(s.nama)}','${encodeURIComponent(s.kelas)}')">&#128203; Lihat</button></td>
       </tr>`;
     }).join('')+`</tbody></table>
     <p style="font-size:12px;color:var(--text2);margin-top:8px">Menampilkan ${siswa.length} siswa</p>`;
@@ -4058,6 +4058,7 @@ function renderRekordDetail(){
         <td style="color:var(--green);font-weight:500">${fmt(r.nominalBayar)}</td>
         <td style="color:${sd.sisa>0?'var(--danger)':'var(--green)'};font-weight:500">${sd.label}</td>
         <td style="display:flex;gap:4px">
+          <button class="btn btn-primary" style="font-size:11px;padding:2px 7px" onclick="openTrxModal(${r.id})">&#128065; Detail</button>
           <button class="btn" style="font-size:11px;padding:2px 7px" onclick="cetakUlang(${r.id})">&#128438;</button>
           <button class="btn btn-danger" style="font-size:11px;padding:2px 7px" onclick="hapusSatuRiwayat(${r.id});renderRekordDetail()">&#128465;</button>
         </td>
@@ -5253,6 +5254,189 @@ function renderTunggakan(){
 <div id="print-area" style="display:none"></div>
 <script>
 
+// ===================== SISWA REKORD MODAL =====================
+function bukaRekordModal(encNama, encKelas){
+  const nama=decodeURIComponent(encNama);
+  const kelas=decodeURIComponent(encKelas);
+  rekordCurrentSiswa={nama,kelas};
+  const siswaData=getSiswa().find(s=>s.nama===nama)||{};
+  document.getElementById('srm-nama').textContent=nama;
+  document.getElementById('srm-kelas').textContent=kelas+(siswaData.sppKhusus?' · SPP Khusus: Rp'+siswaData.sppKhusus.toLocaleString('id-ID'):'');
+  document.getElementById('srm-filter').value='';
+  document.getElementById('siswa-rekord-modal').style.display='flex';
+  document.body.style.overflow='hidden';
+  renderSiswaRekordModal();
+  setTimeout(()=>renderTunggakanEditor2(nama),100);
+}
+
+function closeSiswaRekordModal(){
+  document.getElementById('siswa-rekord-modal').style.display='none';
+  document.body.style.overflow='';
+}
+
+function renderSiswaRekordModal(){
+  if(!rekordCurrentSiswa) return;
+  const nama=rekordCurrentSiswa.nama;
+  const filterTipe=document.getElementById('srm-filter').value;
+  let rw=getRiwayat().filter(r=>r.nama.toLowerCase()===nama.toLowerCase());
+  if(filterTipe) rw=rw.filter(r=>r.tipe===filterTipe);
+
+  const totBayar=rw.reduce((a,r)=>a+(r.nominalBayar||0),0);
+  const totTagihan=rw.reduce((a,r)=>a+(r.tagihan||0),0);
+  const totSisa=rw.reduce((a,r)=>a+(r.sisa||0),0);
+
+  // Summary
+  document.getElementById('srm-summary').innerHTML=[
+    {label:'Total Transaksi',val:rw.length+' kwitansi',c:'var(--blue)'},
+    {label:'Total Tagihan',val:fmt(totTagihan),c:'var(--text)'},
+    {label:'Total Dibayar',val:fmt(totBayar),c:'var(--green)'},
+    {label:'Total Sisa',val:fmt(totSisa),c:totSisa>0?'var(--danger)':'var(--green)'},
+  ].map(x=>`<div style="background:var(--gray-light);border-radius:8px;padding:8px 12px;min-width:120px">
+    <div style="font-size:10px;color:var(--text2)">${x.label}</div>
+    <div style="font-size:13px;font-weight:700;color:${x.c};margin-top:2px">${x.val}</div>
+  </div>`).join('');
+
+  if(!rw.length){
+    document.getElementById('srm-table').innerHTML='<div style="text-align:center;color:var(--text2);padding:20px">Tidak ada transaksi.</div>';
+    return;
+  }
+
+  const rows=rw.map(r=>{
+    const isTrf=r.metode==='Transfer';
+    const tipeColor=r.tipe==='SPP'?'badge-blue':r.tipe==='Pengembangan'?'badge-green':r.tipe==='Koperasi'?'badge-orange':'badge-orange';
+    return `<tr style="cursor:pointer;background:${isTrf?'#eff6ff':''}" onclick="openTrxModal(${r.id})">
+      <td><span class="badge badge-blue" style="font-size:10px">${r.no}</span></td>
+      <td>${fmtTgl(r.tanggal)}</td>
+      <td><span style="font-size:10px;padding:2px 7px;border-radius:10px;background:${isTrf?'#dbeafe':'#dcfce7'};color:${isTrf?'#1d4ed8':'#15803d'};font-weight:700">${isTrf?'🏦 TF':'💵 Kas'}</span></td>
+      <td><span class="badge ${tipeColor}" style="font-size:10px">${r.tipe}</span></td>
+      <td style="max-width:180px;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.bayarLabel}</td>
+      <td style="color:var(--green);font-weight:600;font-size:13px">${fmt(r.nominalBayar)}</td>
+      <td style="color:${r.sisa>0?'var(--danger)':'var(--green)'};font-size:12px;font-weight:600">${r.sisa>0?fmt(r.sisa):'Lunas'}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('srm-table').innerHTML=`
+    <table class="hist-table" style="font-size:12px">
+      <thead><tr>
+        <th>No.</th><th>Tanggal</th><th>Metode</th><th>Jenis</th><th>Keterangan</th><th>Dibayar</th><th>Sisa</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <p style="font-size:10px;color:var(--text2);margin-top:6px">Klik baris untuk lihat detail · ${rw.length} transaksi</p>`;
+}
+
+function renderTunggakanEditor2(nama){
+  const wrap=document.getElementById('srm-tunggakan');
+  if(!wrap) return;
+  // Temporarily use this div as tunggakan-editor target
+  const realTE=document.getElementById('tunggakan-editor');
+  if(realTE) realTE.id='tunggakan-editor-bak';
+  wrap.id='tunggakan-editor';
+  renderTunggakanEditor(nama);
+  wrap.id='srm-tunggakan';
+  if(realTE) realTE.id='tunggakan-editor';
+}
+
+function downloadRekordExcel(){
+  if(!rekordCurrentSiswa) return;
+  // Reuse existing download logic
+  const nama=rekordCurrentSiswa.nama;
+  const rw=getRiwayat().filter(r=>r.nama.toLowerCase()===nama.toLowerCase());
+  downloadRekordSiswaExcel(nama,rw);
+}
+
+// Close on backdrop
+document.addEventListener('click',function(e){
+  const m=document.getElementById('siswa-rekord-modal');
+  if(e.target===m) closeSiswaRekordModal();
+});
+
+// ===================== TRANSAKSI DETAIL MODAL =====================
+var _trxModalId = null;
+
+function openTrxModal(id){
+  const r = getRiwayat().find(x=>x.id===id);
+  if(!r) return;
+  _trxModalId = id;
+  document.getElementById('trx-modal-no').textContent = r.no;
+  document.getElementById('trx-modal-tgl').textContent = fmtTgl(r.tanggal) + (r.waktu?' · '+r.waktu:'') + ' · ' + (r.metode==='Transfer'?'🏦 Transfer':'💵 Kas');
+
+  const items = r.items && r.items.length ? r.items : [{
+    tipe: r.tipe, label: r.bayarLabel, tagihan: r.tagihan,
+    dibayar: r.nominalBayar, sisa: r.sisa, qty: 1
+  }];
+
+  let html = `<div style="margin-bottom:14px;padding:10px 14px;background:var(--gray-light);border-radius:8px">
+    <div style="font-size:12px;color:var(--text2);margin-bottom:4px">Diterima dari</div>
+    <div style="font-size:15px;font-weight:700">${r.nama}</div>
+    <div style="font-size:12px;color:var(--text2)">${r.kelas||''}</div>
+  </div>`;
+
+  html += `<table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:14px">
+    <thead>
+      <tr style="background:var(--gray-light)">
+        <th style="padding:8px;text-align:left;font-size:11px;color:var(--text2)">Jenis</th>
+        <th style="padding:8px;text-align:left;font-size:11px;color:var(--text2)">Keterangan</th>
+        <th style="padding:8px;text-align:right;font-size:11px;color:var(--text2)">Tagihan</th>
+        <th style="padding:8px;text-align:right;font-size:11px;color:var(--text2)">Dibayar</th>
+        <th style="padding:8px;text-align:right;font-size:11px;color:var(--text2)">Sisa</th>
+      </tr>
+    </thead>
+    <tbody>`;
+
+  items.forEach(it=>{
+    const tipeBadgeColor = it.tipe==='SPP'?'#dbeafe':it.tipe==='Pengembangan'?'#dcfce7':it.tipe==='Koperasi'?'#fff7ed':'#fef3c7';
+    const tipeTxtColor = it.tipe==='SPP'?'#1d4ed8':it.tipe==='Pengembangan'?'#15803d':it.tipe==='Koperasi'?'var(--orange)':'#92400e';
+    html += `<tr style="border-bottom:1px solid var(--border)">
+      <td style="padding:8px">
+        <span style="font-size:11px;font-weight:600;padding:2px 7px;border-radius:10px;background:${tipeBadgeColor};color:${tipeTxtColor}">${it.tipe}</span>
+      </td>
+      <td style="padding:8px">${it.label||it.keterangan||'—'}</td>
+      <td style="padding:8px;text-align:right">${fmt(it.tagihan||0)}</td>
+      <td style="padding:8px;text-align:right;color:var(--green);font-weight:600">${fmt(it.dibayar||0)}</td>
+      <td style="padding:8px;text-align:right;color:${(it.sisa||0)>0?'var(--danger)':'var(--green)'};font-weight:600">${(it.sisa||0)>0?fmt(it.sisa):'Lunas'}</td>
+    </tr>`;
+  });
+
+  html += `</tbody></table>`;
+
+  // Total row
+  const totTagihan = items.reduce((a,it)=>a+(it.tagihan||0),0);
+  const totDibayar = items.reduce((a,it)=>a+(it.dibayar||0),0);
+  const totSisa = items.reduce((a,it)=>a+(it.sisa||0),0);
+  html += `<div style="display:flex;justify-content:space-between;padding:10px 14px;background:var(--blue);color:#fff;border-radius:8px;font-weight:700">
+    <span>Total Diterima</span>
+    <span style="font-size:16px">${fmt(totDibayar)}</span>
+  </div>`;
+  if(totSisa>0){
+    html += `<div style="text-align:right;margin-top:6px;font-size:12px;color:var(--danger);font-weight:600">Sisa: ${fmt(totSisa)}</div>`;
+  }
+  if(r.kembalian>0){
+    html += `<div style="display:flex;justify-content:space-between;margin-top:8px;padding:8px 14px;background:#fff7ed;border-radius:8px;border:1.5px solid var(--orange)">
+      <span style="font-size:13px;color:var(--orange);font-weight:600">💰 Kembalian</span>
+      <span style="font-size:15px;font-weight:700;color:var(--orange)">${fmt(r.kembalian)}</span>
+    </div>`;
+  }
+
+  document.getElementById('trx-modal-body').innerHTML = html;
+  document.getElementById('trx-detail-modal').style.display = 'flex';
+}
+
+function closeTrxModal(){
+  document.getElementById('trx-detail-modal').style.display = 'none';
+  _trxModalId = null;
+}
+
+function cetakUlangFromModal(){
+  if(_trxModalId) cetakUlang(_trxModalId);
+}
+
+// Close modal on backdrop click
+document.addEventListener('click', function(e){
+  const modal = document.getElementById('trx-detail-modal');
+  if(e.target === modal) closeTrxModal();
+});
+
 // ===================== PREVIEW TAB =====================
 function editKwitansi(){ showPage('kwitansi'); }
 function tutupPreview(){
@@ -5271,5 +5455,63 @@ function resetDariPreview(){
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js">
 
 </script>
+<!-- MODAL: REKORD SISWA -->
+<div id="siswa-rekord-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9998;align-items:flex-start;justify-content:center;padding:16px;overflow-y:auto">
+  <div style="background:#fff;border-radius:14px;padding:0;max-width:780px;width:100%;margin:auto;box-shadow:0 8px 32px rgba(0,0,0,.25);overflow:hidden">
+    <!-- Header -->
+    <div style="background:var(--blue);color:#fff;padding:16px 20px;display:flex;justify-content:space-between;align-items:center">
+      <div>
+        <div style="font-size:16px;font-weight:700" id="srm-nama"></div>
+        <div style="font-size:12px;opacity:.85;margin-top:2px" id="srm-kelas"></div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button onclick="downloadRekordExcel()" class="btn btn-green" style="font-size:12px;padding:5px 12px">💾 Excel</button>
+        <button onclick="closeSiswaRekordModal()" style="background:rgba(255,255,255,.2);border:none;color:#fff;font-size:18px;cursor:pointer;border-radius:50%;width:30px;height:30px;display:flex;align-items:center;justify-content:center">✕</button>
+      </div>
+    </div>
+    <!-- Summary -->
+    <div style="padding:14px 20px;background:#f8fafc;border-bottom:1px solid var(--border)">
+      <div id="srm-summary" style="display:flex;gap:10px;flex-wrap:wrap"></div>
+    </div>
+    <!-- Filter -->
+    <div style="padding:10px 20px;border-bottom:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <select id="srm-filter" onchange="renderSiswaRekordModal()" style="padding:6px 10px;font-size:13px;border:1px solid var(--border);border-radius:7px">
+        <option value="">Semua Jenis</option>
+        <option value="SPP">SPP</option>
+        <option value="Pengembangan">Pengembangan</option>
+        <option value="Pendaftaran">Pendaftaran</option>
+        <option value="Lainnya">Lainnya</option>
+        <option value="Koperasi">🛒 Koperasi</option>
+      </select>
+    </div>
+    <!-- Transaksi Table -->
+    <div style="padding:16px 20px;max-height:45vh;overflow-y:auto">
+      <div id="srm-table"></div>
+    </div>
+    <!-- Tunggakan SPP -->
+    <div style="padding:16px 20px;border-top:1px solid var(--border)">
+      <div id="srm-tunggakan"></div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: DETAIL TRANSAKSI -->
+<div id="trx-detail-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;align-items:center;justify-content:center;padding:16px">
+  <div style="background:#fff;border-radius:14px;padding:24px;max-width:580px;width:100%;max-height:88vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.2)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div>
+        <div style="font-size:15px;font-weight:700" id="trx-modal-no"></div>
+        <div style="font-size:12px;color:var(--text2);margin-top:2px" id="trx-modal-tgl"></div>
+      </div>
+      <button onclick="closeTrxModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text2)">✕</button>
+    </div>
+    <div id="trx-modal-body"></div>
+    <div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end">
+      <button class="btn btn-primary" onclick="cetakUlangFromModal()" style="font-size:12px">🖨 Cetak Ulang</button>
+      <button class="btn" onclick="closeTrxModal()" style="font-size:12px">Tutup</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
