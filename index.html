@@ -416,6 +416,36 @@ function doConfirmLoadCloud(){ if(typeof confirmLoadCloud==='function') confirmL
       </div>
     </div>
 
+    <!-- FORMULIR PENDAFTARAN -->
+    <div id="sb-formulir-section" style="display:none;background:#fef9c3;border:1.5px solid #fcd34d;border-radius:10px;padding:14px;margin-bottom:14px">
+      <div style="font-size:13px;font-weight:700;color:#92400e;margin-bottom:10px">📋 Biaya Formulir Pendaftaran</div>
+      <div class="row2" style="margin-bottom:10px">
+        <div class="field" style="margin-bottom:0">
+          <label>Biaya Formulir</label>
+          <div id="sb-formulir-nominal" style="padding:8px 12px;background:#fff;border:1px solid #fcd34d;border-radius:7px;font-weight:700;color:#92400e;font-size:14px">—</div>
+        </div>
+        <div class="field" style="margin-bottom:0">
+          <label>Status Pembayaran Formulir</label>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <label style="display:flex;align-items:center;gap:6px;padding:8px 14px;border-radius:7px;border:2px solid var(--blue);background:#eff6ff;cursor:pointer;font-size:13px;font-weight:600" id="sb-form-label-belum">
+              <input type="radio" name="sb-formulir-status" value="sekarang" checked onchange="onSbFormulirChange(this.value)" style="accent-color:var(--blue)"> 💳 Bayar Sekarang
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;padding:8px 14px;border-radius:7px;border:2px solid var(--border);cursor:pointer;font-size:13px;font-weight:600" id="sb-form-label-sudah">
+              <input type="radio" name="sb-formulir-status" value="sudah" onchange="onSbFormulirChange(this.value)" style="accent-color:var(--green)"> ✅ Sudah Bayar
+            </label>
+          </div>
+        </div>
+      </div>
+      <div id="sb-catatan-wrap" style="display:none">
+        <div class="field" style="margin-bottom:0">
+          <label>Catatan <span style="color:var(--danger)">*</span> <span style="font-size:11px;color:var(--text2)">(wajib diisi — kapan & bagaimana formulir dibayar)</span></label>
+          <textarea id="sb-catatan" rows="2" placeholder="Contoh: Formulir dibayar tunai oleh orang tua pada 10 Juni 2026..."
+            style="width:100%;padding:8px;font-size:13px;border:1.5px solid var(--border);border-radius:7px;outline:none;resize:vertical;font-family:inherit"
+            oninput="updateSbBuatBtn()"></textarea>
+        </div>
+      </div>
+    </div>
+
     <!-- INFO BIAYA -->
     <div id="sb-biaya-info" style="display:none;background:var(--blue-light);border-radius:8px;padding:14px;margin-bottom:14px">
       <div style="font-size:12px;font-weight:600;color:var(--blue);margin-bottom:10px">RINCIAN BIAYA PENDAFTARAN <span style="font-weight:400;font-size:11px;opacity:.7">(bisa diedit manual)</span></div>
@@ -494,9 +524,9 @@ function doConfirmLoadCloud(){ if(typeof confirmLoadCloud==='function') confirmL
       </div>
     </div>
 
-    <div class="alert alert-danger" id="sb-alert"></div>
+      <div class="alert alert-danger" id="sb-alert"></div>
     <div class="btn-row">
-      <button class="btn btn-primary" onclick="buatKwitansiSiswaBaru()">&#128196; Buat Kwitansi Siswa Baru</button>
+      <button class="btn btn-primary" id="sb-buat-btn" onclick="buatKwitansiSiswaBaru()" disabled style="opacity:.5;cursor:not-allowed">&#128196; Buat Kwitansi Siswa Baru</button>
       <button class="btn" onclick="resetSiswaBaru()">&#8635; Reset</button>
     </div>
   </div>
@@ -2355,6 +2385,33 @@ function onSbTanggalChange(){
   onSbBiayaEdit();
 }
 
+const FORMULIR_TARIF={'TK':25000,'SD':25000,'SMP':50000,'SMK':100000};
+
+function onSbFormulirChange(val){
+  const cw=document.getElementById('sb-catatan-wrap');
+  const lb=document.getElementById('sb-form-label-belum');
+  const ls=document.getElementById('sb-form-label-sudah');
+  if(cw) cw.style.display=val==='sudah'?'block':'none';
+  if(lb){lb.style.borderColor=val==='belum'?'var(--danger)':'var(--border)';lb.style.background=val==='belum'?'#fef2f2':'';}
+  if(ls){ls.style.borderColor=val==='sudah'?'var(--green)':'var(--border)';ls.style.background=val==='sudah'?'#f0fdf4':'';}
+  updateSbBuatBtn();
+}
+
+function updateSbBuatBtn(){
+  const btn=document.getElementById('sb-buat-btn');
+  if(!btn)return;
+  const jenjang=document.getElementById('sb-jenjang').value;
+  if(!jenjang){btn.disabled=true;btn.style.opacity='.5';btn.style.cursor='not-allowed';return;}
+  const tarif=FORMULIR_TARIF[jenjang]||0;
+  // All jenjang now have formulir - no skip needed
+  // if(tarif===0){btn.disabled=false;btn.style.opacity='1';btn.style.cursor='pointer';return;}
+  const status=document.querySelector('input[name="sb-formulir-status"]:checked')?.value;
+  const catatan=(document.getElementById('sb-catatan')?.value||'').trim();
+  // Bayar sekarang: always OK. Sudah bayar: need catatan
+  const ok = status==='sekarang' || (status==='sudah' && catatan.length>0);
+  btn.disabled=!ok;btn.style.opacity=ok?'1':'.5';btn.style.cursor=ok?'pointer':'not-allowed';
+}
+
 function onSbJenjangChange(){
   const jenjang=document.getElementById('sb-jenjang').value;
   const isPlus=document.getElementById('sb-plus').value==='plus';
@@ -2374,6 +2431,26 @@ function onSbJenjangChange(){
   // Update SPP nominal
   const kelasStr=jenjang==='TK'?'TK':jenjang==='SD'?(isPlus?'1 SD Plus':'1 SD'):jenjang==='SMP'?(isPlus?'7 SMP Plus':'7 SMP'):'10 SMK';
   document.getElementById('sb-spp-nominal').textContent=fmt(getSppNominal(kelasStr,getSPP()));
+  // Show formulir section
+  const fs=document.getElementById('sb-formulir-section');
+  const fn2=document.getElementById('sb-formulir-nominal');
+  if(fs){
+    const tarif=FORMULIR_TARIF[jenjang]||0;
+    if(tarif>0){
+      fs.style.display='block';
+      if(fn2) fn2.textContent=fmt(tarif);
+      // Reset to belum bayar
+      document.querySelectorAll('input[name="sb-formulir-status"]').forEach(r=>{r.checked=r.value==='sekarang';});
+      const cw=document.getElementById('sb-catatan-wrap');if(cw)cw.style.display='none';
+      const lb=document.getElementById('sb-form-label-belum');
+      if(lb){lb.style.borderColor='var(--danger)';lb.style.background='#fef2f2';}
+      const ls=document.getElementById('sb-form-label-sudah');
+      if(ls){ls.style.borderColor='var(--border)';ls.style.background='';}
+    } else {
+      fs.style.display='none';
+    }
+  }
+  updateSbBuatBtn();
 }
 
 function onSbBiayaEdit(){
@@ -2427,6 +2504,13 @@ function buatKwitansiSiswaBaru(){
   if(!nama){al.textContent='Nama siswa wajib diisi.';al.classList.add('show');return;}
   if(!jenjang){al.textContent='Pilih jenjang masuk.';al.classList.add('show');return;}
   if(!dp){al.textContent='DP / cicilan pertama wajib diisi.';al.classList.add('show');return;}
+  // Formulir
+  const formulirTarif = FORMULIR_TARIF[jenjang]||0;
+  const formulirStatus = formulirTarif>0 ? (document.querySelector('input[name="sb-formulir-status"]:checked')?.value||'sekarang') : 'none';
+  const catatanFormulir = (document.getElementById('sb-catatan')?.value||'').trim();
+  if(formulirTarif>0 && formulirStatus==='sudah' && !catatanFormulir){
+    al.textContent='Catatan wajib diisi jika formulir sudah dibayar sebelumnya.';al.classList.add('show');return;
+  }
   if(withSpp&&!sppBulan){al.textContent='Pilih bulan SPP.';al.classList.add('show');return;}
 
   const biaya=parseInt(document.getElementById('sb-biaya-input').value)||0;
@@ -2449,11 +2533,19 @@ function buatKwitansiSiswaBaru(){
   const noPdf='PDF-'+now.getFullYear()+'-'+String(rw.filter(r=>r.tipe==='Pendaftaran'&&new Date(r.tanggal).getFullYear()===now.getFullYear()).length+1).padStart(4,'0');
   const recDaftar={
     id:Date.now(),no:noPdf,nama,kelas:kelasStr,tipe:'Pendaftaran',
-    bayarLabel:`Pendaftaran ${jenjang} - DP Cicilan 1`,
-    tanggal,tagihan:totalDaftar,nominalBayar:dp,sisa:sisaDaftar,
+    bayarLabel:'Pendaftaran '+jenjang+' - DP Cicilan 1'+(formulirStatus==='sekarang'&&formulirTarif>0?' + Formulir':'')+(catatanFormulir?' ('+catatanFormulir+')':''),
+    tanggal,
+    tagihan:totalDaftar+(formulirStatus==='sekarang'?formulirTarif:0),
+    nominalBayar:dp+(formulirStatus==='sekarang'?formulirTarif:0),
+    sisa:sisaDaftar,
     diskonPct:dPct,diskonAmt:dAmt,metode,
-    items:[{tipe:'Pendaftaran',label:`Pendaftaran ${jenjang}${dPct>0?' (Diskon '+dPct+'%)':''}`,tagihan:totalDaftar,dibayar:dp,sisa:sisaDaftar,diskonPct:dPct,diskonAmt:dAmt}],
-    totalDibayar:dp,totalSisa:sisaDaftar,tglFmt:tglFmtStr,waktu
+    formulirStatus,formulirTarif,catatanFormulir:catatanFormulir||null,
+    items:[
+      {tipe:'Pendaftaran',label:`Pendaftaran ${jenjang}${dPct>0?' (Diskon '+dPct+'%)':''}`,tagihan:totalDaftar,dibayar:dp,sisa:sisaDaftar,diskonPct:dPct,diskonAmt:dAmt},
+      ...(formulirStatus==='sekarang'&&formulirTarif>0?[{tipe:'Formulir',label:`Formulir ${jenjang}`,tagihan:formulirTarif,dibayar:formulirTarif,sisa:0,diskonPct:0,diskonAmt:0}]:[])
+    ],
+    totalDibayar:dp+(formulirStatus==='sekarang'?formulirTarif:0),
+    totalSisa:sisaDaftar,tglFmt:tglFmtStr,waktu
   };
   newRecs.push(recDaftar);
   pages.push(buildKwitansiHTML(recDaftar,logoHTML,'Sekolah Swasta Yos Anugerah','kmp. Durian Blok B no.36, Kel.Sadai, Kec.Bengkong, Batam','81372928540'));
@@ -4105,6 +4197,11 @@ function summaryCards(data,containerId){
   const byDaftar=kasData.filter(r=>r.tipe==='Pendaftaran').reduce((a,r)=>a+(r.nominalBayar||0),0);
   const byLain=kasData.filter(r=>r.tipe==='Lainnya').reduce((a,r)=>a+(r.nominalBayar||0),0);
   const byKop=kasData.filter(r=>r.tipe==='Koperasi').reduce((a,r)=>a+(r.nominalBayar||0),0);
+  // Formulir is stored as items[].tipe='Formulir' inside Pendaftaran records
+  const byFormulir=kasData.reduce((a,r)=>{
+    if(!r.items) return a;
+    return a+r.items.filter(it=>it.tipe==='Formulir').reduce((b,it)=>b+(it.dibayar||0),0);
+  },0);
   const cards=[
     {label:'Total Transaksi',val:data.length+' kwitansi',c:'var(--blue)'},
     {label:'💵 Total Kas',val:fmt(totKas),c:'var(--green)'},
@@ -4114,6 +4211,7 @@ function summaryCards(data,containerId){
     {label:'Pendaftaran',val:fmt(byDaftar),c:'var(--orange)'},
     {label:'Lainnya',val:fmt(byLain),c:'var(--gray)'},
     {label:'🛒 Koperasi',val:fmt(byKop),c:'var(--orange)',highlight:byKop>0},
+    {label:'📋 Formulir',val:fmt(byFormulir),c:'#92400e',highlight:byFormulir>0},
     {label:'Sisa/Tunggakan',val:fmt(totSisa),c:'var(--danger)'},
   ];
   document.getElementById(containerId).innerHTML=cards.map(x=>`
@@ -4553,6 +4651,10 @@ function renderRingkasanKas(){
   // Only today's pinjaman
   const pinjaman=getPinjaman().filter(p=>p.tanggal===tgl&&!p.lunas).reduce((a,p)=>a+p.nominal,0);
   const koperasi=rw.filter(r=>r.tanggal===tgl&&r.tipe==='Koperasi'&&(!r.metode||r.metode==='Kas')).reduce((a,r)=>a+(r.nominalBayar||0),0);
+  const formulirKas=rw.filter(r=>r.tanggal===tgl&&(!r.metode||r.metode==='Kas')).reduce((a,r)=>{
+    if(!r.items) return a;
+    return a+r.items.filter(it=>it.tipe==='Formulir').reduce((b,it)=>b+(it.dibayar||0),0);
+  },0);
   const saldo=modal+kasmasuk+koperasi+pinjaman-pengeluaran;
   // Show date context
   const tglLabel=document.getElementById('ringkasan-tgl-label');
@@ -4563,6 +4665,7 @@ function renderRingkasanKas(){
     {label:'📥 Pemasukan Kas (kwitansi)',val:kasmasuk,color:'var(--green)'},
     {label:'🤝 Pinjaman Masuk (belum dikembalikan)',val:pinjaman,color:'var(--blue)'},
     {label:'🛒 Koperasi',val:koperasi,color:'var(--orange)'},
+    {label:'📋 Formulir',val:formulirKas,color:'#92400e'},
     {label:'📤 Pengeluaran',val:-pengeluaran,color:'var(--danger)'},
   ];
   document.getElementById('ringkasan-rows').innerHTML=rows.map(r=>`
@@ -5415,6 +5518,17 @@ function openTrxModal(id){
     html += `<div style="display:flex;justify-content:space-between;margin-top:8px;padding:8px 14px;background:#fff7ed;border-radius:8px;border:1.5px solid var(--orange)">
       <span style="font-size:13px;color:var(--orange);font-weight:600">💰 Kembalian</span>
       <span style="font-size:15px;font-weight:700;color:var(--orange)">${fmt(r.kembalian)}</span>
+    </div>`;
+  }
+  // Show catatan formulir if exists
+  if(r.catatanFormulir){
+    html += `<div style="margin-top:10px;padding:10px 14px;background:#f0fdf4;border-radius:8px;border:1.5px solid #86efac">
+      <div style="font-size:11px;font-weight:700;color:#15803d;margin-bottom:4px">📋 Catatan Formulir</div>
+      <div style="font-size:13px;color:var(--text)">${r.catatanFormulir}</div>
+    </div>`;
+  } else if(r.formulirStatus==='sekarang'&&r.formulirTarif>0){
+    html += `<div style="margin-top:10px;padding:8px 14px;background:#eff6ff;border-radius:8px;border:1px solid #93c5fd">
+      <div style="font-size:11px;color:#1d4ed8">📋 Formulir <strong>${fmt(r.formulirTarif)}</strong> dibayar sekarang bersama DP</div>
     </div>`;
   }
 
