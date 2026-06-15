@@ -4668,9 +4668,11 @@ function renderRingkasanKas(){
     {label:'📋 Formulir',val:formulirKas,color:'#92400e'},
     {label:'📤 Pengeluaran',val:-pengeluaran,color:'var(--danger)'},
   ];
-  document.getElementById('ringkasan-rows').innerHTML=rows.map(r=>`
-    <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)">
-      <span style="font-size:13px">${r.label}</span>
+  const tglForPopup = tgl; // capture for onclick
+  document.getElementById('ringkasan-rows').innerHTML=rows.map((r,ri)=>`
+    <div onclick="${ri===1?'showKasPopup(\''+tglForPopup+'\')':''}" 
+      style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);${ri===1?'cursor:pointer;':''}${ri===1?'border-radius:6px;padding:6px 8px;':''}">
+      <span style="font-size:13px${ri===1?';text-decoration:underline;text-decoration-style:dotted;color:var(--blue)':''}">${r.label}${ri===1?' 🔍':''}</span>
       <span style="font-size:14px;font-weight:600;color:${r.color}">${r.val>=0?'+ ':'- '}${fmt(Math.abs(r.val))}</span>
     </div>`).join('');
   const saldoEl=document.getElementById('saldo-akhir');
@@ -5551,6 +5553,76 @@ document.addEventListener('click', function(e){
   if(e.target === modal) closeTrxModal();
 });
 
+// ===================== KAS POPUP PER JENJANG =====================
+function showKasPopup(tgl){
+  const rw = getRiwayat().filter(r=>r.tanggal===tgl&&(!r.metode||r.metode==='Kas')&&r.tipe!=='Koperasi');
+  document.getElementById('kas-popup-tgl').textContent = fmtTgl(tgl);
+
+  // Group by jenjang
+  const jenjangMap = {'TK':'TK','1 SD':'SD','1 SD Plus':'SD','2 SD':'SD','2 SD Plus':'SD','3 SD':'SD','4 SD':'SD','5 SD':'SD','6 SD':'SD',
+    '7 SMP':'SMP','7 SMP Plus':'SMP','8 SMP':'SMP','8 SMP Plus':'SMP','9 SMP':'SMP',
+    '10 SMK':'SMK','11 SMK':'SMK','12 SMK':'SMK','Umum':'Umum'};
+  const jenjangOrder = ['TK','SD','SMP','SMK','Umum'];
+  const groups = {};
+  jenjangOrder.forEach(j=>groups[j]={total:0,transaksi:[],count:0});
+
+  rw.forEach(r=>{
+    const j = jenjangMap[r.kelas]||'Umum';
+    if(!groups[j]) groups[j]={total:0,transaksi:[],count:0};
+    groups[j].total += r.nominalBayar||0;
+    groups[j].count++;
+    groups[j].transaksi.push(r);
+  });
+
+  const grandTotal = rw.reduce((a,r)=>a+(r.nominalBayar||0),0);
+
+  let html = `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">`;
+  jenjangOrder.forEach(j=>{
+    if(!groups[j]||groups[j].count===0) return;
+    html+=`<div style="background:var(--gray-light);border-radius:8px;padding:8px 14px;min-width:120px;text-align:center">
+      <div style="font-size:11px;color:var(--text2)">${j}</div>
+      <div style="font-size:14px;font-weight:700;color:var(--green)">${fmt(groups[j].total)}</div>
+      <div style="font-size:10px;color:var(--text2)">${groups[j].count} kwitansi</div>
+    </div>`;
+  });
+  html+=`<div style="background:var(--blue);border-radius:8px;padding:8px 14px;min-width:120px;text-align:center">
+    <div style="font-size:11px;color:rgba(255,255,255,.8)">Total</div>
+    <div style="font-size:14px;font-weight:700;color:#fff">${fmt(grandTotal)}</div>
+    <div style="font-size:10px;color:rgba(255,255,255,.7)">${rw.length} kwitansi</div>
+  </div></div>`;
+
+  // Detail per jenjang
+  jenjangOrder.forEach(j=>{
+    if(!groups[j]||groups[j].count===0) return;
+    html+=`<div style="margin-bottom:14px">
+      <div style="font-size:12px;font-weight:700;color:var(--blue);margin-bottom:6px;display:flex;justify-content:space-between">
+        <span>${j}</span><span style="color:var(--green)">${fmt(groups[j].total)}</span>
+      </div>
+      <table class="hist-table" style="font-size:12px">
+        <thead><tr><th>No.</th><th>Nama</th><th>Kelas</th><th>Jenis</th><th>Dibayar</th></tr></thead>
+        <tbody>`;
+    groups[j].transaksi.forEach(r=>{
+      html+=`<tr onclick="openTrxModal(${r.id});document.getElementById('kas-popup-modal').style.display='none'" style="cursor:pointer">
+        <td><span class="badge badge-blue" style="font-size:10px">${r.no}</span></td>
+        <td>${r.nama}</td>
+        <td><span class="badge badge-blue" style="font-size:10px">${r.kelas||'—'}</span></td>
+        <td style="font-size:11px">${r.tipe}</td>
+        <td style="color:var(--green);font-weight:600">${fmt(r.nominalBayar)}</td>
+      </tr>`;
+    });
+    html+=`</tbody></table></div>`;
+  });
+
+  document.getElementById('kas-popup-body').innerHTML = html;
+  document.getElementById('kas-popup-modal').style.display = 'flex';
+}
+
+// Close kas popup on backdrop
+document.addEventListener('click',function(e){
+  const m=document.getElementById('kas-popup-modal');
+  if(e.target===m) m.style.display='none';
+});
+
 // ===================== PREVIEW TAB =====================
 function editKwitansi(){ showPage('kwitansi'); }
 function tutupPreview(){
@@ -5605,6 +5677,22 @@ function resetDariPreview(){
     <!-- Tunggakan SPP -->
     <div style="padding:16px 20px;border-top:1px solid var(--border)">
       <div id="srm-tunggakan"></div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: KAS PEMASUKAN POPUP -->
+<div id="kas-popup-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9997;align-items:center;justify-content:center;padding:16px">
+  <div style="background:#fff;border-radius:14px;padding:0;max-width:680px;width:100%;max-height:88vh;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,.2);display:flex;flex-direction:column">
+    <div style="background:var(--blue);color:#fff;padding:16px 20px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0">
+      <div>
+        <div style="font-size:15px;font-weight:700">📥 Pemasukan Kas — Per Jenjang</div>
+        <div style="font-size:12px;opacity:.85;margin-top:2px" id="kas-popup-tgl"></div>
+      </div>
+      <button onclick="document.getElementById('kas-popup-modal').style.display='none'" style="background:rgba(255,255,255,.2);border:none;color:#fff;font-size:18px;cursor:pointer;border-radius:50%;width:30px;height:30px">✕</button>
+    </div>
+    <div style="overflow-y:auto;padding:16px 20px">
+      <div id="kas-popup-body"></div>
     </div>
   </div>
 </div>
