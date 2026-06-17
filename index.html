@@ -4053,6 +4053,8 @@ function renderRekordSiswa(){
   const sortMode=document.getElementById('rekord-sort').value;
   const rw=getRiwayat();
   let siswa=[...getSiswa()];
+  // Limit to 30 rows when no filter (performance - 700 siswa is slow)
+  const hasFilter=q||filterKelas||sortMode==='tunggakan';
 
   if(q)siswa=siswa.filter(s=>s.nama.toLowerCase().includes(q));
   if(filterKelas)siswa=siswa.filter(s=>s.kelas===filterKelas);
@@ -5050,15 +5052,25 @@ function downloadKasTunaiExcel(){
 }
 
 // ===================== ADMIN =====================
+var _adminInited = false;
 function initAdmin(){
   const loggedIn=sessionStorage.getItem('ya_admin');
   if(loggedIn){
     document.getElementById('admin-login').style.display='none';
     document.getElementById('admin-panel').style.display='block';
-    buildTarifGrid();renderAdminSiswa();buildNaikKelasList();renderTunggakan();renderRekordSiswa();
+    if(!_adminInited){
+      _adminInited=true;
+      buildTarifGrid();
+      renderAdminSiswa();
+      buildNaikKelasList();
+      renderTunggakan();
+      // Defer rekord siswa - heavy, load lazily on tab click
+      setTimeout(()=>renderRekordSiswa(),300);
+    }
   }else{
     document.getElementById('admin-login').style.display='block';
     document.getElementById('admin-panel').style.display='none';
+    _adminInited=false;
   }
 }
 
@@ -5204,10 +5216,13 @@ function renderAdminSiswa(){
   const q=(document.getElementById('admin-siswa-search').value||'').toLowerCase();
   const siswa=getSiswa();
   const filtered=q?siswa.filter(s=>s.nama.toLowerCase().includes(q)):siswa;
+  // Limit display to 50 rows when no search query (performance)
+  const display = q ? filtered : filtered.slice(0,50);
+  const showingAll = q || filtered.length<=50;
   document.getElementById('admin-siswa-wrap').innerHTML=`
     <table class="siswa-table">
       <thead><tr><th>#</th><th>Nama</th><th>Kelas</th><th>Aksi</th></tr></thead>
-      <tbody>`+filtered.map((s,i)=>{
+      <tbody>`+display.map((s,i)=>{
         const realIdx=siswa.indexOf(s);
         return `<tr><td style="color:var(--text2);font-size:12px">${realIdx+1}</td>
           <td>${s.nama}</td>
