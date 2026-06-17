@@ -1411,7 +1411,7 @@ function selectSfSiswa(i, encNama, encKelas){
 
 // ---- ITEM FORM ----
 function tambahItemForm(){
-  itemList.push({tipe:'', label:'', nominal:0, isCustom:false, customNominal:0, diskonPct:0, diskonAmt:0});
+  itemList.push({tipe:'', label:'', nominal:0, isCustom:false, customNominal:0, diskonPct:0, diskonAmt:0, catatan:null});
   renderItemForms();
 }
 
@@ -3644,13 +3644,13 @@ function buatKwitansi(){
       if(it.tipe==='SPP'&&it.sppKustom){
         const kustomNom=(it.sppKustomNominal||0)*qty;
         const labelWithQty=qty>1?`${it.label} (${qty}×Rp${(it.sppKustomNominal||0).toLocaleString('id-ID')})`:it.label;
-        return {tipe:it.tipe,label:labelWithQty,tagihan:kustomNom,dibayar:kustomNom,sisa:0,diskonPct:0,diskonAmt:0,qty,sppKustom:true};
+        return {tipe:it.tipe,label:labelWithQty,tagihan:kustomNom,dibayar:kustomNom,sisa:0,diskonPct:0,diskonAmt:0,qty,sppKustom:true,catatan:it.catatan||null};
       }
       const subtotal=nom*qty;
       const kas=it.kasInput>0?Math.min(it.kasInput,subtotal):subtotal;
       const sisa=subtotal-kas;
       const labelWithQty=qty>1?`${it.label} (${qty}x)`:it.label;
-      return {tipe:it.tipe,label:labelWithQty,tagihan:subtotal,dibayar:kas,sisa,diskonPct:dPct,diskonAmt:dAmt,qty};
+      return {tipe:it.tipe,label:labelWithQty,tagihan:subtotal,dibayar:kas,sisa,diskonPct:dPct,diskonAmt:dAmt,qty,catatan:it.catatan||null};
     });
 
     const totalDibayar = recItems.reduce((a,it)=>a+it.dibayar,0);
@@ -3664,7 +3664,8 @@ function buatKwitansi(){
     const rec = {
       id:Date.now()+si, no, nama:siswa.nama, kelas:siswa.kelas,
       tipe:tipeMain, bayarLabel:recItems.map(it=>it.label).join(' + '),
-      catatan:itemList.filter(it=>it.catatan).map(it=>it.catatan).join(' | ')||null,
+      catatan:itemList.filter(it=>it.catatan&&it.selectedSiswa&&it.selectedSiswa.includes(si)).map(it=>it.catatan).join(' | ')||
+              itemList.filter(it=>it.catatan&&!it.selectedSiswa).map(it=>it.catatan).join(' | ')||null,
       tanggal, tagihan:totalDibayar, nominalBayar:totalDibayar,
       sisa:totalSisa, diskonPct:0, diskonAmt:0, metode,
       items:recItems, totalDibayar, totalSisa, tglFmt:tglFmtStr, waktu
@@ -3793,7 +3794,7 @@ function resetForm(){
   renderSiswaForms();renderItemForms();
   document.getElementById('inp-tanggal').value=today();
   document.getElementById('alert-form').classList.remove('show');
-  const cEl=document.getElementById('inp-catatan');if(cEl)cEl.value='';
+  // catatan cleared via tambahItemForm (fresh items have no catatan)
   // multi-preview removed (now using preview tab)
   tambahSiswaForm();tambahItemForm();
 }
@@ -4166,7 +4167,13 @@ function renderRekordDetail(){
         <td>${fmtTgl(r.tanggal)}</td>
         <td><span class="badge ${r.tipe==='SPP'?'badge-blue':r.tipe==='Pengembangan'?'badge-green':r.tipe==='Pendaftaran'?'badge-orange':'badge-blue'}">${r.tipe}</span></td>
         <td>${r.bayarLabel}</td>
-        <td style="font-size:11px;color:${r.catatan?'var(--text)':'var(--text2)'};max-width:140px;white-space:pre-wrap">${r.catatan||'—'}</td>
+        <td style="font-size:11px;max-width:140px">
+          ${r.catatan
+            ? `<span onclick="showCatatanPopup(event,'${(r.catatan||'').replace(/'/g,"\'")}','${r.no}','${r.id}')"
+                style="cursor:pointer;color:var(--blue);text-decoration:underline;text-decoration-style:dotted;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;max-width:130px"
+                title="${r.catatan}">${r.catatan}</span>`
+            : `<span onclick="showCatatanPopup(event,'','${r.no}','${r.id}')" style="cursor:pointer;color:var(--text2)" title="Klik untuk tambah catatan">+ tambah</span>`}
+        </td>
         <td>${fmt(r.tagihan)}</td>
         <td style="color:var(--green);font-weight:500">${fmt(r.nominalBayar)}</td>
         <td style="color:${sd.sisa>0?'var(--danger)':'var(--green)'};font-weight:500">${sd.label}</td>
@@ -5408,6 +5415,118 @@ function bukaRekordModal(encNama, encKelas){
   setTimeout(()=>renderTunggakanEditor2(nama),100);
 }
 
+function showCatatanPopup(e, catatan, no, recId){
+  e.stopPropagation();
+  document.querySelectorAll('.catatan-popup').forEach(el=>el.remove());
+  const popup = document.createElement('div');
+  popup.className = 'catatan-popup';
+  popup.style.cssText = 'position:fixed;z-index:99999;background:#fff;border:1.5px solid var(--blue);border-radius:10px;padding:14px 16px;width:300px;box-shadow:0 4px 20px rgba(0,0,0,.2);font-size:13px';
+
+  function renderPopupView(){
+    const d = document.createElement('div');
+    d.innerHTML = '<div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:8px">📝 Catatan — '+no+'</div>'
+      + '<div style="color:var(--text);line-height:1.6;max-height:150px;overflow-y:auto;padding-right:4px">'+(catatan||'—')+'</div>'
+      + '<div style="display:flex;gap:6px;margin-top:10px"></div>';
+    const btnEdit = document.createElement('button');
+    btnEdit.textContent = '✏️ Edit';
+    btnEdit.style.cssText = 'font-size:11px;padding:4px 12px;border-radius:5px;border:1px solid var(--blue);cursor:pointer;background:var(--blue);color:#fff';
+    btnEdit.onclick = renderPopupEdit;
+    const btnClose = document.createElement('button');
+    btnClose.textContent = 'Tutup';
+    btnClose.style.cssText = 'font-size:11px;padding:4px 12px;border-radius:5px;border:1px solid var(--border);cursor:pointer;background:var(--gray-light)';
+    btnClose.onclick = function(){ document.querySelectorAll('.catatan-popup').forEach(function(el){el.remove();}); };
+    d.querySelector('div:last-child').appendChild(btnEdit);
+    d.querySelector('div:last-child').appendChild(btnClose);
+    popup.innerHTML = '';
+    popup.appendChild(d);
+  }
+
+  function renderPopupEdit(){
+    popup.innerHTML = '';
+    const title = document.createElement('div');
+    title.style.cssText = 'font-size:11px;font-weight:700;color:var(--text2);margin-bottom:8px';
+    title.textContent = '✏️ Edit Catatan — '+no;
+    const ta = document.createElement('textarea');
+    ta.id = 'catatan-edit-input';
+    ta.rows = 4;
+    ta.value = catatan||'';
+    ta.style.cssText = 'width:100%;padding:8px;font-size:13px;border:1.5px solid var(--blue);border-radius:7px;outline:none;resize:vertical;font-family:inherit;box-sizing:border-box';
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;gap:6px;margin-top:8px';
+    const btnSave = document.createElement('button');
+    btnSave.textContent = '💾 Simpan';
+    btnSave.style.cssText = 'font-size:11px;padding:4px 12px;border-radius:5px;border:1px solid var(--green);cursor:pointer;background:var(--green);color:#fff';
+    btnSave.onclick = function(){ catatan=ta.value.trim(); saveCatatanEdit(recId, catatan); };
+    const btnCancel = document.createElement('button');
+    btnCancel.textContent = 'Batal';
+    btnCancel.style.cssText = 'font-size:11px;padding:4px 12px;border-radius:5px;border:1px solid var(--border);cursor:pointer;background:var(--gray-light)';
+    btnCancel.onclick = renderPopupView;
+    row.appendChild(btnSave);
+    row.appendChild(btnCancel);
+    popup.appendChild(title);
+    popup.appendChild(ta);
+    popup.appendChild(row);
+    setTimeout(function(){ta.focus();},50);
+  }
+
+  // Make functions accessible
+  popup.renderPopupView = renderPopupView;
+  popup.renderPopupEdit = renderPopupEdit;
+  window.renderPopupView = renderPopupView;
+  window.renderPopupEdit = renderPopupEdit;
+
+  renderPopupView();
+
+  const x = Math.min(e.clientX, window.innerWidth-320);
+  const y = Math.min(e.clientY+10, window.innerHeight-250);
+  popup.style.left = x+'px';
+  popup.style.top = y+'px';
+  document.body.appendChild(popup);
+
+  setTimeout(()=>document.addEventListener('click', function h(ev){
+    if(!popup.contains(ev.target)){popup.remove();document.removeEventListener('click',h);}
+  }), 100);
+}
+
+function editCatatanInModal(recId, itemIdx){
+  const r = getRiwayat().find(x=>x.id===recId);
+  if(!r) return;
+  const currentCatatan = (r.items&&r.items[itemIdx])?r.items[itemIdx].catatan||'':r.catatan||'';
+  const newCatatan = prompt('Edit catatan:', currentCatatan);
+  if(newCatatan===null) return; // cancelled
+  const rw = getRiwayat();
+  const idx = rw.findIndex(x=>x.id===recId);
+  if(idx<0) return;
+  const val = newCatatan.trim()||null;
+  if(rw[idx].items && rw[idx].items[itemIdx]!==undefined){
+    rw[idx].items[itemIdx].catatan = val;
+  }
+  // Update rec-level catatan too
+  rw[idx].catatan = rw[idx].items
+    ? rw[idx].items.filter(it=>it.catatan).map(it=>it.catatan).join(' | ')||null
+    : val;
+  setRiwayat(rw);
+  // Refresh modal
+  openTrxModal(recId);
+  if(typeof renderRekordDetail==='function') renderRekordDetail();
+  if(typeof renderSiswaRekordModal==='function') renderSiswaRekordModal();
+}
+
+function saveCatatanEdit(recId, newCatatanVal){
+  const newCatatan = newCatatanVal!==undefined ? (newCatatanVal.trim()||null) : (document.getElementById('catatan-edit-input')?.value||'').trim()||null;
+  const rw = getRiwayat();
+  const idx = rw.findIndex(r=>String(r.id)===String(recId));
+  if(idx<0) return;
+  rw[idx].catatan = newCatatan;
+  // Update items catatan too if single item
+  if(rw[idx].items && rw[idx].items.length===1) rw[idx].items[0].catatan = newCatatan;
+  setRiwayat(rw);
+  document.querySelectorAll('.catatan-popup').forEach(el=>el.remove());
+  // Refresh rekord detail
+  if(typeof renderRekordDetail==='function') renderRekordDetail();
+  if(typeof renderSiswaRekordModal==='function') renderSiswaRekordModal();
+}
+
 function closeSiswaRekordModal(){
   document.getElementById('siswa-rekord-modal').style.display='none';
   document.body.style.overflow='';
@@ -5499,11 +5618,8 @@ function openTrxModal(id){
   _trxModalId = id;
   document.getElementById('trx-modal-no').textContent = r.no;
   document.getElementById('trx-modal-tgl').textContent = fmtTgl(r.tanggal) + (r.waktu?' · '+r.waktu:'') + ' · ' + (r.metode==='Transfer'?'🏦 Transfer':'💵 Kas');
-  // Show catatan in modal header area if exists
-  const catatanBadge = r.catatan
-    ? `<div style="margin-top:6px;padding:6px 12px;background:#f0fdf4;border-radius:6px;border-left:3px solid var(--green);font-size:12px;color:var(--text)">📝 ${r.catatan}</div>`
-    : `<div style="margin-top:4px;font-size:11px;color:var(--text2)">📝 Catatan: —</div>`;
-  document.getElementById('trx-modal-tgl').insertAdjacentHTML('afterend', catatanBadge);
+  // Remove any previous catatan badge (catatan now shown in table)
+  document.querySelectorAll('.trx-catatan-badge').forEach(el=>el.remove());
 
   const items = r.items && r.items.length ? r.items : [{
     tipe: r.tipe, label: r.bayarLabel, tagihan: r.tagihan,
@@ -5521,6 +5637,7 @@ function openTrxModal(id){
       <tr style="background:var(--gray-light)">
         <th style="padding:8px;text-align:left;font-size:11px;color:var(--text2)">Jenis</th>
         <th style="padding:8px;text-align:left;font-size:11px;color:var(--text2)">Keterangan</th>
+        <th style="padding:8px;text-align:left;font-size:11px;color:var(--text2)">Catatan</th>
         <th style="padding:8px;text-align:right;font-size:11px;color:var(--text2)">Tagihan</th>
         <th style="padding:8px;text-align:right;font-size:11px;color:var(--text2)">Dibayar</th>
         <th style="padding:8px;text-align:right;font-size:11px;color:var(--text2)">Sisa</th>
@@ -5536,6 +5653,14 @@ function openTrxModal(id){
         <span style="font-size:11px;font-weight:600;padding:2px 7px;border-radius:10px;background:${tipeBadgeColor};color:${tipeTxtColor}">${it.tipe}</span>
       </td>
       <td style="padding:8px">${it.label||it.keterangan||'—'}</td>
+      <td style="padding:8px;font-size:11px">
+        ${it.catatan
+          ? `<span style="color:var(--text)">${it.catatan}</span>`
+          : `<span style="color:var(--text2)">—</span>`
+        }
+        <button onclick="editCatatanInModal(${r.id},${items.indexOf(it)})" 
+          style="font-size:10px;padding:1px 6px;border-radius:4px;border:1px solid var(--border);cursor:pointer;background:var(--gray-light);margin-left:4px">✏️</button>
+      </td>
       <td style="padding:8px;text-align:right">${fmt(it.tagihan||0)}</td>
       <td style="padding:8px;text-align:right;color:var(--green);font-weight:600">${fmt(it.dibayar||0)}</td>
       <td style="padding:8px;text-align:right;color:${(it.sisa||0)>0?'var(--danger)':'var(--green)'};font-weight:600">${(it.sisa||0)>0?fmt(it.sisa):'Lunas'}</td>
