@@ -1567,6 +1567,15 @@ function renderItemForms(){
           </select>
         </div>
         <div style="margin-bottom:8px">${keteranganField}</div>
+        <div style="margin-bottom:8px">
+          <label style="display:block;font-size:12px;font-weight:500;color:var(--text2);margin-bottom:4px">
+            📝 Catatan <span style="font-weight:400;color:var(--text2)">(opsional)</span>
+          </label>
+          <input type="text" placeholder="Kosongkan jika tidak ada catatan..."
+            value="${it.catatan||''}"
+            oninput="onItemCatatan(${i},this.value)"
+            style="width:100%;padding:8px;font-size:13px;border:1px solid var(--border);border-radius:7px;outline:none;box-sizing:border-box">
+        </div>
       </div>
       ${isSPP&&siswaList.length>1&&!isSPPKustom?`
       <div class="row2" style="margin-bottom:8px">
@@ -1927,6 +1936,10 @@ function onItemCustomNominal(i, val){
 function onItemQty(i, val){
   itemList[i].qty = Math.max(1, parseInt(val)||1);
   updateItemDisplay(i);
+}
+
+function onItemCatatan(i, val){
+  itemList[i].catatan = val.trim()||null;
 }
 
 function onItemKas(i, val){
@@ -3223,6 +3236,9 @@ function buildKwitansiHTML(rec, logoHTML, namaSekolah, alamat, telepon){
       <span style="font-size:13px;color:var(--orange);font-weight:600">💰 Kembalian</span>
       <span style="font-size:18px;font-weight:700;color:var(--orange)">${fmt(rec.kembalian)}</span>
     </div>`:''}
+    ${rec.catatan?`<div style="margin-top:12px;padding:8px 12px;background:#f8fafc;border-radius:6px;border-left:3px solid var(--blue);font-size:12px">
+      <span style="color:var(--text2);font-weight:600">Catatan: </span><span>${rec.catatan}</span>
+    </div>`:''}
     <div style="margin-top:18px;display:flex;justify-content:flex-end">
       <div style="text-align:center">
         <div style="font-size:12px;color:var(--text2)">Batam, ${rec.tglFmt}</div>
@@ -3648,6 +3664,7 @@ function buatKwitansi(){
     const rec = {
       id:Date.now()+si, no, nama:siswa.nama, kelas:siswa.kelas,
       tipe:tipeMain, bayarLabel:recItems.map(it=>it.label).join(' + '),
+      catatan:itemList.filter(it=>it.catatan).map(it=>it.catatan).join(' | ')||null,
       tanggal, tagihan:totalDibayar, nominalBayar:totalDibayar,
       sisa:totalSisa, diskonPct:0, diskonAmt:0, metode,
       items:recItems, totalDibayar, totalSisa, tglFmt:tglFmtStr, waktu
@@ -3776,6 +3793,7 @@ function resetForm(){
   renderSiswaForms();renderItemForms();
   document.getElementById('inp-tanggal').value=today();
   document.getElementById('alert-form').classList.remove('show');
+  const cEl=document.getElementById('inp-catatan');if(cEl)cEl.value='';
   // multi-preview removed (now using preview tab)
   tambahSiswaForm();tambahItemForm();
 }
@@ -4140,7 +4158,7 @@ function renderRekordDetail(){
 
   const allRwSiswa = getRiwayat().filter(r=>r.nama.toLowerCase()===rekordCurrentSiswa.nama.toLowerCase());
   wrap.innerHTML=`<table class="hist-table">
-    <thead><tr><th>No. Kwitansi</th><th>Tanggal</th><th>Jenis</th><th>Keterangan</th><th>Tagihan</th><th>Dibayar</th><th>Sisa</th><th>Aksi</th></tr></thead>
+    <thead><tr><th>No. Kwitansi</th><th>Tanggal</th><th>Jenis</th><th>Keterangan</th><th>Catatan</th><th>Tagihan</th><th>Dibayar</th><th>Sisa</th><th>Aksi</th></tr></thead>
     <tbody>`+rw.map(r=>{
       const sd=getSisaDisplay(r, allRwSiswa);
       return `<tr>
@@ -4148,6 +4166,7 @@ function renderRekordDetail(){
         <td>${fmtTgl(r.tanggal)}</td>
         <td><span class="badge ${r.tipe==='SPP'?'badge-blue':r.tipe==='Pengembangan'?'badge-green':r.tipe==='Pendaftaran'?'badge-orange':'badge-blue'}">${r.tipe}</span></td>
         <td>${r.bayarLabel}</td>
+        <td style="font-size:11px;color:${r.catatan?'var(--text)':'var(--text2)'};max-width:140px;white-space:pre-wrap">${r.catatan||'—'}</td>
         <td>${fmt(r.tagihan)}</td>
         <td style="color:var(--green);font-weight:500">${fmt(r.nominalBayar)}</td>
         <td style="color:${sd.sisa>0?'var(--danger)':'var(--green)'};font-weight:500">${sd.label}</td>
@@ -5480,6 +5499,11 @@ function openTrxModal(id){
   _trxModalId = id;
   document.getElementById('trx-modal-no').textContent = r.no;
   document.getElementById('trx-modal-tgl').textContent = fmtTgl(r.tanggal) + (r.waktu?' · '+r.waktu:'') + ' · ' + (r.metode==='Transfer'?'🏦 Transfer':'💵 Kas');
+  // Show catatan in modal header area if exists
+  const catatanBadge = r.catatan
+    ? `<div style="margin-top:6px;padding:6px 12px;background:#f0fdf4;border-radius:6px;border-left:3px solid var(--green);font-size:12px;color:var(--text)">📝 ${r.catatan}</div>`
+    : `<div style="margin-top:4px;font-size:11px;color:var(--text2)">📝 Catatan: —</div>`;
+  document.getElementById('trx-modal-tgl').insertAdjacentHTML('afterend', catatanBadge);
 
   const items = r.items && r.items.length ? r.items : [{
     tipe: r.tipe, label: r.bayarLabel, tagihan: r.tagihan,
