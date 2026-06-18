@@ -869,7 +869,7 @@ function doConfirmLoadCloud(){ if(typeof confirmLoadCloud==='function') confirmL
       <div class="card">
         <div class="card-title">Rekord Pembayaran Per Siswa</div>
         <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
-          <input class="search-bar" id="rekord-search" placeholder="Ketik nama siswa..." oninput="renderRekordSiswa()" style="margin-bottom:0;flex:1;min-width:180px">
+          <input class="search-bar" id="rekord-search" placeholder="Ketik nama siswa..." oninput="renderRekordSiswaDebounced()" style="margin-bottom:0;flex:1;min-width:180px">
           <select id="rekord-filter-kelas" onchange="renderRekordSiswa()" style="width:auto">
             <option value="">Semua Kelas</option>
             <option>TK</option><option>1 SD</option><option>1 SD Plus</option>
@@ -4066,13 +4066,26 @@ function getJenjangSiswa(kelas){
 
 const KELAS_ORDER=['TK','1 SD','1 SD Plus','2 SD','2 SD Plus','3 SD','4 SD','5 SD','6 SD','7 SMP','7 SMP Plus','8 SMP','8 SMP Plus','9 SMP','10 SMK','11 SMK','12 SMK'];
 
+// Debounce renderRekordSiswa to avoid lag on typing
+var _rekordDebounceTimer=null;
+function renderRekordSiswaDebounced(){
+  clearTimeout(_rekordDebounceTimer);
+  _rekordDebounceTimer=setTimeout(renderRekordSiswa,300);
+}
+
 function renderRekordSiswa(){
   const q=(document.getElementById('rekord-search').value||'').toLowerCase();
   const filterKelas=document.getElementById('rekord-filter-kelas').value;
   const sortMode=document.getElementById('rekord-sort').value;
+  // Pre-compute riwayat map once (not per siswa)
   const rw=getRiwayat();
+  const rwByNama={};
+  rw.forEach(r=>{
+    const key=r.nama.toLowerCase();
+    if(!rwByNama[key]) rwByNama[key]=[];
+    rwByNama[key].push(r);
+  });
   let siswa=[...getSiswa()];
-  // Limit to 30 rows when no filter (performance - 700 siswa is slow)
   const hasFilter=q||filterKelas||sortMode==='tunggakan';
 
   if(q)siswa=siswa.filter(s=>s.nama.toLowerCase().includes(q));
