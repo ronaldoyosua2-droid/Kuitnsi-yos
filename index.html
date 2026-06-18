@@ -4743,12 +4743,16 @@ function renderPengeluaran(){
   let data=getPengeluaran();
   if(q)data=data.filter(p=>p.ket.toLowerCase().includes(q));
   const wrap=document.getElementById('pgr-list');
-  const total=data.reduce((a,p)=>a+p.nominal,0);
+  const totalAll=data.reduce((a,p)=>a+p.nominal,0);
+  const todayStr=today();
+  const totalHarian=data.filter(p=>p.tanggal===todayStr).reduce((a,p)=>a+p.nominal,0);
   const totalBar=document.getElementById('pgr-total-bar');
   const totalEl=document.getElementById('pgr-total');
   if(data.length){
     totalBar.style.display='block';
-    totalEl.textContent=fmt(total);
+    totalEl.innerHTML=fmt(totalAll)
+      +'<span style="font-size:12px;font-weight:400;color:var(--text2);margin-left:12px">| Hari ini: </span>'
+      +'<span style="color:var(--danger);font-weight:700">'+fmt(totalHarian)+'</span>';
   } else totalBar.style.display='none';
   if(!data.length){wrap.innerHTML='<div class="hist-empty">Belum ada pengeluaran</div>';return;}
   wrap.innerHTML=`<table class="hist-table">
