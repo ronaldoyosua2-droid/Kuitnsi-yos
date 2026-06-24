@@ -226,11 +226,11 @@ function doConfirmLoadCloud(){ if(typeof confirmLoadCloud==='function') confirmL
           <div style="font-size:14px;font-weight:600" id="multi-preview-label"></div>
           <div style="display:flex;gap:8px;margin-top:6px">
             <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer">
-              <input type="radio" name="kw-mode" value="pisah" checked onchange="toggleKwitansiMode(this.value)" style="accent-color:var(--blue)">
+              <input type="radio" name="kw-mode-old" value="pisah" checked onchange="toggleKwitansiMode(this.value)" style="accent-color:var(--blue)">
               Kwitansi terpisah per siswa
             </label>
             <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer">
-              <input type="radio" name="kw-mode" value="gabung" onchange="toggleKwitansiMode(this.value)" style="accent-color:var(--blue)">
+              <input type="radio" name="kw-mode-old" value="gabung" onchange="toggleKwitansiMode(this.value)" style="accent-color:var(--blue)">
               1 kwitansi gabungan
             </label>
           </div>
@@ -1462,10 +1462,31 @@ function renderItemForms(){
             </span>`:''}
         </div>
         ${it.label?`<div style="font-size:11px;color:var(--blue);font-weight:500;margin-top:6px;padding:4px 8px;background:var(--blue-light);border-radius:5px">📋 ${it.label}</div>`:''}
+        ${(()=>{
+          const snm=siswaList.length?siswaList[0].nama:null;
+          if(!snm||!it.label||it.sppDari===undefined) return '';
+          const sisamap=getSppSisaPerBulan(snm);
+          if(!Object.keys(sisamap).length) return '';
+          const thn2=it.sppTahun||new Date().getFullYear();
+          const sampai2=it.sppSampai!==undefined?it.sppSampai:it.sppDari;
+          const warnings=[];
+          for(let b=it.sppDari;b<=sampai2;b++){
+            const key=BULAN[b]+' '+thn2;
+            if(sisamap[key]>0) warnings.push(key+' (sisa Rp'+sisamap[key].toLocaleString('id-ID')+')');
+          }
+          if(!warnings.length) return '';
+          return '<div style="margin-top:4px;padding:5px 8px;background:#fef9c3;border:1px solid #fcd34d;border-radius:5px;font-size:11px;color:#92400e">'
+            +'⚠️ Sisa dari pembayaran sebelumnya: '+warnings.join(', ')
+            +'<br><span style="opacity:.8">Nominal akan disesuaikan otomatis.</span></div>';
+        })()}
         <div style="margin-top:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
           <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;padding:5px 12px;border:1.5px solid ${isSPPKustom?'var(--orange)':'var(--border)'};border-radius:6px;background:${isSPPKustom?'var(--orange-light)':'#fff'}">
             <input type="checkbox" ${isSPPKustom?'checked':''} onchange="onSppKustomToggle(${i},this.checked)" style="width:14px;height:14px">
             ✏️ SPP Kustom (bayar dibantu/subsidized)
+          </label>
+          <label style="display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600;border:1.5px solid ${it.sppCicilan?'var(--blue)':'var(--border)'};background:${it.sppCicilan?'#eff6ff':'#fff'}">
+            <input type="checkbox" ${it.sppCicilan?'checked':''} onchange="onSppCicilanToggle(${i},this.checked)" style="width:14px;height:14px;accent-color:var(--blue)">
+            📅 Mode Cicilan
           </label>
           ${isSPPKustom?`
           <div style="display:flex;align-items:center;gap:6px">
@@ -1498,7 +1519,7 @@ function renderItemForms(){
       if(!it.selectedSiswa) it.selectedSiswa = siswaList.map((_,si)=>si);
       const rows=siswaList.map((s,si)=>{
         let nom=0;
-        if(isSPP) nom=s.kelas?getSppNominalSiswa(s.nama,s.kelas,spp):0;
+        if(isSPP){ const tgl=document.getElementById('inp-tanggal')?.value||today(); nom=s.kelas?getSppNominalSiswa(s.nama,getKelasEfektif(s.kelas,tgl)||s.kelas,spp,tgl):0; }
         else if(it.tipe==='Pengembangan') nom=s.kelas?getPgmNominal(s.kelas,getPGM()):0;
         else if(isCustom){
           // Custom: use perSiswaNominal if set, else customNominal
@@ -1567,6 +1588,28 @@ function renderItemForms(){
           </select>
         </div>
         <div style="margin-bottom:8px">${keteranganField}</div>
+        ${it.sppCicilan?`
+        <div style="background:#eff6ff;border:1.5px solid #93c5fd;border-radius:8px;padding:12px;margin-top:8px;margin-bottom:8px">
+          <div style="font-size:12px;font-weight:700;color:var(--blue);margin-bottom:8px">📅 Mode Cicilan — Ketik nominal, sistem hitung otomatis</div>
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+            <div style="flex:1">
+              <label style="font-size:11px;color:var(--text2);display:block;margin-bottom:3px">Nominal Dibayar (Rp)</label>
+              <input type="number" placeholder="350000" value="${it.sppCicilanNominal||''}"
+                oninput="itemList[${i}].sppCicilanNominal=parseInt(this.value)||0;hitungCicilanSPP(${i});updateCicilanResultDiv(${i})"
+                style="width:100%;padding:8px 10px;font-size:15px;font-weight:700;color:var(--blue);border:1.5px solid #93c5fd;border-radius:7px;outline:none;box-sizing:border-box">
+            </div>
+          </div>
+          <div id="cicilan-result-${i}">
+            ${it.sppCicilanResult&&it.sppCicilanResult.length
+              ? it.sppCicilanResult.map(r=>`<div style="display:flex;justify-content:space-between;padding:4px 10px;background:#fff;border-radius:5px;font-size:12px;border:1px solid #dbeafe;margin-bottom:3px"><span>${r.label}</span><span style="font-weight:700;color:${r.sisa>0?'#d97706':'var(--green)'}">${fmt(r.bayar)}${r.sisa>0?' (sisa '+fmt(r.sisa)+')':' ✅'}</span></div>`).join('')
+              : '<div style="font-size:11px;color:var(--text2)">Ketik nominal untuk melihat rincian cicilan.</div>'
+            }
+          </div>
+          <div id="cicilan-total-${i}" style="display:${it.sppCicilanResult&&it.sppCicilanResult.length?'flex':'none'};padding:6px 10px;background:var(--blue);color:#fff;border-radius:5px;font-size:13px;font-weight:700;justify-content:space-between;margin-top:4px">
+            <span>Total Bayar</span>
+            <span class="cicilan-total-val">${it.sppCicilanResult?fmt(it.sppCicilanResult.reduce((a,r)=>a+r.bayar,0)):''}</span>
+          </div>
+        </div>`:''}
         <div style="margin-bottom:8px">
           <label style="display:block;font-size:12px;font-weight:500;color:var(--text2);margin-bottom:4px">
             📝 Catatan <span style="font-weight:400;color:var(--text2)">(opsional)</span>
@@ -1748,7 +1791,8 @@ function updateSppRange(i){
   const sampai = it.sppSampai;
   const kelas=siswaList.length?siswaList[0].kelas:null;
   const siswaNama=siswaList.length?siswaList[0].nama:null;
-  if(kelas) itemList[i].nominal=siswaNama?getSppNominalSiswa(siswaNama,kelas,getSPP()):getSppNominal(kelas,getSPP());
+  const tglInput=document.getElementById('inp-tanggal')?.value||today();
+  if(kelas) itemList[i].nominal=siswaNama?getSppNominalSiswa(siswaNama,kelas,getSPP(),tglInput):getSppNominal(getKelasEfektif(kelas,tglInput),getSPP());
 
   // Dari kosong → reset
   if(dari===undefined){
@@ -1908,6 +1952,101 @@ function selectItemOpt(i, oi){
   setTimeout(()=>updateItemDisplay(i),50);
 }
 
+function onSppCicilanToggle(i, checked){
+  itemList[i].sppCicilan = checked;
+  itemList[i].sppCicilanNominal = null;
+  itemList[i].sppCicilanResult = null;
+  if(checked) itemList[i].sppKustom = false; // cicilan dan kustom tidak bisa bersamaan
+  renderItemForms();
+}
+
+function onSppCicilanNominal(i, val){
+  itemList[i].sppCicilanNominal = parseInt(val)||0;
+  hitungCicilanSPP(i);
+  // Update only the result div, don't re-render entire form (would lose focus)
+  updateCicilanResultDiv(i);
+}
+
+function updateCicilanResultDiv(i){
+  const it = itemList[i];
+  const resultDiv = document.getElementById('cicilan-result-'+i);
+  const totalDiv = document.getElementById('cicilan-total-'+i);
+  if(!resultDiv) return;
+  const result = it.sppCicilanResult;
+  if(!result || !result.length){
+    resultDiv.innerHTML = '<div style="font-size:11px;color:var(--text2)">Ketik nominal untuk melihat rincian cicilan.</div>';
+    if(totalDiv) totalDiv.style.display='none';
+    return;
+  }
+  resultDiv.innerHTML = result.map(r=>`
+    <div style="display:flex;justify-content:space-between;padding:4px 10px;background:#fff;border-radius:5px;font-size:12px;border:1px solid #dbeafe;margin-bottom:3px">
+      <span>${r.label}</span>
+      <span style="font-weight:700;color:${r.sisa>0?'#d97706':'var(--green)'}">${fmt(r.bayar)}${r.sisa>0?' (sisa '+fmt(r.sisa)+')':' ✅'}</span>
+    </div>`).join('');
+  if(totalDiv){
+    totalDiv.style.display='flex';
+    totalDiv.querySelector('.cicilan-total-val').textContent = fmt(result.reduce((a,r)=>a+r.bayar,0));
+  }
+}
+
+function hitungCicilanSPP(i){
+  const it = itemList[i];
+  if(!it.sppCicilan || !it.sppCicilanNominal || it.sppDari===undefined) return;
+  const siswa = siswaList[0];
+  if(!siswa) return;
+  const tgl = document.getElementById('inp-tanggal')?.value||today();
+  const spp = getSPP();
+  const kelas = getKelasEfektif(siswa.kelas, tgl)||siswa.kelas;
+  const nomPerBulan = getSppNominalSiswa(siswa.nama, kelas, spp, tgl);
+  const sisamap = getSppSisaPerBulan(siswa.nama);
+  const thn = it.sppTahun||new Date().getFullYear();
+
+  let sisa = it.sppCicilanNominal;
+  const result = [];
+  let b = it.sppDari;
+  const maxBulan = 24; // max 24 bulan
+  let iter = 0;
+  while(sisa > 0 && iter < maxBulan){
+    const bln = b % 12;
+    const thnBln = thn + Math.floor(b / 12);
+    const key = BULAN[bln] + ' ' + thnBln;
+    // Nominal for this month (check if partial from before)
+    const sisaBefore = sisamap[key]||0;
+    const nomBulanIni = sisaBefore > 0 ? sisaBefore : nomPerBulan;
+    if(sisa >= nomBulanIni){
+      result.push({label: key, bayar: nomBulanIni, sisa: 0});
+      sisa -= nomBulanIni;
+    } else {
+      result.push({label: key, bayar: sisa, sisa: nomBulanIni - sisa});
+      sisa = 0;
+    }
+    b++;
+    iter++;
+  }
+  itemList[i].sppCicilanResult = result;
+
+  // Update label and qty based on result
+  const dariLabel = result[0]?.label||'';
+  const sampaiLabel = result[result.length-1]?.label||'';
+  const qty = result.length;
+  if(dariLabel === sampaiLabel){
+    itemList[i].label = 'SPP ' + dariLabel;
+  } else {
+    const dariParts = dariLabel.split(' ');
+    const sampaiParts = sampaiLabel.split(' ');
+    itemList[i].label = 'SPP ' + dariParts[0] + ' - ' + sampaiParts[0] + ' ' + thn + ' ('+qty+'x)';
+  }
+  itemList[i].qty = qty;
+  // Update sampai bulan
+  if(result.length > 0){
+    const lastParts = result[result.length-1].label.split(' ');
+    const lastBulan = BULAN.indexOf(lastParts[0]);
+    if(lastBulan >= 0) itemList[i].sppSampai = lastBulan;
+  }
+  // nominal = total bayar
+  itemList[i].nominal = nomPerBulan;
+}
+
 function onSppKustomToggle(i, checked){
   itemList[i].sppKustom = checked;
   if(!checked){
@@ -2062,7 +2201,29 @@ function cekDuplikat(nama, tipe, label){
       if(existMonths.size===0 && r.items){
         r.items.forEach(function(it){ parseSppMonths(it.label||'').forEach(function(m){existMonths.add(m);}); });
       }
-      existMonths.forEach(function(m){ if(newMonths.has(m)) dup=r; });
+      // Only block if month is FULLY paid (sisa=0)
+      // Partial months (sisa>0) can be paid again
+      var recFullyPaid = r.sisa === 0;
+      if(!recFullyPaid){
+        // Check per-item sisa
+        var itemSisaMap = {};
+        if(r.items && r.items.length){
+          r.items.forEach(function(it){
+            var itMonths = parseSppMonths(it.label||'');
+            itMonths.forEach(function(m){ itemSisaMap[m] = it.sisa||0; });
+          });
+        }
+        existMonths.forEach(function(m){
+          if(newMonths.has(m)){
+            // Only block if this specific month is fully paid
+            var monthSisa = itemSisaMap[m];
+            if(monthSisa === undefined) monthSisa = r.sisa; // fallback to rec sisa
+            if(monthSisa === 0) dup = r;
+          }
+        });
+      } else {
+        existMonths.forEach(function(m){ if(newMonths.has(m)) dup=r; });
+      }
     });
     return dup;
   }
@@ -2248,7 +2409,18 @@ function buatKwitansiPindah(){
   // Build custom kwitansi HTML with pindah info
   const itemsHTML=recItems.map(it=>`
     <tr>
-      <td style="padding:4px 2px;font-size:13px">${it.label}</td>
+      <td style="padding:4px 2px;font-size:13px">
+        <div>${it.label}</div>
+        ${it.cicilanResult&&it.cicilanResult.length?`
+        <div style="margin-top:4px;padding-left:8px;border-left:2px solid #e5e7eb">
+          ${it.cicilanResult.map(r=>`
+          <div style="font-size:11px;color:#6b7280;display:flex;justify-content:space-between;gap:8px;padding:1px 0">
+            <span>${r.label}</span>
+            <span style="font-weight:600;color:${r.sisa>0?'#d97706':'#16a34a'};white-space:nowrap">${fmt(r.bayar)}${r.sisa>0?' (sisa '+fmt(r.sisa)+')':' ✅'}</span>
+          </div>`).join('')}
+        </div>`:''}
+        ${it.catatan?`<div style="font-size:10px;color:#9ca3af;margin-top:2px">📝 ${it.catatan}</div>`:''}
+      </td>
       <td style="padding:4px 2px;font-size:13px;text-align:right">${fmt(it.tagihan)}</td>
       <td style="padding:4px 2px;font-size:13px;text-align:right;color:var(--green)">${it.diskonPct>0?'-'+fmt(it.diskonAmt):'—'}</td>
       <td style="padding:4px 2px;font-size:13px;text-align:right;font-weight:600;color:${it.sisa>0?'var(--danger)':'var(--text)'}">${fmt(it.dibayar)}</td>
@@ -3186,7 +3358,15 @@ function buildKwitansiHTML(rec, logoHTML, namaSekolah, alamat, telepon){
   const itemsHTML = rec.items.map(it=>`
     <tr>
       <td style="padding:4px 2px;color:#6b7280;font-size:13px">${it.tipe}</td>
-      <td style="padding:4px 2px;font-size:13px">${it.label}</td>
+      <td style="padding:4px 2px;font-size:13px">
+        <div style="font-weight:500">${it.label}</div>
+        ${it.cicilanResult&&it.cicilanResult.length?
+          it.cicilanResult.map(r=>`<div style="font-size:10px;color:#6b7280;display:flex;gap:8px;justify-content:space-between;padding:1px 0 1px 8px;border-left:2px solid #e5e7eb">
+            <span>${r.label}</span>
+            <span style="font-weight:600;white-space:nowrap;color:${r.sisa>0?'#d97706':'#16a34a'}">${fmt(r.bayar)}${r.sisa>0?' →sisa '+fmt(r.sisa):' ✅'}</span>
+          </div>`).join(''):''}
+        ${it.catatan?`<div style="font-size:10px;color:#9ca3af;margin-top:2px">📝 ${it.catatan}</div>`:''}
+      </td>
       <td style="padding:4px 2px;font-size:13px;text-align:right">${fmt(it.tagihan)}</td>
       <td style="padding:4px 2px;font-size:13px;text-align:right;font-weight:500;color:${it.sisa>0?'#dc2626':'#15803d'}">${fmt(it.dibayar)}</td>
     </tr>
@@ -3252,6 +3432,39 @@ function buildKwitansiHTML(rec, logoHTML, namaSekolah, alamat, telepon){
 }
 
 // ===================== TUNGGAKAN SPP =====================
+function getSppSisaPerBulan(nama){
+  // Returns map: {"September 2025": 145000, ...} for months with sisa > 0
+  var rw = getRiwayat();
+  var sisamap = {};
+  rw.filter(function(r){ return r.nama===nama&&r.tipe==='SPP'&&r.sisa>0; }).forEach(function(r){
+    var recYear = r.tanggal ? r.tanggal.substring(0,4) : String(new Date().getFullYear());
+    var items = r.items&&r.items.length>0 ? r.items : [{label:r.bayarLabel||'', sisa:r.sisa||0}];
+    items.forEach(function(item){
+      if(!(item.sisa>0)) return;
+      var rawLabel = (item.label||'').replace(/\s*\([^)]*\)/g,'').trim();
+      var m2=rawLabel.match(/SPP\s+(\w+)\s*-\s*(\w+)\s+(\d{4})/);
+      var m1=!m2&&rawLabel.match(/SPP\s+(\w+)\s+(\d{4})/);
+      var m2old=!m2&&!m1&&rawLabel.match(/SPP\s+(\w+)\s*-\s*(\w+)/);
+      var m1old=!m2&&!m1&&!m2old&&rawLabel.match(/SPP\s+(\w+)/);
+      var months=[];
+      if(m2){
+        var dari=BULAN.indexOf(m2[1]),sampai=BULAN.indexOf(m2[2]),thn=m2[3];
+        if(dari>=0&&sampai>=0) for(var b=dari;b<=sampai;b++) months.push(BULAN[b]+' '+thn);
+      } else if(m1){ months.push(m1[1]+' '+m1[2]); }
+      else if(m2old){
+        var dari=BULAN.indexOf(m2old[1]),sampai=BULAN.indexOf(m2old[2]);
+        if(dari>=0&&sampai>=0) for(var b=dari;b<=sampai;b++) months.push(BULAN[b]+' '+recYear);
+      } else if(m1old){ months.push(m1old[1]+' '+recYear); }
+      // Distribute sisa evenly across months (or full sisa to single month)
+      if(months.length>0){
+        var sisaPerBulan = Math.round(item.sisa / months.length);
+        months.forEach(function(m){ sisamap[m]=(sisamap[m]||0)+sisaPerBulan; });
+      }
+    });
+  });
+  return sisamap;
+}
+
 function getSppHistory(nama){
   var rw=getRiwayat(), paid=new Set(), partial=new Set();
   rw.filter(function(r){return r.nama===nama&&r.tipe==='SPP';}).forEach(function(r){
@@ -3350,6 +3563,22 @@ const KELAS_URUTAN = [
   '7 SMP','7 SMP Plus','8 SMP','8 SMP Plus','9 SMP',
   '10 SMK','11 SMK','12 SMK'
 ];
+
+// Get effective kelas based on date (auto naik kelas on July 1)
+function getKelasEfektif(kelas, tanggal){
+  if(!kelas||!tanggal) return kelas;
+  const tgl = new Date(tanggal);
+  const year = tgl.getFullYear();
+  const july1 = new Date(year+'-07-01');
+  // If payment date >= July 1, use next kelas
+  if(tgl >= july1){
+    const idx = KELAS_URUTAN.indexOf(kelas);
+    if(idx >= 0 && idx < KELAS_URUTAN.length-1){
+      return KELAS_URUTAN[idx+1];
+    }
+  }
+  return kelas;
+}
 
 // Get kelas at a specific tahun ajaran offset from mulai
 function getKelasAtTA(kelasAwal, mulaiTA, targetTA){
@@ -3619,7 +3848,31 @@ function buatKwitansi(){
       const qty = it.qty||1;
       if(!it.isCustom){
         const spp=getSPP(), pgm=getPGM(), daftar=getDaftar(), diskon=getDiskon();
-        if(it.tipe==='SPP') nom=getSppNominalSiswa(siswa.nama,siswa.kelas,spp);
+        if(it.tipe==='SPP'){
+          if(it.sppCicilan && it.sppCicilanNominal){
+            // Cicilan mode - nom = sppCicilanNominal (already total)
+            nom = it.sppCicilanNominal;
+            // Force kas = nominal (cicilan always pays exactly what's entered)
+            if(!it.kasInput) it.kasInput = it.sppCicilanNominal;
+          } else {
+            const tglBayar=document.getElementById('inp-tanggal')?.value||today();
+            const kelasEfBuat=getKelasEfektif(siswa.kelas,tglBayar)||siswa.kelas;
+            const nomPerBulan=getSppNominalSiswa(siswa.nama,kelasEfBuat,spp,tglBayar);
+            if(it.sppDari!==undefined){
+              const sisamapB=getSppSisaPerBulan(siswa.nama);
+              const thnB=it.sppTahun||new Date().getFullYear();
+              const sampaiB=it.sppSampai!==undefined?it.sppSampai:it.sppDari;
+              let totalB=0;
+              for(let b=it.sppDari;b<=sampaiB;b++){
+                const keyB=BULAN[b]+' '+thnB;
+                totalB+=sisamapB[keyB]!==undefined?sisamapB[keyB]:nomPerBulan;
+              }
+              nom=totalB;
+            } else {
+              nom=nomPerBulan*(it.qty||1);
+            }
+          }
+        }
         else if(it.tipe==='Pengembangan'){
           // Check if only selected siswa
           if(it.selectedSiswa&&!it.selectedSiswa.includes(si)) nom=0;
@@ -3646,11 +3899,13 @@ function buatKwitansi(){
         const labelWithQty=qty>1?`${it.label} (${qty}×Rp${(it.sppKustomNominal||0).toLocaleString('id-ID')})`:it.label;
         return {tipe:it.tipe,label:labelWithQty,tagihan:kustomNom,dibayar:kustomNom,sisa:0,diskonPct:0,diskonAmt:0,qty,sppKustom:true,catatan:it.catatan||null};
       }
-      const subtotal=nom*qty;
+      // In cicilan mode: nom is already total paid, don't multiply by qty
+      const subtotal=it.sppCicilan&&it.sppCicilanNominal ? nom : nom*qty;
       const kas=it.kasInput>0?Math.min(it.kasInput,subtotal):subtotal;
       const sisa=subtotal-kas;
-      const labelWithQty=qty>1?`${it.label} (${qty}x)`:it.label;
-      return {tipe:it.tipe,label:labelWithQty,tagihan:subtotal,dibayar:kas,sisa,diskonPct:dPct,diskonAmt:dAmt,qty,catatan:it.catatan||null};
+      const labelWithQty=it.sppCicilan?it.label:(qty>1?`${it.label} (${qty}x)`:it.label);
+      return {tipe:it.tipe,label:labelWithQty,tagihan:subtotal,dibayar:kas,sisa,diskonPct:dPct,diskonAmt:dAmt,qty,catatan:it.catatan||null,
+        cicilanResult:it.sppCicilan&&it.sppCicilanResult?it.sppCicilanResult:null};
     });
 
     const totalDibayar = recItems.reduce((a,it)=>a+it.dibayar,0);
@@ -3662,7 +3917,8 @@ function buatKwitansi(){
     const no           = prefix+'-'+yr+'-'+String(countSoFar).padStart(4,'0');
 
     const rec = {
-      id:Date.now()+si, no, nama:siswa.nama, kelas:siswa.kelas,
+      id:Date.now()+si, no, nama:siswa.nama,
+      kelas:getKelasEfektif(siswa.kelas, tanggal)||siswa.kelas,
       tipe:tipeMain, bayarLabel:recItems.map(it=>it.label).join(' + '),
       catatan:itemList.filter(it=>it.catatan&&it.selectedSiswa&&it.selectedSiswa.includes(si)).map(it=>it.catatan).join(' | ')||
               itemList.filter(it=>it.catatan&&!it.selectedSiswa).map(it=>it.catatan).join(' | ')||null,
@@ -3723,6 +3979,7 @@ function buildGabunganKwitansi(recs, logoHTML, namaSekolah, alamat, telepon){
   const noGab = recs.map(r=>r.no).join(' / ');
   const totalDibayar = recs.reduce((a,r)=>a+r.totalDibayar,0);
   const totalSisa = recs.reduce((a,r)=>a+r.totalSisa,0);
+  const metode = recs[0].metode||'Kas';
 
   // Build rows per siswa
   const siswaRows = recs.map(rec=>`
@@ -3759,6 +4016,11 @@ function buildGabunganKwitansi(recs, logoHTML, namaSekolah, alamat, telepon){
     <table style="width:100%;font-size:13px;margin-bottom:10px;border-collapse:collapse">
       <tr><td style="color:var(--text2);width:38%;padding:4px 2px">Tanggal</td><td style="padding:4px 2px">${tglFmtStr}</td></tr>
       <tr><td style="color:var(--text2);padding:4px 2px">Jumlah Siswa</td><td style="padding:4px 2px;font-weight:600">${recs.length} siswa</td></tr>
+      <tr><td style="color:var(--text2);padding:4px 2px">Metode</td><td style="padding:4px 2px">
+        <span style="display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:600;background:${metode==='Transfer'?'#dbeafe':'#dcfce7'};color:${metode==='Transfer'?'#1d4ed8':'#15803d'}">
+          ${metode==='Transfer'?'🏦 Transfer':'💵 Kas'}
+        </span>
+      </td></tr>
     </table>
     <div style="background:var(--gray-light);border-radius:7px;padding:10px 12px;margin-bottom:12px">
       <div style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;margin-bottom:6px">Rincian Pembayaran</div>
@@ -4151,52 +4413,91 @@ function renderRekordDetail(){
 
   const totBayar=rw.reduce((a,r)=>a+(r.nominalBayar||0),0);
   const totTagihan=rw.reduce((a,r)=>a+(r.tagihan||0),0);
-  // Hitung sisa aktual dengan akumulasi cicilan pendaftaran
   let totSisa=0;
   const aktualDaftarDetail=getSisaAktualPendaftaran(rekordCurrentSiswa.nama);
   if(aktualDaftarDetail) totSisa+=aktualDaftarDetail.sisaAktual;
   rw.filter(r=>r.tipe!=='Pendaftaran').forEach(r=>totSisa+=(r.sisa||0));
 
   document.getElementById('rekord-detail-summary').innerHTML=[
-    {label:'Total Transaksi',val:rw.length+' kwitansi',color:'var(--blue)'},
-    {label:'Total Tagihan',val:fmt(totTagihan),color:'var(--text)'},
-    {label:'Total Dibayar',val:fmt(totBayar),color:'var(--green)'},
-    {label:'Total Tunggakan',val:fmt(totSisa),color:totSisa>0?'var(--danger)':'var(--green)'},
-  ].map(x=>`<div style="background:var(--gray-light);border-radius:8px;padding:10px 14px;min-width:120px">
-    <div style="font-size:11px;color:var(--text2)">${x.label}</div>
-    <div style="font-size:15px;font-weight:600;color:${x.color};margin-top:2px">${x.val}</div>
+    {label:'Total Transaksi',val:rw.length+' kwitansi',c:'var(--blue)'},
+    {label:'Total Tagihan',val:fmt(totTagihan),c:'var(--text)'},
+    {label:'Total Dibayar',val:fmt(totBayar),c:'var(--green)'},
+    {label:'Total Sisa',val:fmt(totSisa),c:totSisa>0?'var(--danger)':'var(--green)'},
+  ].map(x=>`<div style="background:var(--gray-light);border-radius:8px;padding:8px 12px;min-width:110px">
+    <div style="font-size:10px;color:var(--text2)">${x.label}</div>
+    <div style="font-size:13px;font-weight:600;color:${x.c};margin-top:2px">${x.val}</div>
   </div>`).join('');
 
   const wrap=document.getElementById('rekord-detail-table');
-  if(!rw.length){wrap.innerHTML='<div class="hist-empty">Belum ada transaksi</div>';return;}
+  if(!rw.length){wrap.innerHTML='<div class="hist-empty">Tidak ada transaksi</div>';return;}
 
-  const allRwSiswa = getRiwayat().filter(r=>r.nama.toLowerCase()===rekordCurrentSiswa.nama.toLowerCase());
-  wrap.innerHTML=`<table class="hist-table">
-    <thead><tr><th>No. Kwitansi</th><th>Tanggal</th><th>Jenis</th><th>Keterangan</th><th>Catatan</th><th>Tagihan</th><th>Dibayar</th><th>Sisa</th><th>Aksi</th></tr></thead>
-    <tbody>`+rw.map(r=>{
-      const sd=getSisaDisplay(r, allRwSiswa);
-      return `<tr>
+  const allRwSiswa=getRiwayat().filter(r=>r.nama.toLowerCase()===rekordCurrentSiswa.nama.toLowerCase());
+  const siswaData2=getSiswa().find(s=>s.nama===rekordCurrentSiswa.nama)||{};
+
+  // Group by Tahun Ajaran
+  function getTAFromTgl(tgl){
+    if(!tgl) return 'Lainnya';
+    const d=new Date(tgl),y=d.getFullYear(),m=d.getMonth();
+    return m>=6?y+'/'+(y+1):(y-1)+'/'+y;
+  }
+
+  const taGroups={};
+  rw.forEach(r=>{
+    const ta=getTAFromTgl(r.tanggal);
+    if(!taGroups[ta])taGroups[ta]=[];
+    taGroups[ta].push(r);
+  });
+
+  let html='';
+  Object.keys(taGroups).sort().forEach(ta=>{
+    const taRecs=taGroups[ta];
+    // Kelas for this TA
+    let kelasTA=rekordCurrentSiswa.kelas||'';
+    if(siswaData2.mulaiPendidikan){
+      const taList=getAllTA(siswaData2.mulaiPendidikan);
+      const k=getKelasAtTA(rekordCurrentSiswa.kelas,taList[taList.length-1],ta);
+      if(k) kelasTA=k;
+    }
+    const taTotBayar=taRecs.reduce((a,r)=>a+(r.nominalBayar||0),0);
+    const taTotSisa=taRecs.reduce((a,r)=>a+(r.sisa||0),0);
+
+    html+=`<div style="margin-bottom:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--blue);color:#fff;border-radius:8px 8px 0 0;font-weight:700;font-size:13px">
+        <span>📅 TA ${ta}${kelasTA?' — '+kelasTA:''}</span>
+        <span style="font-size:11px;font-weight:400;opacity:.9">${fmt(taTotBayar)}${taTotSisa>0?' · Sisa: '+fmt(taTotSisa):' ✅'}</span>
+      </div>
+      <table class="hist-table" style="margin-bottom:0">
+        <thead><tr><th>No. Kwitansi</th><th>Tanggal</th><th>Jenis</th><th>Keterangan</th><th>Catatan</th><th>Tagihan</th><th>Dibayar</th><th>Sisa</th><th>Aksi</th></tr></thead>
+        <tbody>`;
+    taRecs.forEach(r=>{
+      const sd=getSisaDisplay(r,allRwSiswa);
+      const tipeColor=r.tipe==='SPP'?'badge-blue':r.tipe==='Pengembangan'?'badge-green':'badge-orange';
+      const catatanVal=r.catatan||'';
+      html+=`<tr>
         <td><span class="badge badge-blue">${r.no}</span></td>
         <td>${fmtTgl(r.tanggal)}</td>
-        <td><span class="badge ${r.tipe==='SPP'?'badge-blue':r.tipe==='Pengembangan'?'badge-green':r.tipe==='Pendaftaran'?'badge-orange':'badge-blue'}">${r.tipe}</span></td>
+        <td><span class="badge ${tipeColor}">${r.tipe}</span></td>
         <td>${r.bayarLabel}</td>
-        <td style="font-size:11px;max-width:140px">
-          ${r.catatan
-            ? `<span onclick="showCatatanPopup(event,'${(r.catatan||'').replace(/'/g,"\'")}','${r.no}','${r.id}')"
-                style="cursor:pointer;color:var(--blue);text-decoration:underline;text-decoration-style:dotted;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;max-width:130px"
-                title="${r.catatan}">${r.catatan}</span>`
-            : `<span onclick="showCatatanPopup(event,'','${r.no}','${r.id}')" style="cursor:pointer;color:var(--text2)" title="Klik untuk tambah catatan">+ tambah</span>`}
+        <td style="font-size:11px;max-width:120px">
+          ${catatanVal
+            ?`<span onclick="showCatatanPopup(event,'${catatanVal.replace(/'/g,"\'")}','${r.no}','${r.id}')"
+               style="cursor:pointer;color:var(--blue);text-decoration:underline dotted;display:block;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
+               title="${catatanVal}">${catatanVal}</span>`
+            :`<span onclick="showCatatanPopup(event,'','${r.no}','${r.id}')" style="cursor:pointer;color:var(--text2)">+ tambah</span>`}
         </td>
         <td>${fmt(r.tagihan)}</td>
         <td style="color:var(--green);font-weight:500">${fmt(r.nominalBayar)}</td>
         <td style="color:${sd.sisa>0?'var(--danger)':'var(--green)'};font-weight:500">${sd.label}</td>
         <td style="display:flex;gap:4px">
-          <button class="btn btn-primary" style="font-size:11px;padding:2px 7px" onclick="openTrxModal(${r.id})">&#128065; Detail</button>
+          <button class="btn btn-primary" style="font-size:11px;padding:2px 7px" onclick="openTrxModal(${r.id})">&#128065;</button>
           <button class="btn" style="font-size:11px;padding:2px 7px" onclick="cetakUlang(${r.id})">&#128438;</button>
           <button class="btn btn-danger" style="font-size:11px;padding:2px 7px" onclick="hapusSatuRiwayat(${r.id});renderRekordDetail()">&#128465;</button>
         </td>
       </tr>`;
-    }).join('')+`</tbody></table>`;
+    });
+    html+=`</tbody></table></div>`;
+  });
+  wrap.innerHTML=html;
 }
 
 function downloadRekordSatu(){
@@ -5669,7 +5970,15 @@ function openTrxModal(id){
       <td style="padding:8px">
         <span style="font-size:11px;font-weight:600;padding:2px 7px;border-radius:10px;background:${tipeBadgeColor};color:${tipeTxtColor}">${it.tipe}</span>
       </td>
-      <td style="padding:8px">${it.label||it.keterangan||'—'}</td>
+      <td style="padding:8px">
+        <div>${it.label||it.keterangan||'—'}</div>
+        ${it.cicilanResult&&it.cicilanResult.length?`<div style="margin-top:4px;padding-left:6px;border-left:2px solid #dbeafe">`
+          +it.cicilanResult.map(r=>`<div style="font-size:11px;color:var(--text2);display:flex;justify-content:space-between;gap:8px;padding:1px 0">
+            <span>${r.label}</span>
+            <span style="font-weight:600;color:${r.sisa>0?'#d97706':'var(--green)'}">
+              ${fmt(r.bayar)}${r.sisa>0?' (sisa '+fmt(r.sisa)+')':' ✅'}
+            </span></div>`).join('')+`</div>`:''}
+      </td>
       <td style="padding:8px;font-size:11px">
         ${it.catatan
           ? `<span style="color:var(--text)">${it.catatan}</span>`
