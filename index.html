@@ -2010,9 +2010,11 @@ function hitungCicilanSPP(i){
     const bln = b % 12;
     const thnBln = thn + Math.floor(b / 12);
     const key = BULAN[bln] + ' ' + thnBln;
-    // Nominal for this month (check if partial from before)
+    // Nominal for this month: sisa tunggakan (partial) or tarif normal
     const sisaBefore = sisamap[key]||0;
     const nomBulanIni = sisaBefore > 0 ? sisaBefore : nomPerBulan;
+    // Guard: skip jika tarif 0 (data tidak valid) untuk cegah loop tak terbatas
+    if(nomBulanIni <= 0){ b++; iter++; continue; }
     if(sisa >= nomBulanIni){
       result.push({label: key, bayar: nomBulanIni, sisa: 0});
       sisa -= nomBulanIni;
