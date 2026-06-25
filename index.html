@@ -1509,7 +1509,37 @@ function renderItemForms(){
           id="if-label-${i}"
           style="width:100%;padding:8px;font-size:13px;border:1px solid var(--border);border-radius:7px;outline:none">
         <div class="dropdown" id="if-dd-${i}"></div>
-      </div>`;
+      </div>
+      ${(()=>{
+        if(it.tipe!=='Pendaftaran') return '';
+        const snm=siswaList.length?siswaList[0].nama:'';
+        if(!snm) return '';
+        const aktDaftar=getSisaAktualPendaftaran(snm);
+        if(!aktDaftar||!aktDaftar.totalTagihan) return '';
+        const sisaPdf=aktDaftar.sisaAktual;
+        if(sisaPdf<=0) return '<div style="padding:8px 12px;background:var(--green-light);border:1px solid #86efac;border-radius:7px;font-size:13px;color:var(--green);font-weight:600;margin-bottom:8px">✅ Pendaftaran sudah LUNAS</div>';
+        // Auto-set customNominal if not set yet
+        if(!it.customNominal) { itemList[i].customNominal=sisaPdf; }
+        return `<div style="padding:10px 12px;background:#fef9c3;border:1.5px solid #fcd34d;border-radius:8px;font-size:13px;margin-bottom:10px">
+          <div style="font-weight:700;color:#92400e;margin-bottom:6px">📋 Sisa Tunggakan Pendaftaran</div>
+          <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #fef3c7">
+            <span style="color:#78350f">Total Biaya Pendaftaran</span>
+            <span style="font-weight:600">${fmt(aktDaftar.totalTagihan)}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #fef3c7">
+            <span style="color:#78350f">Sudah Dibayar</span>
+            <span style="font-weight:600;color:var(--green)">${fmt(aktDaftar.totalDibayar)}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:4px 0">
+            <span style="color:#92400e;font-weight:700">Sisa Belum Dibayar</span>
+            <span style="font-weight:700;font-size:15px;color:var(--danger)">${fmt(sisaPdf)}</span>
+          </div>
+          <div style="margin-top:8px;font-size:11px;color:#92400e">
+            💡 Nominal di bawah sudah diisi otomatis sesuai sisa. Ubah jika bayar sebagian.
+          </div>
+        </div>`;
+      })()}
+      `;
 
     // Build per-siswa checkbox selector for SPP
     let perSiswaBreakdown = '';
@@ -3883,11 +3913,19 @@ function buatKwitansi(){
           else nom=getPgmNominal(siswa.kelas,pgm);
         }
         else if(it.tipe==='Pendaftaran'){
-          const j=JENJANG_MAP[siswa.kelas]||'SD';
-          nom=daftar[j]||0;
-          const bln=getBulanNow();
-          dPct=diskon[bln]||0;
-          if(dPct>0){dAmt=Math.round(nom*dPct/100);nom=nom-dAmt;}
+          // Cicilan pendaftaran: tagihan = sisa aktual (bukan tarif penuh lagi)
+          const aktDaftarBuat=getSisaAktualPendaftaran(siswa.nama);
+          if(aktDaftarBuat&&aktDaftarBuat.totalTagihan>0){
+            // Sudah ada record pendaftaran sebelumnya → ini cicilan
+            nom=aktDaftarBuat.sisaAktual||0;
+          } else {
+            // Pendaftaran baru (belum ada record) → tarif penuh
+            const j=JENJANG_MAP[siswa.kelas]||'SD';
+            nom=daftar[j]||0;
+            const bln=getBulanNow();
+            dPct=diskon[bln]||0;
+            if(dPct>0){dAmt=Math.round(nom*dPct/100);nom=nom-dAmt;}
+          }
         }
       } else {
         // Check per-siswa nominal first
@@ -3902,6 +3940,20 @@ function buatKwitansi(){
         const kustomNom=(it.sppKustomNominal||0)*qty;
         const labelWithQty=qty>1?`${it.label} (${qty}×Rp${(it.sppKustomNominal||0).toLocaleString('id-ID')})`:it.label;
         return {tipe:it.tipe,label:labelWithQty,tagihan:kustomNom,dibayar:kustomNom,sisa:0,diskonPct:0,diskonAmt:0,qty,sppKustom:true,catatan:it.catatan||null};
+      }
+      // Pendaftaran cicilan: tagihan = sisa aktual sebelum bayar, kas = kasInput yg diketik user
+      if(it.tipe==='Pendaftaran'&&nom>0){
+        const aktDaftarBuat=getSisaAktualPendaftaran(siswa.nama);
+        if(aktDaftarBuat&&aktDaftarBuat.totalTagihan>0&&aktDaftarBuat.sisaAktual>0){
+          // Ada record pendaftaran sebelumnya → ini cicilan
+          const sisaSebelum=aktDaftarBuat.sisaAktual;
+          // kasInput = yg user ketik di "Kas Diterima"; jika kosong pakai customNominal (bayar penuh)
+          const kasDibayar=it.kasInput>0?Math.min(it.kasInput,sisaSebelum):Math.min(nom,sisaSebelum);
+          const sisaSetelah=Math.max(0,sisaSebelum-kasDibayar);
+          const labelKw=it.label||'Cicilan Pendaftaran';
+          return {tipe:it.tipe,label:labelKw,tagihan:sisaSebelum,dibayar:kasDibayar,sisa:sisaSetelah,
+            diskonPct:0,diskonAmt:0,qty:1,catatan:it.catatan||null,cicilanResult:null};
+        }
       }
       // In cicilan mode: nom is already total paid, don't multiply by qty
       const subtotal=it.sppCicilan&&it.sppCicilanNominal ? nom : (it.sppDari!==undefined ? nom : nom*qty);
@@ -5863,7 +5915,11 @@ function renderSiswaRekordModal(){
 
   const totBayar=rw.reduce((a,r)=>a+(r.nominalBayar||0),0);
   const totTagihan=rw.reduce((a,r)=>a+(r.tagihan||0),0);
-  const totSisa=rw.reduce((a,r)=>a+(r.sisa||0),0);
+  // Hitung totSisa dengan akumulasi pendaftaran (sama dengan kolom tunggakan)
+  let totSisa=0;
+  const aktualDaftarModal=getSisaAktualPendaftaran(nama);
+  if(aktualDaftarModal) totSisa+=aktualDaftarModal.sisaAktual;
+  getRiwayat().filter(r=>r.nama.toLowerCase()===nama.toLowerCase()&&r.tipe!=='Pendaftaran').forEach(r=>totSisa+=(r.sisa||0));
 
   // Summary
   document.getElementById('srm-summary').innerHTML=[
