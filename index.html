@@ -2938,28 +2938,30 @@ function getBayarOptions(tipe,kelas,q){
   return opts;
 }
 
-function getSppNominalSiswa(nama, kelas, spp){
+function getSppNominalSiswa(nama, kelas, spp, tgl){
   var siswaData = getSiswa().find(function(s){return s.nama===nama;});
   if(siswaData && siswaData.sppKhusus) return siswaData.sppKhusus;
   return getSppNominal(kelas, spp);
 }
 
 function getSppNominal(kelas,spp){
+  // Cek key langsung dulu (misal '4 SD') sebelum fallback ke key lama
+  if(spp[kelas]!==undefined&&spp[kelas]>0)return spp[kelas];
   if(kelas==='TK')return spp['TK']||145000;
-  if(kelas==='1 SD')return spp['SD (kelas 1)']||145000;
-  if(kelas==='2 SD')return spp['SD (kelas 2)']||155000;
-  if(kelas==='3 SD')return spp['SD (kelas 3)']||165000;
-  if(kelas==='4 SD')return spp['SD (kelas 4)']||175000;
-  if(kelas==='5 SD')return spp['SD (kelas 5)']||185000;
-  if(kelas==='6 SD')return spp['SD (kelas 6)']||195000;
+  if(kelas==='1 SD')return spp['SD (kelas 1)']||spp['1 SD']||145000;
+  if(kelas==='2 SD')return spp['SD (kelas 2)']||spp['2 SD']||155000;
+  if(kelas==='3 SD')return spp['SD (kelas 3)']||spp['3 SD']||165000;
+  if(kelas==='4 SD')return spp['SD (kelas 4)']||spp['4 SD']||175000;
+  if(kelas==='5 SD')return spp['SD (kelas 5)']||spp['5 SD']||185000;
+  if(kelas==='6 SD')return spp['SD (kelas 6)']||spp['6 SD']||195000;
   if(kelas==='1 SD Plus')return spp['1 SD Plus']||240000;
   if(kelas==='2 SD Plus')return spp['2 SD Plus']||255000;
-  if(kelas==='7 SMP')return spp['SMP (kelas 7-9)']||230000;
+  if(kelas==='7 SMP')return spp['SMP (kelas 7-9)']||spp['7 SMP']||230000;
   if(kelas==='7 SMP Plus')return spp['7 SMP Plus']||330000;
-  if(kelas==='8 SMP')return spp['SMP (kelas 7-9)']||230000;
+  if(kelas==='8 SMP')return spp['SMP (kelas 7-9)']||spp['8 SMP']||230000;
   if(kelas==='8 SMP Plus')return spp['8 SMP Plus']||330000;
-  if(kelas==='9 SMP')return spp['SMP (kelas 7-9)']||230000;
-  if(['10 SMK','11 SMK','12 SMK'].includes(kelas))return spp['SMK (kelas 10-12)']||350000;
+  if(kelas==='9 SMP')return spp['SMP (kelas 7-9)']||spp['9 SMP']||230000;
+  if(['10 SMK','11 SMK','12 SMK'].includes(kelas))return spp['SMK (kelas 10-12)']||spp[kelas]||350000;
   return 0;
 }
 
@@ -3900,7 +3902,7 @@ function buatKwitansi(){
         return {tipe:it.tipe,label:labelWithQty,tagihan:kustomNom,dibayar:kustomNom,sisa:0,diskonPct:0,diskonAmt:0,qty,sppKustom:true,catatan:it.catatan||null};
       }
       // In cicilan mode: nom is already total paid, don't multiply by qty
-      const subtotal=it.sppCicilan&&it.sppCicilanNominal ? nom : nom*qty;
+      const subtotal=it.sppCicilan&&it.sppCicilanNominal ? nom : (it.sppDari!==undefined ? nom : nom*qty);
       const kas=it.kasInput>0?Math.min(it.kasInput,subtotal):subtotal;
       const sisa=subtotal-kas;
       const labelWithQty=it.sppCicilan?it.label:(qty>1?`${it.label} (${qty}x)`:it.label);
