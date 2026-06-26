@@ -1472,7 +1472,7 @@ function renderItemForms(){
           const warnings=[];
           for(let b=it.sppDari;b<=sampai2;b++){
             const key=BULAN[b]+' '+thn2;
-            if(sisamap[key]>0) warnings.push(key+' (sisa Rp'+sisamap[key].toLocaleString('id-ID')+')');
+            if(sisamap[key]>0) warnings.push(key+' (kurang Rp '+sisamap[key].toLocaleString('id-ID')+')');
           }
           if(!warnings.length) return '';
           return '<div style="margin-top:4px;padding:5px 8px;background:#fef9c3;border:1px solid #fcd34d;border-radius:5px;font-size:11px;color:#92400e">'
@@ -1631,7 +1631,7 @@ function renderItemForms(){
           </div>
           <div id="cicilan-result-${i}">
             ${it.sppCicilanResult&&it.sppCicilanResult.length
-              ? it.sppCicilanResult.map(r=>`<div style="display:flex;justify-content:space-between;padding:4px 10px;background:#fff;border-radius:5px;font-size:12px;border:1px solid #dbeafe;margin-bottom:3px"><span>${r.label}</span><span style="font-weight:700;color:${r.sisa>0?'#d97706':'var(--green)'}">${fmt(r.bayar)}${r.sisa>0?' (sisa '+fmt(r.sisa)+')':' ✅'}</span></div>`).join('')
+              ? it.sppCicilanResult.map(r=>`<div style="display:flex;justify-content:space-between;padding:4px 10px;background:#fff;border-radius:5px;font-size:12px;border:1px solid #dbeafe;margin-bottom:3px"><span>${r.label}</span><span style="font-weight:700;color:${r.sisa>0?'#dc2626':'var(--green)'}">${fmt(r.bayar)}${r.sisa>0?` <span style="color:#dc2626;font-weight:700">(kurang ${fmt(r.sisa)})</span>`:' ✅'}</span></div>`).join('')
               : '<div style="font-size:11px;color:var(--text2)">Ketik nominal untuk melihat rincian cicilan.</div>'
             }
           </div>
@@ -2011,7 +2011,7 @@ function updateCicilanResultDiv(i){
   resultDiv.innerHTML = result.map(r=>`
     <div style="display:flex;justify-content:space-between;padding:4px 10px;background:#fff;border-radius:5px;font-size:12px;border:1px solid #dbeafe;margin-bottom:3px">
       <span>${r.label}</span>
-      <span style="font-weight:700;color:${r.sisa>0?'#d97706':'var(--green)'}">${fmt(r.bayar)}${r.sisa>0?' (sisa '+fmt(r.sisa)+')':' ✅'}</span>
+      <span style="font-weight:700;color:${r.sisa>0?'#dc2626':'var(--green)'}">${fmt(r.bayar)}${r.sisa>0?` <span style="color:#dc2626;font-weight:700">(kurang ${fmt(r.sisa)})</span>`:' ✅'}</span>
     </div>`).join('');
   if(totalDiv){
     totalDiv.style.display='flex';
@@ -2046,10 +2046,10 @@ function hitungCicilanSPP(i){
     // Guard: skip jika tarif 0 (data tidak valid) untuk cegah loop tak terbatas
     if(nomBulanIni <= 0){ b++; iter++; continue; }
     if(sisa >= nomBulanIni){
-      result.push({label: key, bayar: nomBulanIni, sisa: 0});
+      result.push({label: key, bayar: nomBulanIni, sisa: 0, sisaCarryover: sisaBefore>0});
       sisa -= nomBulanIni;
     } else {
-      result.push({label: key, bayar: sisa, sisa: nomBulanIni - sisa});
+      result.push({label: key, bayar: sisa, sisa: nomBulanIni - sisa, sisaCarryover: sisaBefore>0});
       sisa = 0;
     }
     b++;
@@ -2448,7 +2448,7 @@ function buatKwitansiPindah(){
           ${it.cicilanResult.map(r=>`
           <div style="font-size:11px;color:#6b7280;display:flex;justify-content:space-between;gap:8px;padding:1px 0">
             <span>${r.label}</span>
-            <span style="font-weight:600;color:${r.sisa>0?'#d97706':'#16a34a'};white-space:nowrap">${fmt(r.bayar)}${r.sisa>0?' (sisa '+fmt(r.sisa)+')':' ✅'}</span>
+            <span style="font-weight:600;color:${r.sisa>0?'#dc2626':'#16a34a'};white-space:nowrap">${fmt(r.bayar)}${r.sisa>0?` <span style="color:#dc2626">(kurang ${fmt(r.sisa)})</span>`:' ✅'}</span>
           </div>`).join('')}
         </div>`:''}
         ${it.catatan?`<div style="font-size:10px;color:#9ca3af;margin-top:2px">📝 ${it.catatan}</div>`:''}
@@ -3397,7 +3397,7 @@ function buildKwitansiHTML(rec, logoHTML, namaSekolah, alamat, telepon){
         ${it.cicilanResult&&it.cicilanResult.length?
           it.cicilanResult.map(r=>`<div style="font-size:10px;color:#6b7280;display:flex;gap:8px;justify-content:space-between;padding:1px 0 1px 8px;border-left:2px solid #e5e7eb">
             <span>${r.label}</span>
-            <span style="font-weight:600;white-space:nowrap;color:${r.sisa>0?'#d97706':'#16a34a'}">${fmt(r.bayar)}${r.sisa>0?' →sisa '+fmt(r.sisa):' ✅'}</span>
+            <span style="font-weight:600;white-space:nowrap;color:${r.sisa>0?'#dc2626':'#16a34a'}">${fmt(r.bayar)}${r.sisa>0?` <span style="color:#dc2626">(kurang ${fmt(r.sisa)})</span>`:' ✅'}</span>
           </div>`).join(''):''}
         ${it.catatan?`<div style="font-size:10px;color:#9ca3af;margin-top:2px">📝 ${it.catatan}</div>`:''}
       </td>
@@ -3467,14 +3467,29 @@ function buildKwitansiHTML(rec, logoHTML, namaSekolah, alamat, telepon){
 
 // ===================== TUNGGAKAN SPP =====================
 function getSppSisaPerBulan(nama){
-  // Returns map: {"September 2025": 145000, ...} for months with sisa > 0
+  // Returns map: {"Juni 2026": 170000, ...} — NET sisa per bulan setelah semua pembayaran
+  // Metode MAX: tagihan per bulan = MAX dari semua entry (nominal terbesar = tarif sebenarnya)
+  // Bayar per bulan = SUM semua pembayaran untuk bulan itu (bisa dari cicilan berbeda)
+  // Ini bekerja untuk record lama (tanpa sisaCarryover) maupun record baru
   var rw = getRiwayat();
-  var sisamap = {};
-  rw.filter(function(r){ return r.nama===nama&&r.tipe==='SPP'&&r.sisa>0; }).forEach(function(r){
+  var tagihanPerBulan = {}, bayarPerBulan = {};
+
+  rw.filter(function(r){ return r.nama===nama&&r.tipe==='SPP'; }).forEach(function(r){
     var recYear = r.tanggal ? r.tanggal.substring(0,4) : String(new Date().getFullYear());
-    var items = r.items&&r.items.length>0 ? r.items : [{label:r.bayarLabel||'', sisa:r.sisa||0}];
+    var items = r.items&&r.items.length>0 ? r.items : [{label:r.bayarLabel||'', tagihan:r.tagihan||0, dibayar:r.nominalBayar||0, cicilanResult:null}];
     items.forEach(function(item){
-      if(!(item.sisa>0)) return;
+      // Gunakan cicilanResult jika ada (paling akurat per bulan)
+      if(item.cicilanResult&&item.cicilanResult.length){
+        item.cicilanResult.forEach(function(cr){
+          var t=cr.bayar+(cr.sisa||0);
+          // MAX tagihan: nominal per bulan = nilai terbesar dari semua entry bulan ini
+          tagihanPerBulan[cr.label]=Math.max(tagihanPerBulan[cr.label]||0, t);
+          // SUM bayar: total semua pembayaran untuk bulan ini
+          bayarPerBulan[cr.label]=(bayarPerBulan[cr.label]||0)+cr.bayar;
+        });
+        return;
+      }
+      // Fallback: parse label (record lama tanpa cicilanResult)
       var rawLabel = (item.label||'').replace(/\s*\([^)]*\)/g,'').trim();
       var m2=rawLabel.match(/SPP\s+(\w+)\s*-\s*(\w+)\s+(\d{4})/);
       var m1=!m2&&rawLabel.match(/SPP\s+(\w+)\s+(\d{4})/);
@@ -3489,25 +3504,49 @@ function getSppSisaPerBulan(nama){
         var dari=BULAN.indexOf(m2old[1]),sampai=BULAN.indexOf(m2old[2]);
         if(dari>=0&&sampai>=0) for(var b=dari;b<=sampai;b++) months.push(BULAN[b]+' '+recYear);
       } else if(m1old){ months.push(m1old[1]+' '+recYear); }
-      // Distribute sisa evenly across months (or full sisa to single month)
       if(months.length>0){
-        var sisaPerBulan = Math.round(item.sisa / months.length);
-        months.forEach(function(m){ sisamap[m]=(sisamap[m]||0)+sisaPerBulan; });
+        var nomPerBulan=Math.round((item.tagihan||0)/months.length);
+        var bayarPerBln=Math.round((item.dibayar||0)/months.length);
+        months.forEach(function(m){
+          tagihanPerBulan[m]=Math.max(tagihanPerBulan[m]||0, nomPerBulan);
+          bayarPerBulan[m]=(bayarPerBulan[m]||0)+bayarPerBln;
+        });
       }
     });
+  });
+
+  // NET sisa = tagihan - min(bayar, tagihan) per bulan
+  var sisamap={};
+  Object.keys(tagihanPerBulan).forEach(function(m){
+    var net=tagihanPerBulan[m]-Math.min(bayarPerBulan[m]||0, tagihanPerBulan[m]);
+    if(net>0) sisamap[m]=net;
   });
   return sisamap;
 }
 
 function getSppHistory(nama){
   var rw=getRiwayat(), paid=new Set(), partial=new Set();
+  // Kumpulkan status per bulan dari getSppSisaPerBulan (NET sisa)
+  var sisamapNet=getSppSisaPerBulan(nama);
+
   rw.filter(function(r){return r.nama===nama&&r.tipe==='SPP';}).forEach(function(r){
     var recYear = r.tanggal ? r.tanggal.substring(0,4) : String(new Date().getFullYear());
-    // Use per-item sisa if available for accurate tracking
     var items = r.items && r.items.length > 0
       ? r.items
-      : [{label:r.bayarLabel||r.label||'', sisa:r.sisa||0}];
+      : [{label:r.bayarLabel||r.label||'', sisa:r.sisa||0, cicilanResult:null}];
     items.forEach(function(item){
+      // Jika ada cicilanResult: gunakan status per bulan yang akurat
+      if(item.cicilanResult&&item.cicilanResult.length){
+        item.cicilanResult.forEach(function(cr){
+          if(cr.sisaCarryover) return; // skip bulan carryover, sudah ditangani record sebelumnya
+          // Status final dari sisamapNet (sudah diperhitungkan semua pembayaran)
+          var netSisa=sisamapNet[cr.label]||0;
+          if(netSisa<=0) paid.add(cr.label);
+          else partial.add(cr.label);
+        });
+        return;
+      }
+      // Fallback: parse label (record lama tanpa cicilanResult)
       var rawLabel = item.label||'';
       var itemSisa = (item.sisa===undefined) ? (r.sisa||0) : (item.sisa||0);
       var target = itemSisa===0 ? paid : partial;
@@ -3530,6 +3569,8 @@ function getSppHistory(nama){
       }
     });
   });
+  // Pastikan bulan di paid tidak juga di partial (net sisa=0 = lunas)
+  paid.forEach(function(m){ partial.delete(m); });
   return {paid:paid, partial:partial};
 }
 
@@ -3764,17 +3805,17 @@ function renderTunggakanEditor(nama){
       +'<span style="font-weight:400;color:var(--text2)">'+gPaid+'/'+months.length+' lunas</span></div>'
       +'<div style="display:flex;flex-wrap:wrap;gap:3px">';
     months.forEach(function(m){
-      var isPaid=paid.has(m),isManual=manual.includes(m),isAuto=autoTunggakan.includes(m);
-      var bg=isPaid?'var(--green-light)':isAuto?'#fff3cd':isManual?'var(--danger-light)':'var(--gray-light)';
-      var bc=isPaid?'#86efac':isAuto?'#ffc107':isManual?'#fca5a5':'var(--border)';
-      var col=isPaid?'var(--green)':isAuto?'#856404':isManual?'var(--danger)':'var(--text)';
+      var isPaid=paid.has(m),isPartial=partial.has(m)&&!paid.has(m),isManual=manual.includes(m),isAuto=autoTunggakan.includes(m);
+      var bg=isPaid?'var(--green-light)':isPartial?'#fef9c3':isAuto?'#fff3cd':isManual?'var(--danger-light)':'var(--gray-light)';
+      var bc=isPaid?'#86efac':isPartial?'#fcd34d':isAuto?'#ffc107':isManual?'#fca5a5':'var(--border)';
+      var col=isPaid?'var(--green)':isPartial?'#92400e':isAuto?'#856404':isManual?'var(--danger)':'var(--text)';
       html+='<label style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:6px;'
         +'cursor:'+(isPaid?'not-allowed':'pointer')+';background:'+bg+';border:1px solid '+bc+';font-size:11px;margin:2px">'
         +'<input type="checkbox"'+(isManual||isAuto?' checked':'')+(isPaid?' disabled':'')
         +' data-nama="'+enc+'" data-bulan="'+m+'"'
         +' onchange="onTunggakanCheck(this.dataset.nama,this.dataset.bulan,this.checked)"'
         +' style="width:13px;height:13px">'
-        +'<span style="color:'+col+'">'+m+(isPaid?' ✅':isAuto?' ⚠':'')+'</span>'
+        +'<span style="color:'+col+'">'+m+(isPaid?' ✅':isPartial?' 💛':isAuto?' ⚠':'')+'</span>'
         +'</label>';
     });
     html+='</div></div>';
@@ -3958,9 +3999,18 @@ function buatKwitansi(){
       // In cicilan mode: nom is already total paid, don't multiply by qty
       const subtotal=it.sppCicilan&&it.sppCicilanNominal ? nom : (it.sppDari!==undefined ? nom : nom*qty);
       const kas=it.kasInput>0?Math.min(it.kasInput,subtotal):subtotal;
-      const sisa=subtotal-kas;
+      let sisa=subtotal-kas;
+      // Cicilan SPP: tagihan = total semua bulan, sisa = dari cicilanResult (partial bulan terakhir)
+      let tagihanCicilan=subtotal;
+      if(it.sppCicilan&&it.sppCicilanResult&&it.sppCicilanResult.length){
+        // Total tagihan = sum nominal semua bulan dalam range
+        tagihanCicilan=it.sppCicilanResult.reduce((a,r)=>a+(r.bayar+(r.sisa||0)),0);
+        // Sisa = sisa dari bulan partial terakhir (jika ada)
+        const lastPartial=it.sppCicilanResult.find(r=>r.sisa>0);
+        sisa=lastPartial?lastPartial.sisa:0;
+      }
       const labelWithQty=it.sppCicilan?it.label:(qty>1?`${it.label} (${qty}x)`:it.label);
-      return {tipe:it.tipe,label:labelWithQty,tagihan:subtotal,dibayar:kas,sisa,diskonPct:dPct,diskonAmt:dAmt,qty,catatan:it.catatan||null,
+      return {tipe:it.tipe,label:labelWithQty,tagihan:tagihanCicilan,dibayar:kas,sisa,diskonPct:dPct,diskonAmt:dAmt,qty,catatan:it.catatan||null,
         cicilanResult:it.sppCicilan&&it.sppCicilanResult?it.sppCicilanResult:null};
     });
 
@@ -4147,7 +4197,10 @@ function filterRiwayat(){
   const aktualDaftarRv=getSisaAktualPendaftaran(exact.nama);
   let totalSisa=0;
   if(aktualDaftarRv) totalSisa+=aktualDaftarRv.sisaAktual;
-  rw.filter(r=>r.tipe!=='Pendaftaran').forEach(r=>totalSisa+=(r.sisa||0));
+  // SPP: NET sisa per bulan
+  const sppNetRv=getSppSisaPerBulan(exact.nama);
+  Object.values(sppNetRv).forEach(v=>totalSisa+=v);
+  rw.filter(r=>r.tipe!=='Pendaftaran'&&r.tipe!=='SPP').forEach(r=>totalSisa+=(r.sisa||0));
   const badgeTung=document.getElementById('rv-tunggakan-badge');
   if(totalSisa>0){badgeTung.style.display='';badgeTung.textContent='Tunggakan '+fmt(totalSisa)}
   else badgeTung.style.display='none';
@@ -4433,7 +4486,10 @@ function renderRekordSiswa(){
       let totSisa=0;
       const aktualDaftarRow=getSisaAktualPendaftaran(s.nama);
       if(aktualDaftarRow) totSisa+=aktualDaftarRow.sisaAktual;
-      sr.filter(r=>r.tipe!=='Pendaftaran').forEach(r=>totSisa+=(r.sisa||0));
+      // SPP: NET sisa per bulan
+      const sppNetRow=getSppSisaPerBulan(s.nama);
+      Object.values(sppNetRow).forEach(v=>totSisa+=v);
+      sr.filter(r=>r.tipe!=='Pendaftaran'&&r.tipe!=='SPP').forEach(r=>totSisa+=(r.sisa||0));
       const hasTung=totSisa>0;
       return `<tr>
         <td style="color:var(--text2);font-size:12px">${i+1}</td>
@@ -4472,7 +4528,10 @@ function renderRekordDetail(){
   let totSisa=0;
   const aktualDaftarDetail=getSisaAktualPendaftaran(rekordCurrentSiswa.nama);
   if(aktualDaftarDetail) totSisa+=aktualDaftarDetail.sisaAktual;
-  rw.filter(r=>r.tipe!=='Pendaftaran').forEach(r=>totSisa+=(r.sisa||0));
+  // SPP: NET sisa per bulan
+  const sppNetDetail=getSppSisaPerBulan(rekordCurrentSiswa.nama);
+  Object.values(sppNetDetail).forEach(v=>totSisa+=v);
+  rw.filter(r=>r.tipe!=='Pendaftaran'&&r.tipe!=='SPP').forEach(r=>totSisa+=(r.sisa||0));
 
   document.getElementById('rekord-detail-summary').innerHTML=[
     {label:'Total Transaksi',val:rw.length+' kwitansi',c:'var(--blue)'},
@@ -5915,11 +5974,15 @@ function renderSiswaRekordModal(){
 
   const totBayar=rw.reduce((a,r)=>a+(r.nominalBayar||0),0);
   const totTagihan=rw.reduce((a,r)=>a+(r.tagihan||0),0);
-  // Hitung totSisa dengan akumulasi pendaftaran (sama dengan kolom tunggakan)
+  // Hitung totSisa: SPP dari NET sisamap, Pendaftaran dari aktualDaftar, lainnya dari r.sisa
   let totSisa=0;
   const aktualDaftarModal=getSisaAktualPendaftaran(nama);
   if(aktualDaftarModal) totSisa+=aktualDaftarModal.sisaAktual;
-  getRiwayat().filter(r=>r.nama.toLowerCase()===nama.toLowerCase()&&r.tipe!=='Pendaftaran').forEach(r=>totSisa+=(r.sisa||0));
+  // SPP: gunakan NET sisa per bulan (mencegah double-count cicilan)
+  const sppSisamapModal=getSppSisaPerBulan(nama);
+  Object.values(sppSisamapModal).forEach(function(v){ totSisa+=v; });
+  // Lainnya (bukan SPP dan bukan Pendaftaran): gunakan r.sisa langsung
+  getRiwayat().filter(r=>r.nama.toLowerCase()===nama.toLowerCase()&&r.tipe!=='Pendaftaran'&&r.tipe!=='SPP').forEach(r=>totSisa+=(r.sisa||0));
 
   // Summary
   document.getElementById('srm-summary').innerHTML=[
@@ -6035,8 +6098,8 @@ function openTrxModal(id){
         ${it.cicilanResult&&it.cicilanResult.length?`<div style="margin-top:4px;padding-left:6px;border-left:2px solid #dbeafe">`
           +it.cicilanResult.map(r=>`<div style="font-size:11px;color:var(--text2);display:flex;justify-content:space-between;gap:8px;padding:1px 0">
             <span>${r.label}</span>
-            <span style="font-weight:600;color:${r.sisa>0?'#d97706':'var(--green)'}">
-              ${fmt(r.bayar)}${r.sisa>0?' (sisa '+fmt(r.sisa)+')':' ✅'}
+            <span style="font-weight:600;color:${r.sisa>0?'#dc2626':'var(--green)'}">
+              ${fmt(r.bayar)}${r.sisa>0?` <span style="color:#dc2626">(kurang ${fmt(r.sisa)})</span>`:' ✅'}
             </span></div>`).join('')+`</div>`:''}
       </td>
       <td style="padding:8px;font-size:11px">
