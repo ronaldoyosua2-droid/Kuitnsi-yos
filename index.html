@@ -686,7 +686,8 @@ function doConfirmLoadCloud(){ if(typeof confirmLoadCloud==='function') confirmL
         <option>10 SMK</option><option>11 SMK</option><option>12 SMK</option>
       </select>
       <button class="btn btn-green" style="font-size:12px;padding:6px 14px" onclick="downloadAllExcel()">&#128190; Download Excel</button>
-
+      <button class="btn" style="font-size:12px;padding:6px 14px;background:#fff7ed;border-color:#fdba74;color:#c2410c" onclick="triggerImportExcel()" title="Restore/gabung data dari file Excel hasil download sebelumnya">&#128228; Import Excel</button>
+      <input type="file" id="import-excel-input" accept=".xlsx,.xls" style="display:none" onchange="handleImportExcel(this)">
     </div>
     <div id="all-riwayat-wrap">
       <div class="hist-empty">Belum ada riwayat pembayaran</div>
@@ -775,6 +776,9 @@ function doConfirmLoadCloud(){ if(typeof confirmLoadCloud==='function') confirmL
         <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
           <input class="search-bar" id="admin-siswa-search" placeholder="Cari nama siswa..." oninput="renderAdminSiswa()" style="margin-bottom:0;flex:1;min-width:150px">
           <button class="btn btn-primary" onclick="openTambahSiswa()">+ Tambah Siswa</button>
+          <button class="btn btn-green" onclick="downloadSiswaExcel()" title="Download data siswa (nama, kelas, dll) sebagai Excel">&#128190; Download Data Siswa</button>
+          <button class="btn" style="background:#fff7ed;border-color:#fdba74;color:#c2410c" onclick="triggerImportSiswa()" title="Restore/gabung data siswa dari file Excel, termasuk update kelas setelah naik kelas">&#128228; Import Data Siswa</button>
+          <input type="file" id="import-siswa-input" accept=".xlsx,.xls" style="display:none" onchange="handleImportSiswa(this)">
         </div>
         <div id="admin-siswa-wrap"></div>
       </div>
@@ -4370,15 +4374,203 @@ function downloadExcel(){
 function downloadAllExcel(){
   const rw=getRiwayat();
   if(!rw.length){alert('Belum ada riwayat pembayaran.');return}
-  const headers=['No Kwitansi','Nama','Kelas','Metode','Jenis','Keterangan','Tanggal','Tagihan (Rp)','Dibayar (Rp)','Sisa (Rp)','Status'];
-  const rows=rw.map(r=>[r.no,r.nama,r.kelas||'--',r.metode||'Kas',r.tipe,r.bayarLabel,fmtTgl(r.tanggal),r.tagihan||0,r.nominalBayar||0,r.sisa||0,r.sisa>0?'Belum Lunas':'Lunas']);
+  const headers=['No Kwitansi','Nama','Kelas','Metode','Jenis','Keterangan','Tanggal','Tagihan (Rp)','Dibayar (Rp)','Sisa (Rp)','Status','Data Lengkap (jangan diedit)'];
+  const rows=rw.map(r=>[r.no,r.nama,r.kelas||'--',r.metode||'Kas',r.tipe,r.bayarLabel,fmtTgl(r.tanggal),r.tagihan||0,r.nominalBayar||0,r.sisa||0,r.sisa>0?'Belum Lunas':'Lunas',JSON.stringify(r)]);
   const kasOnly=rw.filter(r=>!r.metode||r.metode==='Kas');
   const totT=kasOnly.reduce((a,r)=>a+(r.tagihan||0),0);
   const totD=kasOnly.reduce((a,r)=>a+(r.nominalBayar||0),0);
   const totS=rw.reduce((a,r)=>a+(r.sisa||0),0);
-  const summary=['','','','Kas only','','TOTAL',totT,totD,totS,''];
+  const summary=['','','','Kas only','','TOTAL',totT,totD,totS,'',''];
   const wb=buildXlsx('Semua Pembayaran',headers,rows,summary);
   if(wb)saveXlsx(wb,'Riwayat_Pembayaran_'+new Date().toLocaleDateString('id-ID').replace(/\//g,'-')+'.xlsx');
+}
+
+// ===================== DATA SISWA: EXPORT/IMPORT =====================
+function downloadSiswaExcel(){
+  const siswa=getSiswa();
+  if(!siswa.length){alert('Belum ada data siswa.');return}
+  const headers=['Nama','Kelas','Mulai Pendidikan (YYYY-MM)','SPP Khusus (Rp)'];
+  const rows=siswa.map(s=>[s.nama,s.kelas||'',s.mulaiPendidikan||'',s.sppKhusus||'']);
+  const wb=buildXlsx('Data Siswa',headers,rows);
+  if(wb)saveXlsx(wb,'Data_Siswa_'+new Date().toLocaleDateString('id-ID').replace(/\//g,'-')+'.xlsx');
+}
+
+function triggerImportSiswa(){
+  document.getElementById('import-siswa-input').click();
+}
+
+function handleImportSiswa(input){
+  const file=input.files[0];
+  if(!file)return;
+  const reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      const data=new Uint8Array(e.target.result);
+      const wb=XLSX.read(data,{type:'array'});
+      const sheetName=wb.SheetNames.find(n=>n==='Data Siswa')||wb.SheetNames[0];
+      const ws=wb.Sheets[sheetName];
+      const aoa=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+      if(!aoa.length){alert('File Excel kosong atau format tidak dikenali.');input.value='';return;}
+      const headers=aoa[0];
+      const namaIdx=headers.findIndex(h=>String(h).toLowerCase().includes('nama'));
+      const kelasIdx=headers.findIndex(h=>String(h).toLowerCase().includes('kelas'));
+      const mulaiIdx=headers.findIndex(h=>String(h).toLowerCase().includes('mulai'));
+      const sppKhususIdx=headers.findIndex(h=>String(h).toLowerCase().includes('spp khusus'));
+      if(namaIdx<0||kelasIdx<0){
+        alert('Format Excel tidak dikenali (kolom Nama/Kelas tidak ditemukan). Pastikan ini file hasil Download Data Siswa dari aplikasi ini.');
+        input.value='';
+        return;
+      }
+
+      const existing=getSiswa();
+      // Key unik: nama (case-insensitive). Siswa dengan nama sama dianggap sama.
+      const existingNames=new Set(existing.map(s=>s.nama.toLowerCase().trim()));
+      let added=0, skipped=0, updated=0;
+      const toAdd=[];
+      const toUpdate=[]; // {idx, newKelas} - untuk siswa yg sudah ada tapi kelasnya beda (misal abis naik kelas)
+
+      for(let i=1;i<aoa.length;i++){
+        const row=aoa[i];
+        if(!row||!row[namaIdx])continue;
+        const nama=String(row[namaIdx]).trim();
+        const kelas=String(row[kelasIdx]||'').trim();
+        const mulai=mulaiIdx>=0?String(row[mulaiIdx]||'').trim():'';
+        const sppKh=sppKhususIdx>=0?Number(row[sppKhususIdx])||undefined:undefined;
+        const key=nama.toLowerCase();
+
+        if(existingNames.has(key)){
+          // Siswa sudah ada → cek apakah kelasnya beda (kemungkinan hasil naik kelas yg belum sync)
+          const idx=existing.findIndex(s=>s.nama.toLowerCase().trim()===key);
+          if(idx>=0 && existing[idx].kelas!==kelas && kelas){
+            toUpdate.push({idx,kelas,mulai,sppKh});
+            updated++;
+          } else {
+            skipped++;
+          }
+          continue;
+        }
+        const newS={nama,kelas};
+        if(mulai) newS.mulaiPendidikan=mulai;
+        if(sppKh) newS.sppKhusus=sppKh;
+        toAdd.push(newS);
+        added++;
+      }
+
+      if(toAdd.length===0&&toUpdate.length===0){
+        alert('Tidak ada perubahan. Semua '+skipped+' siswa di file sudah sesuai dengan data saat ini.');
+        input.value='';
+        return;
+      }
+
+      let msg='Ditemukan:\n';
+      if(added>0) msg+='• '+added+' siswa baru akan ditambahkan\n';
+      if(updated>0) msg+='• '+updated+' siswa akan diperbarui kelasnya (kemungkinan dari proses naik kelas)\n';
+      if(skipped>0) msg+='• '+skipped+' siswa dilewati (sudah sama persis)\n';
+      msg+='\nLanjutkan import?';
+      if(!confirm(msg)){ input.value=''; return; }
+
+      let merged=existing.concat(toAdd);
+      toUpdate.forEach(function(u){
+        merged[u.idx]=Object.assign({},merged[u.idx],{kelas:u.kelas});
+        if(u.mulai) merged[u.idx].mulaiPendidikan=u.mulai;
+        if(u.sppKh) merged[u.idx].sppKhusus=u.sppKh;
+      });
+      merged.sort((a,b)=>a.nama.localeCompare(b.nama));
+      setSiswa(merged);
+      alert('✅ Import selesai. '+added+' siswa baru, '+updated+' diperbarui, '+skipped+' dilewati.');
+      input.value='';
+      renderAdminSiswa();buildNaikKelasList();renderRekordSiswa();
+    }catch(err){
+      alert('Gagal membaca file Excel: '+err.message);
+      input.value='';
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// ===================== IMPORT EXCEL (RESTORE/MERGE) =====================
+function triggerImportExcel(){
+  document.getElementById('import-excel-input').click();
+}
+
+function handleImportExcel(input){
+  const file=input.files[0];
+  if(!file)return;
+  const reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      const data=new Uint8Array(e.target.result);
+      const wb=XLSX.read(data,{type:'array'});
+      const sheetName=wb.SheetNames.find(n=>n==='Semua Pembayaran')||wb.SheetNames[0];
+      const ws=wb.Sheets[sheetName];
+      const aoa=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+      if(!aoa.length){alert('File Excel kosong atau format tidak dikenali.');input.value='';return;}
+      const headers=aoa[0];
+      const jsonColIdx=headers.findIndex(h=>String(h).includes('Data Lengkap'));
+      const noColIdx=headers.findIndex(h=>String(h).includes('No Kwitansi'));
+      if(noColIdx<0){alert('Format Excel tidak dikenali (kolom "No Kwitansi" tidak ditemukan). Pastikan ini file hasil Download Excel dari aplikasi ini.');input.value='';return;}
+
+      const existing=getRiwayat();
+      const existingNos=new Set(existing.map(r=>r.no));
+      let added=0, skipped=0, partial=0;
+      const toAdd=[];
+
+      for(let i=1;i<aoa.length;i++){
+        const row=aoa[i];
+        if(!row||!row[noColIdx])continue; // skip baris kosong/summary
+        const no=row[noColIdx];
+        if(existingNos.has(no)){ skipped++; continue; }
+
+        if(jsonColIdx>=0 && row[jsonColIdx]){
+          // Punya data lengkap (JSON) → restore akurat termasuk items & cicilanResult
+          try{
+            const full=JSON.parse(row[jsonColIdx]);
+            toAdd.push(full);
+            added++;
+            continue;
+          }catch(e){ /* fallback ke bawah jika JSON rusak */ }
+        }
+        // Fallback: rekonstruksi dari kolom dasar (tanpa detail cicilan per bulan)
+        const headerMap={};
+        headers.forEach((h,idx)=>headerMap[h]=idx);
+        const tagihan=Number(row[headerMap['Tagihan (Rp)']])||0;
+        const dibayar=Number(row[headerMap['Dibayar (Rp)']])||0;
+        const sisa=Number(row[headerMap['Sisa (Rp)']])||0;
+        toAdd.push({
+          id:'restore_'+no+'_'+Date.now(),
+          no:no,
+          nama:row[headerMap['Nama']]||'',
+          kelas:row[headerMap['Kelas']]||'',
+          metode:row[headerMap['Metode']]||'Kas',
+          tipe:row[headerMap['Jenis']]||'',
+          bayarLabel:row[headerMap['Keterangan']]||'',
+          tanggal:row[headerMap['Tanggal']]||'',
+          tagihan:tagihan, nominalBayar:dibayar, sisa:sisa,
+          items:null // tidak ada detail cicilan - akan tampil sbg 1 baris saja
+        });
+        added++; partial++;
+      }
+
+      if(toAdd.length===0){
+        alert('Tidak ada data baru untuk diimpor. Semua '+skipped+' transaksi di file sudah ada di sistem.');
+        input.value='';
+        return;
+      }
+
+      const msg='Ditemukan '+added+' transaksi baru'+(partial>0?' ('+partial+' di antaranya tanpa detail cicilan lengkap)':'')+' dan '+skipped+' transaksi yang dilewati (sudah ada).\n\nLanjutkan import?';
+      if(!confirm(msg)){ input.value=''; return; }
+
+      const merged=existing.concat(toAdd);
+      setRiwayat(merged);
+      alert('✅ Import selesai. '+added+' transaksi ditambahkan, '+skipped+' dilewati.');
+      input.value='';
+      filterAllRiwayat();filterRiwayat();
+    }catch(err){
+      alert('Gagal membaca file Excel: '+err.message);
+      input.value='';
+    }
+  };
+  reader.readAsArrayBuffer(file);
 }
 
 function downloadRiwayatSiswa(){
@@ -5774,17 +5966,49 @@ function prosesNaikKelas(){
   const al=document.getElementById('naik-alert');
   const checks=document.querySelectorAll('#naik-kelas-list input[type=checkbox]');
   const siswa=getSiswa();
-  const newSiswa=[];
+  const dicentang=[];
   checks.forEach(c=>{
+    if(!c.checked)return;
     const idx=parseInt(c.dataset.idx);
     const s=siswa[idx];
-    if(!c.checked)return;
-    const to=NAIK_MAP[s.kelas];
-    if(to&&to!=='LULUS')newSiswa.push({nama:s.nama,kelas:to});
+    dicentang.push(s);
   });
-  newSiswa.sort((a,b)=>a.nama.localeCompare(b.nama));
-  setSiswa(newSiswa);
-  al.textContent='Naik kelas berhasil! '+newSiswa.length+' siswa diperbarui.';al.classList.add('show');
+  if(dicentang.length===0){
+    al.textContent='Belum ada siswa yang dicentang.';al.classList.add('show');
+    setTimeout(()=>al.classList.remove('show'),3000);
+    return;
+  }
+  if(!confirm('Proses naik kelas untuk '+dicentang.length+' siswa?\n\nIni akan mengubah data kelas secara permanen. Backup otomatis akan dibuat dan bisa di-undo selama belum menutup halaman ini.')) return;
+
+  // Backup sebelum proses, agar bisa di-undo
+  lsSet('ya_siswa_backup_naikkelas', siswa);
+
+  // Update HANYA siswa yang dicentang & punya field lengkap (tidak hilang sppKhusus dll), siswa lain tetap utuh
+  const updated=siswa.map(s=>{
+    const match=dicentang.find(d=>d===s);
+    if(!match) return s;
+    const to=NAIK_MAP[s.kelas];
+    if(!to) return s; // kelas tidak dikenal, biarkan
+    if(to==='LULUS') return Object.assign({},s,{kelas:'LULUS',_lulus:true,_lulusDari:s.kelas});
+    return Object.assign({},s,{kelas:to});
+  });
+
+  setSiswa(updated);
+  al.innerHTML='✅ Naik kelas berhasil! '+dicentang.length+' siswa diperbarui. '
+    +'<button onclick="undoNaikKelas()" style="margin-left:8px;padding:3px 10px;font-size:11px;border-radius:5px;background:#fff;border:1px solid currentColor;cursor:pointer;color:inherit">↩ Undo</button>';
+  al.classList.add('show');
+  buildNaikKelasList();renderAdminSiswa();
+}
+
+function undoNaikKelas(){
+  const backup=lsGet('ya_siswa_backup_naikkelas');
+  if(!backup){ alert('Tidak ada backup untuk di-undo.'); return; }
+  if(!confirm('Kembalikan data siswa ke sebelum proses naik kelas terakhir?')) return;
+  setSiswa(backup);
+  localStorage.removeItem('ya_siswa_backup_naikkelas');
+  const al=document.getElementById('naik-alert');
+  al.textContent='↩ Berhasil di-undo. Data siswa dikembalikan seperti semula.';
+  al.classList.add('show');
   buildNaikKelasList();renderAdminSiswa();
   setTimeout(()=>al.classList.remove('show'),3000);
 }
