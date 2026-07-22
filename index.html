@@ -4936,6 +4936,7 @@ function initHarian(){
   const t=today();
   document.getElementById('harian-dari').value=t;
   document.getElementById('harian-sampai').value=t;
+  renderHarian(); // auto-tampilkan transaksi hari ini
 }
 
 function filterRwByDate(dari,sampai){
