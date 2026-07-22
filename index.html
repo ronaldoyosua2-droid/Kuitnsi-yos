@@ -661,6 +661,17 @@ function doConfirmLoadCloud(){ if(typeof confirmLoadCloud==='function') confirmL
 
   <div class="card">
     <div class="card-title">Semua Riwayat Pembayaran</div>
+    <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;align-items:flex-end">
+      <div>
+        <label style="font-size:11px;color:var(--text2);display:block;margin-bottom:3px">Dari Tanggal</label>
+        <input type="date" id="all-filter-dari" onchange="filterAllRiwayat()" style="padding:7px 10px;font-size:13px;border:1px solid var(--border);border-radius:7px;outline:none">
+      </div>
+      <div>
+        <label style="font-size:11px;color:var(--text2);display:block;margin-bottom:3px">Sampai Tanggal</label>
+        <input type="date" id="all-filter-sampai" onchange="filterAllRiwayat()" style="padding:7px 10px;font-size:13px;border:1px solid var(--border);border-radius:7px;outline:none">
+      </div>
+      <button class="btn" onclick="resetFilterTanggalRiwayat()" style="font-size:12px;padding:6px 12px">✕ Semua Tanggal</button>
+    </div>
     <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
       <input class="search-bar" id="all-riwayat-search" placeholder="Cari nama..." oninput="filterAllRiwayat()" style="margin-bottom:0;flex:1;min-width:150px">
       <select id="all-filter-tipe" onchange="filterAllRiwayat()" style="width:auto">
@@ -1333,6 +1344,15 @@ function showPage(p){
   document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(x=>x.classList.remove('active'));
   document.getElementById('page-'+p).classList.add('active');
+  // Set filter tanggal ke hari ini saat buka halaman riwayat
+  if(p==='riwayat'){
+    const t=today();
+    const dari=document.getElementById('all-filter-dari');
+    const sampai=document.getElementById('all-filter-sampai');
+    if(dari&&!dari.value) dari.value=t;
+    if(sampai&&!sampai.value) sampai.value=t;
+    filterAllRiwayat();
+  }
   // Highlight matching nav btn without relying on event.target
   document.querySelectorAll('.nav-btn').forEach(function(btn){
     if(btn.getAttribute('onclick')&&btn.getAttribute('onclick').includes("'"+p+"'")) btn.classList.add('active');
@@ -3156,6 +3176,11 @@ function getLogoHTML(w=64){
 }
 
 document.getElementById('inp-tanggal').value=today();
+  // Set filter riwayat ke hari ini saat pertama load
+  const _dari=document.getElementById('all-filter-dari');
+  const _sampai=document.getElementById('all-filter-sampai');
+  if(_dari) _dari.value=today();
+  if(_sampai) _sampai.value=today();
 
 function onMetodeChange(){
   const isKas=document.querySelector('input[name="inp-metode"]:checked').value==='Kas';
@@ -4279,12 +4304,22 @@ function renderAllRiwayat(){
   filterAllRiwayat();
 }
 
+function resetFilterTanggalRiwayat(){
+  document.getElementById('all-filter-dari').value='';
+  document.getElementById('all-filter-sampai').value='';
+  filterAllRiwayat();
+}
+
 function filterAllRiwayat(){
   const q=(document.getElementById('all-riwayat-search').value||'').toLowerCase();
   const tipe=document.getElementById('all-filter-tipe').value;
   const kelas=document.getElementById('all-filter-kelas').value;
   const metode=document.getElementById('all-filter-metode').value;
+  const dari=document.getElementById('all-filter-dari')?.value||'';
+  const sampai=document.getElementById('all-filter-sampai')?.value||'';
   let rw=getRiwayat();
+  if(dari)rw=rw.filter(r=>r.tanggal&&r.tanggal>=dari);
+  if(sampai)rw=rw.filter(r=>r.tanggal&&r.tanggal<=sampai);
   if(q)rw=rw.filter(r=>r.nama.toLowerCase().includes(q));
   if(tipe)rw=rw.filter(r=>r.tipe===tipe);
   if(kelas)rw=rw.filter(r=>r.kelas===kelas);
