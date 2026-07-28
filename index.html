@@ -110,7 +110,7 @@ input[readonly]{background:var(--gray-light);color:var(--gray)}
 .naik-lulus{color:var(--danger)}
 .tunggakan-item{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--danger-light);border-radius:7px;border:1px solid #fca5a5;margin-bottom:6px;font-size:13px}
 .tab-bar{display:flex;gap:4px;margin-bottom:16px;background:var(--gray-light);border-radius:8px;padding:4px}
-.tab{padding:6px 14px;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer;color:var(--text2);transition:.15s}
+.tab{padding:6px 14px;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer;color:var(--text2);transition:.15s;outline:none;user-select:none;-webkit-user-select:none}
 .tab.active{background:#fff;color:var(--blue);box-shadow:0 1px 4px rgba(0,0,0,.08)}
 .tab-content{display:none}
 .tab-content.active{display:block}
@@ -1511,6 +1511,13 @@ function renderItemForms(){
             ${BULAN.map((b,bi)=>`<option value="${bi}" ${it.sppDari===bi?'selected':''}>${b}</option>`).join('')}
           </select>
           <span style="color:var(--text2);font-weight:600;font-size:16px">→</span>
+          <select onchange="onSppTahunSampai(${i},this.value)"
+            style="width:90px;padding:8px;font-size:13px;border:1px solid var(--border);border-radius:7px;font-weight:600;color:var(--blue)">
+            <option value="">—</option>
+            ${[new Date().getFullYear()-1,new Date().getFullYear(),new Date().getFullYear()+1,new Date().getFullYear()+2].map(y=>
+              `<option value="${y}" ${(it.sppTahunSampai||it.sppTahun||new Date().getFullYear())===y?'selected':''}>${y}</option>`
+            ).join('')}
+          </select>
           <select onchange="onSppBulanSampai(${i},this.value)"
             style="flex:1;min-width:100px;padding:8px;font-size:13px;border:1px solid var(--border);border-radius:7px">
             <option value="">— Sampai —</option>
@@ -1518,7 +1525,7 @@ function renderItemForms(){
           </select>
           ${it.sppDari!==undefined?
             `<span style="font-size:12px;font-weight:600;color:var(--blue);white-space:nowrap;background:var(--blue-light);padding:4px 10px;border-radius:6px">
-              ${it.sppSampai===undefined?'1 bulan':it.sppDari===it.sppSampai?'12 bulan (1 tahun)':qty+' bulan'}
+              ${qty+' bulan'}
             </span>`:''}
         </div>
         ${it.label?`<div style="font-size:11px;color:var(--blue);font-weight:500;margin-top:6px;padding:4px 8px;background:var(--blue-light);border-radius:5px">📋 ${it.label}</div>`:''}
@@ -1609,7 +1616,15 @@ function renderItemForms(){
       if(!it.selectedSiswa) it.selectedSiswa = siswaList.map((_,si)=>si);
       const rows=siswaList.map((s,si)=>{
         let nom=0;
-        if(isSPP){ const tgl=document.getElementById('inp-tanggal')?.value||today(); nom=s.kelas?getSppNominalSiswa(s.nama,getKelasEfektif(s.kelas,tgl)||s.kelas,spp,tgl):0; }
+        if(isSPP){ 
+            const tgl=document.getElementById('inp-tanggal')?.value||today();
+            // Cari bulan SPP dari itemList[i] jika ada
+            const itSpp=itemList[i]||{};
+            const sppThn=itSpp.sppTahun||new Date().getFullYear();
+            const sppBln=itSpp.sppDari!==undefined?itSpp.sppDari:new Date().getMonth();
+            const tglSppEf=itSpp.sppDari!==undefined?(sppThn+'-'+String(sppBln+1).padStart(2,'0')+'-01'):tgl;
+            const kelasEfSiswa=getKelasEfektif(s.kelas,tglSppEf)||s.kelas;
+            nom=s.kelas?getSppNominalSiswa(s.nama,kelasEfSiswa,spp,tglSppEf):0; }
         else if(it.tipe==='Pengembangan') nom=s.kelas?getPgmNominal(s.kelas,getPGM()):0;
         else if(isCustom){
           // Custom: use perSiswaNominal if set, else customNominal
@@ -1628,7 +1643,7 @@ function renderItemForms(){
               style="width:15px;height:15px;cursor:pointer;accent-color:var(--blue)">
             <div>
               <span style="font-weight:600;font-size:13px;color:${isSelected?'var(--text)':'var(--text2)'}">${s.nama||'—'}</span>
-              <span style="font-size:11px;color:var(--text2);margin-left:6px">${s.kelas||''}</span>
+              <span style="font-size:11px;color:var(--text2);margin-left:6px">${isSPP?(()=>{const itD=itemList[i]||{};const thnD=itD.sppTahun||new Date().getFullYear();const blnD=itD.sppDari!==undefined?itD.sppDari:new Date().getMonth();const tglD=itD.sppDari!==undefined?(thnD+'-'+String(blnD+1).padStart(2,'0')+'-01'):(document.getElementById('inp-tanggal')?.value||today());return getKelasEfektif(s.kelas,tglD)||s.kelas;})():s.kelas||''}</span>
               ${isSelected&&nom>0?`<span style="font-size:11px;color:var(--text2);margin-left:4px">(${nomLabel})</span>`:''}
             </div>
           </div>
@@ -1638,8 +1653,14 @@ function renderItemForms(){
       const totalSelected=siswaList.reduce((a,s,si)=>{
         if(!it.selectedSiswa.includes(si)) return a;
         let nom=0;
-        if(isSPP) nom=s.kelas?getSppNominalSiswa(s.nama,s.kelas,spp):0;
-        else if(it.tipe==='Pengembangan') nom=s.kelas?getPgmNominal(s.kelas,getPGM()):0;
+        if(isSPP){
+          const itSppT=itemList[i]||{};
+          const sppThnT=itSppT.sppTahun||new Date().getFullYear();
+          const sppBlnT=itSppT.sppDari!==undefined?itSppT.sppDari:new Date().getMonth();
+          const tglSppEfT=itSppT.sppDari!==undefined?(sppThnT+'-'+String(sppBlnT+1).padStart(2,'0')+'-01'):(document.getElementById('inp-tanggal')?.value||today());
+          const kelasEfT=getKelasEfektif(s.kelas,tglSppEfT)||s.kelas;
+          nom=s.kelas?getSppNominalSiswa(s.nama,kelasEfT,spp,tglSppEfT):0;
+        } else if(it.tipe==='Pengembangan') nom=s.kelas?getPgmNominal(s.kelas,getPGM()):0;
         else if(isCustom){
           nom=(it.perSiswaNominal&&it.perSiswaNominal[si]!==undefined)?parseInt(it.perSiswaNominal[si])||0:(it.customNominal||0);
         } else nom=it.nominal||0;
@@ -1831,8 +1852,32 @@ function onSppBulanDari(i, val){
   updateSppRange(i);
 }
 
+function onSppTahunSampai(i, val){
+  if(val===''){itemList[i].sppTahunSampai=undefined;}
+  else{
+    const thnSampai=parseInt(val);
+    const thnDari=itemList[i].sppTahun||new Date().getFullYear();
+    if(thnSampai<thnDari){
+      alert('Tahun sampai ('+thnSampai+') tidak boleh lebih kecil dari tahun dari ('+thnDari+').');
+      renderItemForms(); return;
+    }
+    itemList[i].sppTahunSampai=thnSampai;
+  }
+  updateSppRange(i);
+}
+
 function onSppBulanSampai(i, val){
   itemList[i].sppSampai = val===''?undefined:parseInt(val);
+  // Validasi: jika tahun sama, bulan sampai tidak boleh < bulan dari
+  const thnDari=itemList[i].sppTahun||new Date().getFullYear();
+  const thnSampai=itemList[i].sppTahunSampai||thnDari;
+  if(thnSampai===thnDari && itemList[i].sppSampai!==undefined && itemList[i].sppDari!==undefined){
+    if(itemList[i].sppSampai<itemList[i].sppDari){
+      alert('Bulan sampai tidak boleh lebih awal dari bulan dari jika tahun sama.');
+      itemList[i].sppSampai=undefined;
+      renderItemForms(); return;
+    }
+  }
   updateSppRange(i);
 }
 
@@ -1882,7 +1927,14 @@ function updateSppRange(i){
   const kelas=siswaList.length?siswaList[0].kelas:null;
   const siswaNama=siswaList.length?siswaList[0].nama:null;
   const tglInput=document.getElementById('inp-tanggal')?.value||today();
-  if(kelas) itemList[i].nominal=siswaNama?getSppNominalSiswa(siswaNama,kelas,getSPP(),tglInput):getSppNominal(getKelasEfektif(kelas,tglInput),getSPP());
+  // Gunakan tanggal dari BULAN SPP yang dipilih (bukan tanggal bayar)
+  // untuk menentukan kelas efektif dan tarif yang benar
+  const thn=it.sppTahun||new Date().getFullYear();
+  const bln=dari!==undefined?dari:new Date().getMonth();
+  // Buat tanggal representatif di bulan SPP yang dipilih
+  const tglSPP=thn+'-'+(String(bln+1).padStart(2,'0'))+'-01';
+  const kelasEf=kelas?getKelasEfektif(kelas,tglSPP)||kelas:kelas;
+  if(kelas) itemList[i].nominal=siswaNama?getSppNominalSiswa(siswaNama,kelasEf,getSPP(),tglSPP):getSppNominal(kelasEf,getSPP());
 
   // Dari kosong → reset
   if(dari===undefined){
@@ -1892,46 +1944,37 @@ function updateSppRange(i){
     return;
   }
 
+  const thnDari=it.sppTahun||new Date().getFullYear();
+  const thnSampai=it.sppTahunSampai||thnDari;
+
   // Dari diisi, Sampai kosong → 1 bulan
   if(sampai===undefined){
     itemList[i].qty=1;
-    const thn1=itemList[i].sppTahun||new Date().getFullYear();
-  itemList[i].label=`SPP ${BULAN[dari]} ${thn1}`;
+    itemList[i].label=`SPP ${BULAN[dari]} ${thnDari}`;
     renderItemForms();
     updateItemDisplay(i);
     return;
   }
 
-  // Dari == Sampai → 12 bulan (1 tahun penuh)
-  if(dari===sampai){
-    itemList[i].qty=12;
-    const thn12=itemList[i].sppTahun||new Date().getFullYear();
-  itemList[i].label=`SPP ${BULAN[dari]} ${thn12} (12 Bulan / 1 Tahun)`;
-    renderItemForms();
-    updateItemDisplay(i);
-    return;
+  // Hitung total bulan dengan cross-year support
+  // Total = (thnSampai - thnDari) * 12 + (sampai - dari) + 1
+  const totalBulan=(thnSampai-thnDari)*12+(sampai-dari)+1;
+  if(totalBulan<=0){
+    alert('Rentang bulan tidak valid. Pastikan bulan sampai tidak lebih awal dari bulan dari.');
+    renderItemForms(); return;
   }
-
-  // Sampai > Dari → hitung rentang normal
-  if(sampai>dari){
-    const qty=sampai-dari+1;
-    itemList[i].qty=qty;
-    const thnR=itemList[i].sppTahun||new Date().getFullYear();
-  itemList[i].label=`SPP ${BULAN[dari]} - ${BULAN[sampai]} ${thnR}`;
-    renderItemForms();
-    updateItemDisplay(i);
-    return;
+  itemList[i].qty=totalBulan;
+  // Label
+  const labelSatu=thnDari===thnSampai && dari===sampai;
+  if(labelSatu){
+    itemList[i].label=`SPP ${BULAN[dari]} ${thnDari}`;
+  } else if(thnDari===thnSampai){
+    itemList[i].label=`SPP ${BULAN[dari]} - ${BULAN[sampai]} ${thnDari}`;
+  } else {
+    itemList[i].label=`SPP ${BULAN[dari]} ${thnDari} - ${BULAN[sampai]} ${thnSampai}`;
   }
-
-  // Sampai < Dari → wrap around tahun (misal Nov - Feb = 4 bulan)
-  if(sampai<dari){
-    const qty=(12-dari)+sampai+1;
-    itemList[i].qty=qty;
-    const thnW=itemList[i].sppTahun||new Date().getFullYear();
-  itemList[i].label=`SPP ${BULAN[dari]} - ${BULAN[sampai]} ${thnW} (${qty} bulan)`;
-    renderItemForms();
-    updateItemDisplay(i);
-  }
+  renderItemForms();
+  updateItemDisplay(i);
 }
 
 function onItemTipeChange(i, tipe){
@@ -3710,10 +3753,28 @@ const KELAS_URUTAN = [
 ];
 
 // Get effective kelas based on date (auto naik kelas on July 1)
+function getTADariTanggal(tanggal){
+  var tgl=new Date(tanggal);
+  var y=tgl.getFullYear(), m=tgl.getMonth();
+  return m>=6 ? y+'/'+(y+1) : (y-1)+'/'+y;
+}
+
 function getKelasEfektif(kelas, tanggal){
-  // Kelas efektif = kelas saat ini di data siswa (sudah diurus via fitur Naik Kelas)
-  // Tidak ada auto-naik kelas berdasarkan tanggal - ini menyebabkan kelas salah di kwitansi
-  return kelas;
+  if(!kelas||!tanggal) return kelas;
+  var taSekarangY=parseInt(getTAAktif().split('/')[0]);
+  var taBayarY=parseInt(getTADariTanggal(tanggal).split('/')[0]);
+  var selisih=taSekarangY-taBayarY;
+  if(selisih===0) return kelas;
+  var isPlus=kelas.includes('Plus');
+  var JALUR_REG=['TK','1 SD','2 SD','3 SD','4 SD','5 SD','6 SD','7 SMP','8 SMP','9 SMP','10 SMK','11 SMK','12 SMK'];
+  var JALUR_PLUS=['1 SD Plus','2 SD Plus','3 SD Plus','4 SD Plus','5 SD Plus','6 SD Plus','7 SMP Plus','8 SMP Plus','9 SMP Plus'];
+  var jalur=isPlus?JALUR_PLUS:JALUR_REG;
+  var idx=jalur.indexOf(kelas);
+  if(idx<0) return kelas;
+  var idxBayar=idx-selisih;
+  if(idxBayar<0) idxBayar=0;
+  if(idxBayar>=jalur.length) return jalur[0];
+  return jalur[idxBayar];
 }
 
 // Get kelas at a specific tahun ajaran offset from mulai
@@ -3992,16 +4053,30 @@ function buatKwitansi(){
             if(!it.kasInput) it.kasInput = it.sppCicilanNominal;
           } else {
             const tglBayar=document.getElementById('inp-tanggal')?.value||today();
-            const kelasEfBuat=getKelasEfektif(siswa.kelas,tglBayar)||siswa.kelas;
-            const nomPerBulan=getSppNominalSiswa(siswa.nama,kelasEfBuat,spp,tglBayar);
+            // Gunakan tanggal bulan SPP pertama untuk kelas efektif (bukan tanggal bayar)
+            const thnEfB=it.sppTahun||new Date().getFullYear();
+            const blnEfB=it.sppDari!==undefined?it.sppDari:new Date().getMonth();
+            const tglEfB=it.sppDari!==undefined?(thnEfB+'-'+String(blnEfB+1).padStart(2,'0')+'-01'):tglBayar;
+            const kelasEfBuat=getKelasEfektif(siswa.kelas,tglEfB)||siswa.kelas;
+            const nomPerBulan=getSppNominalSiswa(siswa.nama,kelasEfBuat,spp,tglEfB);
             if(it.sppDari!==undefined){
               const sisamapB=getSppSisaPerBulan(siswa.nama);
-              const thnB=it.sppTahun||new Date().getFullYear();
+              const thnDariB=it.sppTahun||new Date().getFullYear();
+              const thnSampaiB=it.sppTahunSampai||thnDariB;
               const sampaiB=it.sppSampai!==undefined?it.sppSampai:it.sppDari;
+              // Gunakan kelas efektif per bulan SPP (bukan tanggal bayar)
               let totalB=0;
-              for(let b=it.sppDari;b<=sampaiB;b++){
-                const keyB=BULAN[b]+' '+thnB;
-                totalB+=sisamapB[keyB]!==undefined?sisamapB[keyB]:nomPerBulan;
+              let curThn=thnDariB, curBln=it.sppDari;
+              // Loop sampai mencapai thnSampaiB/sampaiB
+              while(curThn<thnSampaiB||(curThn===thnSampaiB&&curBln<=sampaiB)){
+                const tglBulanIni=curThn+'-'+String(curBln+1).padStart(2,'0')+'-01';
+                const kelasEfBulan=getKelasEfektif(siswa.kelas,tglBulanIni)||siswa.kelas;
+                const nomBulanIni=getSppNominalSiswa(siswa.nama,kelasEfBulan,spp,tglBulanIni);
+                const keyB=BULAN[curBln]+' '+curThn;
+                totalB+=sisamapB[keyB]!==undefined?sisamapB[keyB]:nomBulanIni;
+                // Maju ke bulan berikutnya
+                curBln++;
+                if(curBln>=12){curBln=0;curThn++;}
               }
               nom=totalB;
             } else {
