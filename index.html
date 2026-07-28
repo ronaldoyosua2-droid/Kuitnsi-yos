@@ -3711,17 +3711,8 @@ const KELAS_URUTAN = [
 
 // Get effective kelas based on date (auto naik kelas on July 1)
 function getKelasEfektif(kelas, tanggal){
-  if(!kelas||!tanggal) return kelas;
-  const tgl = new Date(tanggal);
-  const year = tgl.getFullYear();
-  const july1 = new Date(year+'-07-01');
-  // If payment date >= July 1, use next kelas
-  if(tgl >= july1){
-    const idx = KELAS_URUTAN.indexOf(kelas);
-    if(idx >= 0 && idx < KELAS_URUTAN.length-1){
-      return KELAS_URUTAN[idx+1];
-    }
-  }
+  // Kelas efektif = kelas saat ini di data siswa (sudah diurus via fitur Naik Kelas)
+  // Tidak ada auto-naik kelas berdasarkan tanggal - ini menyebabkan kelas salah di kwitansi
   return kelas;
 }
 
