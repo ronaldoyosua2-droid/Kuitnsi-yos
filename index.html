@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Kwitansi — Sekolah Swasta Yos Anugerah</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1a56db">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
 <style>
 *{box-sizing:border-box;margin:0;padding:0;font-family:'Segoe UI',Arial,sans-serif}
 :root{--blue:#1a56a0;--blue-light:#e8f0fb;--green:#15803d;--green-light:#dcfce7;--orange:#c2410c;--orange-light:#fff7ed;--gray:#6b7280;--gray-light:#f3f4f6;--border:#d1d5db;--white:#fff;--text:#111827;--text2:#6b7280;--danger:#dc2626;--danger-light:#fee2e2}
@@ -6877,5 +6880,14 @@ function resetDariPreview(){
   </div>
 </div>
 
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('service-worker.js').catch(err => {
+      console.warn('Service worker gagal register:', err);
+    });
+  });
+}
+</script>
 </body>
 </html>
