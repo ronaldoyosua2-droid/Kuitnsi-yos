@@ -4,13 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Kwitansi — Sekolah Swasta Yos Anugerah</title>
-<link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#1a56db">
-<link rel="apple-touch-icon" href="icons/icon-192.png">
 <style>
 *{box-sizing:border-box;margin:0;padding:0;font-family:'Segoe UI',Arial,sans-serif}
 :root{--blue:#1a56a0;--blue-light:#e8f0fb;--green:#15803d;--green-light:#dcfce7;--orange:#c2410c;--orange-light:#fff7ed;--gray:#6b7280;--gray-light:#f3f4f6;--border:#d1d5db;--white:#fff;--text:#111827;--text2:#6b7280;--danger:#dc2626;--danger-light:#fee2e2}
-body{background:#f1f5f9;min-height:100vh}
+body{background:#f1f5f9;min-height:100vh;cursor:default}
+*:not(input):not(textarea):not(select):not(a):not(button){cursor:default}
+input,textarea,select{cursor:auto}
+button,[onclick]{cursor:pointer!important}
 .page-tabs{background:#fff;border-bottom:1px solid var(--border);padding:0 20px;position:sticky;top:57px;z-index:99;box-shadow:0 1px 4px rgba(0,0,0,.06)}
 .navbar{background:var(--blue);color:#fff;padding:12px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.2)}
 .navbar-top{display:flex;align-items:center;justify-content:space-between;width:100%}
@@ -148,6 +148,108 @@ input[readonly]{background:var(--gray-light);color:var(--gray)}
 <script>
 // Safe wrappers defined early to avoid "not defined" errors
 function doManualSync(){ if(typeof manualSync==='function') manualSync(); }
+
+// ===================== TANGGAL TEXT INPUT =====================
+const BULAN_PARSE = {
+  'jan':1,'januari':1,'feb':2,'februari':2,'mar':3,'maret':3,
+  'apr':4,'april':4,'mei':5,'may':5,'jun':6,'juni':6,
+  'jul':7,'juli':7,'agu':8,'agus':8,'agustus':8,'aug':8,
+  'sep':9,'sept':9,'september':9,'okt':10,'okt':10,'oktober':10,'oct':10,
+  'nov':11,'november':11,'des':12,'desember':12,'dec':12
+};
+
+function parseTanggalText(val){
+  if(!val||!val.trim()) return;
+  val = val.trim().toLowerCase();
+  const thisYear = new Date().getFullYear();
+  let tgl=null, bln=null, thn=thisYear;
+
+  // Format: dd/mm/yyyy atau dd/mm/yy atau dd/mm
+  const slashMatch = val.match(/^(\d{1,2})[\/\-\.](\d{1,2})(?:[\/\-\.](\d{2,4}))?$/);
+  if(slashMatch){
+    tgl = parseInt(slashMatch[1]);
+    bln = parseInt(slashMatch[2]);
+    if(slashMatch[3]){
+      thn = parseInt(slashMatch[3]);
+      if(thn < 100) thn += 2000;
+    }
+  }
+
+  // Format: "13 juli" atau "13 juli 2025" atau "13 juli 25"
+  if(!tgl){
+    const textMatch = val.match(/^(\d{1,2})\s+([a-z]+)(?:\s+(\d{2,4}))?$/);
+    if(textMatch){
+      tgl = parseInt(textMatch[1]);
+      const blnStr = textMatch[2].substring(0,3);
+      // cari bulan
+      for(const [key, num] of Object.entries(BULAN_PARSE)){
+        if(key.startsWith(blnStr)||blnStr.startsWith(key.substring(0,3))){
+          bln = num; break;
+        }
+      }
+      if(textMatch[3]){
+        thn = parseInt(textMatch[3]);
+        if(thn < 100) thn += 2000;
+      }
+    }
+  }
+
+  // Format: "13jul" atau "13jul25"
+  if(!tgl){
+    const compactMatch = val.match(/^(\d{1,2})([a-z]+)(\d{2,4})?$/);
+    if(compactMatch){
+      tgl = parseInt(compactMatch[1]);
+      const blnStr = compactMatch[2].substring(0,3);
+      for(const [key, num] of Object.entries(BULAN_PARSE)){
+        if(key.startsWith(blnStr)){bln=num;break;}
+      }
+      if(compactMatch[3]){
+        thn = parseInt(compactMatch[3]);
+        if(thn < 100) thn += 2000;
+      }
+    }
+  }
+
+  if(!tgl||!bln||tgl<1||tgl>31||bln<1||bln>12) {
+    const status = document.getElementById('inp-tanggal-status');
+    if(status){status.textContent='❌';status.style.color='var(--danger)';status.style.display='inline';}
+    return;
+  }
+
+  const dateStr = thn+'-'+String(bln).padStart(2,'0')+'-'+String(tgl).padStart(2,'0');
+  const dateObj = new Date(dateStr);
+  if(isNaN(dateObj.getTime())){
+    const status = document.getElementById('inp-tanggal-status');
+    if(status){status.textContent='❌';status.style.color='var(--danger)';status.style.display='inline';}
+    return;
+  }
+
+  document.getElementById('inp-tanggal').value = dateStr;
+  // Update text to normalized format
+  const NAMA_BULAN=['','Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+  document.getElementById('inp-tanggal-text').value = tgl+' '+NAMA_BULAN[bln]+' '+thn;
+  document.getElementById('inp-tanggal-text').style.borderColor = 'var(--green)';
+  const status = document.getElementById('inp-tanggal-status');
+  if(status){status.textContent='✅';status.style.color='var(--green)';status.style.display='inline';}
+  // Trigger re-render item forms
+  renderItemForms();
+}
+
+function onTanggalTextInput(val){
+  // Reset border saat mengetik
+  document.getElementById('inp-tanggal-text').style.borderColor = 'var(--border)';
+  const status = document.getElementById('inp-tanggal-status');
+  if(status) status.style.display='none';
+}
+
+function syncTanggalText(dateStr){
+  // Sync dari date picker ke text input
+  if(!dateStr) return;
+  const [thn, bln, tgl] = dateStr.split('-').map(Number);
+  const NAMA_BULAN=['','Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+  const textEl = document.getElementById('inp-tanggal-text');
+  if(textEl) textEl.value = tgl+' '+NAMA_BULAN[bln]+' '+thn;
+}
 function doConfirmLoadCloud(){ if(typeof confirmLoadCloud==='function') confirmLoadCloud(); }
 </script>
 <div class="navbar">
@@ -186,7 +288,15 @@ function doConfirmLoadCloud(){ if(typeof confirmLoadCloud==='function') confirmL
     <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:10px">
       <div class="field" style="margin-bottom:0">
         <label>Tanggal Pembayaran</label>
-        <input type="date" id="inp-tanggal" style="width:auto">
+        <div style="display:flex;align-items:center;gap:6px">
+          <input type="text" id="inp-tanggal-text" placeholder="cth: 13 juli, 12 juli 25, 13/7..."
+            style="width:200px;padding:8px 11px;font-size:14px;border:1px solid var(--border);border-radius:7px;outline:none"
+            oninput="onTanggalTextInput(this.value)"
+            onkeydown="if(event.key==='Enter'){parseTanggalText(this.value);this.blur();}">
+          <input type="date" id="inp-tanggal" style="width:auto"
+            onchange="syncTanggalText(this.value)">
+          <span id="inp-tanggal-status" style="font-size:11px;color:var(--green);display:none">✅</span>
+        </div>
       </div>
       <div class="field" style="margin-bottom:0">
         <label>Metode Pembayaran</label>
@@ -3222,6 +3332,7 @@ function getLogoHTML(w=64){
 }
 
 document.getElementById('inp-tanggal').value=today();
+  syncTanggalText(today());
   // Set filter riwayat ke hari ini saat pertama load
   const _dari=document.getElementById('all-filter-dari');
   const _sampai=document.getElementById('all-filter-sampai');
@@ -6880,14 +6991,5 @@ function resetDariPreview(){
   </div>
 </div>
 
-<script>
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('service-worker.js').catch(err => {
-      console.warn('Service worker gagal register:', err);
-    });
-  });
-}
-</script>
 </body>
 </html>
