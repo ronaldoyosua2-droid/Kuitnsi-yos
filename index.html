@@ -8,9 +8,9 @@
 *{box-sizing:border-box;margin:0;padding:0;font-family:'Segoe UI',Arial,sans-serif}
 :root{--blue:#1a56a0;--blue-light:#e8f0fb;--green:#15803d;--green-light:#dcfce7;--orange:#c2410c;--orange-light:#fff7ed;--gray:#6b7280;--gray-light:#f3f4f6;--border:#d1d5db;--white:#fff;--text:#111827;--text2:#6b7280;--danger:#dc2626;--danger-light:#fee2e2}
 body{background:#f1f5f9;min-height:100vh;cursor:default}
-*:not(input):not(textarea):not(select):not(a):not(button){cursor:default}
+*:not(input):not(textarea):not(select):not(a):not(button){cursor:default;user-select:none;-webkit-user-select:none}
 input,textarea,select{cursor:auto}
-button,[onclick]{cursor:pointer!important}
+button,[onclick],label{cursor:pointer!important}
 .page-tabs{background:#fff;border-bottom:1px solid var(--border);padding:0 20px;position:sticky;top:57px;z-index:99;box-shadow:0 1px 4px rgba(0,0,0,.06)}
 .navbar{background:var(--blue);color:#fff;padding:12px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.2)}
 .navbar-top{display:flex;align-items:center;justify-content:space-between;width:100%}
