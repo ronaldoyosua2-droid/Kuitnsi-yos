@@ -158,6 +158,24 @@ const BULAN_PARSE = {
   'nov':11,'november':11,'des':12,'desember':12,'dec':12
 };
 
+function getEarliestTahunSiswa(){
+  // Hitung tahun paling awal siswa bisa bayar berdasarkan kelas sekarang
+  if(!siswaList.length) return null;
+  const kelas = siswaList[0].kelas;
+  if(!kelas) return null;
+  const taAktif = parseInt(getTAAktif().split('/')[0]);
+  const isPlus = kelas.includes('Plus');
+  const JALUR_SD_UP = ['1 SD','2 SD','3 SD','4 SD','5 SD','6 SD','7 SMP','8 SMP','9 SMP','10 SMK','11 SMK','12 SMK'];
+  const JALUR_PLUS_ALL = ['1 SD Plus','2 SD Plus','3 SD Plus','4 SD Plus','5 SD Plus','6 SD Plus','7 SMP Plus','8 SMP Plus','9 SMP Plus'];
+  if(kelas==='TK') return taAktif;
+  if(isPlus){
+    const idx = JALUR_PLUS_ALL.indexOf(kelas);
+    return idx>=0 ? taAktif-idx : null;
+  }
+  const idx = JALUR_SD_UP.indexOf(kelas);
+  return idx>=0 ? taAktif-idx : null;
+}
+
 function parseTanggalText(val){
   if(!val||!val.trim()) return;
   val = val.trim().toLowerCase();
@@ -221,6 +239,21 @@ function parseTanggalText(val){
   if(isNaN(dateObj.getTime())){
     const status = document.getElementById('inp-tanggal-status');
     if(status){status.textContent='❌';status.style.color='var(--danger)';status.style.display='inline';}
+    return;
+  }
+
+  // Validasi: tidak boleh sebelum tahun masuk kelas 1
+  const earliestThn = getEarliestTahunSiswa();
+  const earliestDate = earliestThn ? (earliestThn+'-07-01') : null;
+  if(earliestDate && dateStr < earliestDate){
+    const tglInput = document.getElementById('inp-tanggal-text');
+    tglInput.style.borderColor = 'var(--danger)';
+    const status = document.getElementById('inp-tanggal-status');
+    if(status){status.textContent='❌';status.style.color='var(--danger)';status.style.display='inline';}
+    // Tampilkan pesan
+    const NAMA_BULAN2=['','Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+    alert('Tanggal '+tgl+' '+NAMA_BULAN2[bln]+' '+thn+' tidak valid.\n\nSiswa ('+
+      (siswaList[0]?.kelas||'-')+') baru mulai sekolah Juli '+earliestThn+'.\nTidak bisa bayar sebelum tanggal tersebut.');
     return;
   }
 
@@ -1612,25 +1645,24 @@ function renderItemForms(){
       <div style="margin-bottom:8px">
         <label style="display:block;font-size:12px;font-weight:500;color:var(--text2);margin-bottom:4px">Bulan SPP</label>
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-          <select onchange="onSppTahun(${i},this.value)"
-            style="width:90px;padding:8px;font-size:13px;border:1px solid var(--border);border-radius:7px;font-weight:600;color:var(--blue)">
-            ${[new Date().getFullYear()-1,new Date().getFullYear(),new Date().getFullYear()+1].map(y=>
-              `<option value="${y}" ${(it.sppTahun||new Date().getFullYear())===y?'selected':''}>${y}</option>`
-            ).join('')}
-          </select>
+          <input type="text" maxlength="4"
+            value="${it.sppTahun||new Date().getFullYear()}"
+            onclick="this.select()"
+            oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,4);if(this.value.length===4)onSppTahunBlur(${i},this,'dari')"
+            onblur="onSppTahunBlur(${i},this,'dari')"
+            style="width:72px;padding:8px;font-size:13px;font-weight:600;color:var(--blue);border:1px solid var(--border);border-radius:7px;text-align:center">
           <select onchange="onSppBulanDari(${i},this.value)"
             style="flex:1;min-width:100px;padding:8px;font-size:13px;border:1px solid var(--border);border-radius:7px">
             <option value="">— Dari —</option>
             ${BULAN.map((b,bi)=>`<option value="${bi}" ${it.sppDari===bi?'selected':''}>${b}</option>`).join('')}
           </select>
           <span style="color:var(--text2);font-weight:600;font-size:16px">→</span>
-          <select onchange="onSppTahunSampai(${i},this.value)"
-            style="width:90px;padding:8px;font-size:13px;border:1px solid var(--border);border-radius:7px;font-weight:600;color:var(--blue)">
-            <option value="">—</option>
-            ${[new Date().getFullYear()-1,new Date().getFullYear(),new Date().getFullYear()+1,new Date().getFullYear()+2].map(y=>
-              `<option value="${y}" ${(it.sppTahunSampai||it.sppTahun||new Date().getFullYear())===y?'selected':''}>${y}</option>`
-            ).join('')}
-          </select>
+          <input type="text" maxlength="4"
+            value="${it.sppTahunSampai||it.sppTahun||new Date().getFullYear()}"
+            onclick="this.select()"
+            oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,4);if(this.value.length===4)onSppTahunBlur(${i},this,'sampai')"
+            onblur="onSppTahunBlur(${i},this,'sampai')"
+            style="width:72px;padding:8px;font-size:13px;font-weight:600;color:var(--blue);border:1px solid var(--border);border-radius:7px;text-align:center">
           <select onchange="onSppBulanSampai(${i},this.value)"
             style="flex:1;min-width:100px;padding:8px;font-size:13px;border:1px solid var(--border);border-radius:7px">
             <option value="">— Sampai —</option>
@@ -1962,6 +1994,70 @@ function onSppTahun(i, val){
 function onSppBulanDari(i, val){
   itemList[i].sppDari = val===''?undefined:parseInt(val);
   if(!itemList[i].sppTahun) itemList[i].sppTahun = new Date().getFullYear();
+  updateSppRange(i);
+}
+
+function validateSppTahunInput(val, el){
+  const thisYear = new Date().getFullYear();
+  const thn = parseInt(val);
+  if(!thn || val.length < 4) return false;
+  if(thn > thisYear + 1){
+    el.style.borderColor = 'var(--danger)';
+    el.style.color = 'var(--danger)';
+    alert('Tahun '+thn+' tidak valid.\nMaksimal tahun '+(thisYear+1)+'.');
+    el.value = String(thisYear);
+    el.style.borderColor = 'var(--border)';
+    el.style.color = 'var(--blue)';
+    return false;
+  }
+  if(thn < 2010){
+    el.style.borderColor = 'var(--danger)';
+    el.style.color = 'var(--danger)';
+    alert('Tahun '+thn+' terlalu lama.\nMinimal tahun 2010.');
+    el.value = String(thisYear);
+    el.style.borderColor = 'var(--border)';
+    el.style.color = 'var(--blue)';
+    return false;
+  }
+  el.style.borderColor = 'var(--border)';
+  el.style.color = 'var(--blue)';
+  return true;
+}
+
+function onSppTahunKey(event, i, el, jenis){
+  // Hanya izinkan angka, backspace, delete, arrow
+  if(!/[0-9]/.test(event.key) && !['Backspace','Delete','ArrowLeft','ArrowRight','Tab','Enter'].includes(event.key)){
+    event.preventDefault(); return;
+  }
+  // Ketika sudah 4 digit atau tekan Enter → validasi dan apply
+  const newVal = el.value.replace(/[^0-9]/g,'') + ((/[0-9]/.test(event.key)) ? event.key : '');
+  if(newVal.length >= 4 || event.key === 'Enter'){
+    event.preventDefault();
+    const val = event.key === 'Enter' ? el.value : newVal;
+    el.value = val.slice(0,4);
+    onSppTahunBlur(i, el, jenis);
+    if(event.key === 'Enter') el.blur();
+  }
+}
+
+function onSppTahunBlur(i, el, jenis){
+  const val = el.value.trim();
+  if(!val || val.length < 4) {
+    // Reset ke tahun sekarang jika tidak lengkap
+    el.value = String(new Date().getFullYear());
+  }
+  if(!validateSppTahunInput(el.value, el)) return;
+  const thn = parseInt(el.value);
+  if(jenis === 'dari'){
+    itemList[i].sppTahun = thn;
+    // Sync tahun sampai jika belum diset atau lebih kecil
+    if(!itemList[i].sppTahunSampai || itemList[i].sppTahunSampai < thn){
+      itemList[i].sppTahunSampai = thn;
+    }
+  } else {
+    onSppTahunSampai(i, String(thn));
+    return;
+  }
   updateSppRange(i);
 }
 
