@@ -2475,7 +2475,9 @@ function getSisaAktualPendaftaran(nama){
   // Total tagihan pendaftaran = tagihan kwitansi pertama (DP)
   // sort by tanggal ascending to find first
   const sorted = [...bayarList].sort((a,b)=>a.tanggal>b.tanggal?1:-1);
-  const totalTagihan = sorted[0].tagihan;
+  // Total tagihan = nilai terbesar di antara semua kwitansi pendaftaran
+  // (menghindari bug jika kwitansi pertama memiliki tagihan 0 atau salah)
+  const totalTagihan = Math.max(...bayarList.map(r=>r.tagihan||0));
   const totalDibayar = bayarList.reduce((a,r)=>a+(r.nominalBayar||0),0);
   const sisaAktual = Math.max(0, totalTagihan - totalDibayar);
   return { totalTagihan, totalDibayar, sisaAktual };
