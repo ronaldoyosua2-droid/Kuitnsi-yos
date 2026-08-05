@@ -2467,18 +2467,35 @@ function updateItemDisplay(i){
 // dengan menjumlahkan semua pembayaran cicilan
 function getSisaAktualPendaftaran(nama){
   const rw = getRiwayat();
-  const bayarList = rw.filter(r =>
-    r.nama.toLowerCase() === nama.toLowerCase() &&
-    r.tipe === 'Pendaftaran'
-  );
-  if(!bayarList.length) return null;
-  // Total tagihan pendaftaran = tagihan kwitansi pertama (DP)
-  // sort by tanggal ascending to find first
-  const sorted = [...bayarList].sort((a,b)=>a.tanggal>b.tanggal?1:-1);
-  // Total tagihan = nilai terbesar di antara semua kwitansi pendaftaran
-  // (menghindari bug jika kwitansi pertama memiliki tagihan 0 atau salah)
-  const totalTagihan = Math.max(...bayarList.map(r=>r.tagihan||0));
-  const totalDibayar = bayarList.reduce((a,r)=>a+(r.nominalBayar||0),0);
+  const namaLower = nama.toLowerCase();
+  let totalTagihan = 0;
+  let totalDibayar = 0;
+  let found = false;
+
+  rw.filter(r => r.nama.toLowerCase() === namaLower).forEach(function(r){
+    if(r.tipe === 'Pendaftaran'){
+      // Kwitansi murni Pendaftaran
+      const t = r.tagihan||0;
+      const d = r.nominalBayar||0;
+      if(t > totalTagihan) totalTagihan = t;
+      totalDibayar += d;
+      found = true;
+    }
+    // Cek item Pendaftaran di dalam kwitansi gabungan (misal SPP+Pelunasan)
+    if(r.items && r.items.length){
+      r.items.forEach(function(it){
+        if(it.tipe === 'Pendaftaran'){
+          const t = it.tagihan||0;
+          const d = it.dibayar||0;
+          if(t > totalTagihan) totalTagihan = t;
+          totalDibayar += d;
+          found = true;
+        }
+      });
+    }
+  });
+
+  if(!found) return null;
   const sisaAktual = Math.max(0, totalTagihan - totalDibayar);
   return { totalTagihan, totalDibayar, sisaAktual };
 }
