@@ -2352,9 +2352,13 @@ function hitungCicilanSPP(i){
     const bln = b % 12;
     const thnBln = thn + Math.floor(b / 12);
     const key = BULAN[bln] + ' ' + thnBln;
-    // Nominal for this month: sisa tunggakan (partial) or tarif normal
+    // Hitung tarif per bulan sesuai kelas efektif bulan itu (bukan tanggal bayar)
+    const tglBulanIni = thnBln+'-'+String(bln+1).padStart(2,'0')+'-01';
+    const kelasEfBulan = getKelasEfektif(siswa.kelas, tglBulanIni)||siswa.kelas;
+    const nomBulanDefault = getSppNominalSiswa(siswa.nama, kelasEfBulan, spp, tglBulanIni);
+    // Nominal for this month: sisa tunggakan (partial) or tarif normal bulan itu
     const sisaBefore = sisamap[key]||0;
-    const nomBulanIni = sisaBefore > 0 ? sisaBefore : nomPerBulan;
+    const nomBulanIni = sisaBefore > 0 ? sisaBefore : nomBulanDefault;
     // Guard: skip jika tarif 0 (data tidak valid) untuk cegah loop tak terbatas
     if(nomBulanIni <= 0){ b++; iter++; continue; }
     if(sisa >= nomBulanIni){
