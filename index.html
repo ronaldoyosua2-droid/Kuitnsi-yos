@@ -1689,10 +1689,30 @@ function renderItemForms(){
             const statusIcon=lastSisa>0?'⚠️':'✅';
             const statusText=lastSisa>0?('Total kurang: Rp '+lastSisa.toLocaleString('id-ID')):'Semua SPP Lunas';
             const bulanSisa=Object.entries(sisamap).map(([k,v])=>`${k}: kurang Rp ${v.toLocaleString('id-ID')}`).join(' · ');
-            infoHtml='<div style="margin-top:6px;padding:8px 12px;background:'+(lastSisa>0?'#fef9c3':'var(--green-light)')+';border:1px solid '+(lastSisa>0?'#fcd34d':'#86efac')+';border-radius:7px;font-size:12px">'
+            // Hitung progress TA sekarang - deteksi bulan yang skip/terlewat
+            const hist=getSppHistory(snm);
+            const taY=parseInt(getTAAktif().split('/')[0]);
+            const taBulanList=[];
+            for(let b=6;b<12;b++) taBulanList.push(BULAN[b]+' '+taY);
+            for(let b=0;b<6;b++) taBulanList.push(BULAN[b]+' '+(taY+1));
+            // Bulan yang sudah ada record (paid/partial) vs yang skip di antara yang sudah bayar
+            const sudahTA=taBulanList.filter(m=>hist.paid.has(m)||hist.partial.has(m));
+            const belumTA=taBulanList.filter(m=>!hist.paid.has(m)&&!hist.partial.has(m)&&!(sisamap[m]>0));
+            // Deteksi skip: bulan yang belum bayar TAPI ada bulan sesudahnya yang sudah bayar
+            const lastPaidIdx=sudahTA.length>0?taBulanList.lastIndexOf(sudahTA[sudahTA.length-1]):-1;
+            const skipBulan=belumTA.filter(m=>taBulanList.indexOf(m)<lastPaidIdx);
+            const berikutnya=belumTA.filter(m=>taBulanList.indexOf(m)>lastPaidIdx)[0]||null;
+            const hasSisaPartial=Object.keys(sisamap).length>0;
+            // Tentukan warna background panel
+            const hasSkip=skipBulan.length>0;
+            const panelBg=lastSisa>0?'#fef9c3':(hasSkip?'#fff7ed':'var(--green-light)');
+            const panelBorder=lastSisa>0?'#fcd34d':(hasSkip?'#fdba74':'#86efac');
+            infoHtml='<div style="margin-top:6px;padding:8px 12px;background:'+panelBg+';border:1px solid '+panelBorder+';border-radius:7px;font-size:12px">'
               +'<div style="font-weight:700;color:'+statusColor+'">'+statusIcon+' Status SPP: '+statusText+'</div>'
               +(bulanSisa?'<div style="color:#92400e;margin-top:3px;font-size:11px">'+bulanSisa+'</div>':'')
-              +'<div style="color:var(--text2);margin-top:3px;font-size:11px">Pembayaran terakhir: '+lastRw.bayarLabel+' ('+lastRw.tanggal+')</div>'
+              +(skipBulan.length>0?'<div style="color:#c2410c;margin-top:3px;font-size:11px">⚠️ Belum bayar (skip): <strong>'+skipBulan.join(', ')+'</strong></div>':'')
+              +'<div style="color:var(--text2);margin-top:3px;font-size:11px">TA ini: '+sudahTA.length+'/12 bulan'+(berikutnya?' · Berikutnya: <strong style="color:var(--blue)">'+berikutnya+'</strong>':sudahTA.length===12?' · <strong style="color:var(--green)">Lunas semua TA ini! 🎉</strong>':'')+'</div>'
+              +'<div style="color:var(--text2);margin-top:2px;font-size:11px">Pembayaran terakhir: '+lastRw.bayarLabel+' ('+lastRw.tanggal+')</div>'
               +'</div>';
           } else {
             infoHtml='<div style="margin-top:6px;padding:8px 12px;background:var(--gray-light);border:1px solid var(--border);border-radius:7px;font-size:12px;color:var(--text2)">'
