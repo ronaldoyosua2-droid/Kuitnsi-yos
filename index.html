@@ -2710,15 +2710,15 @@ function getSisaAktualPendaftaran(nama){
 
   rw.filter(r => r.nama.toLowerCase() === namaLower).forEach(function(r){
     if(r.tipe === 'Pendaftaran'){
-      // Kwitansi murni Pendaftaran
+      // Kwitansi murni Pendaftaran - pakai nominalBayar dari record utama
+      // JANGAN baca items juga karena akan double count
       const t = r.tagihan||0;
       const d = r.nominalBayar||0;
       if(t > totalTagihan) totalTagihan = t;
       totalDibayar += d;
       found = true;
-    }
-    // Cek item Pendaftaran di dalam kwitansi gabungan (misal SPP+Pelunasan)
-    if(r.items && r.items.length){
+    } else if(r.items && r.items.length){
+      // Kwitansi BUKAN Pendaftaran (misal SPP gabungan) - cek item Pendaftaran di dalamnya
       r.items.forEach(function(it){
         if(it.tipe === 'Pendaftaran'){
           const t = it.tagihan||0;
