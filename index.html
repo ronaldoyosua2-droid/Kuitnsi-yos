@@ -4045,7 +4045,26 @@ function buildKwitansiHTML(rec, logoHTML, namaSekolah, alamat, telepon){
 }
 
 // ===================== TUNGGAKAN SPP =====================
+// Cache getSppSisaPerBulan agar tidak scan ulang untuk nama yang sama
+const _sppSisaCache = {};
+let _sppSisaCacheRwLen = -1;
+
 function getSppSisaPerBulan(nama){
+  const rw = getRiwayat();
+  // Invalidate cache kalau riwayat berubah
+  if(rw.length !== _sppSisaCacheRwLen){
+    Object.keys(_sppSisaCache).forEach(k=>delete _sppSisaCache[k]);
+    _sppSisaCacheRwLen = rw.length;
+  }
+  const key = nama.toLowerCase().trim();
+  if(_sppSisaCache[key] !== undefined) return _sppSisaCache[key];
+  // Jalankan kalkulasi asli (inject hasil ke cache setelah selesai)
+  const result = _getSppSisaPerBulanImpl(nama, rw);
+  _sppSisaCache[key] = result;
+  return result;
+}
+
+function _getSppSisaPerBulanImpl(nama, rw){
   // Returns map: {"Juni 2026": 170000, ...} — NET sisa per bulan setelah semua pembayaran
   // Metode MAX: tagihan per bulan = MAX dari semua entry (nominal terbesar = tarif sebenarnya)
   // Bayar per bulan = SUM semua pembayaran untuk bulan itu (bisa dari cicilan berbeda)
@@ -5310,7 +5329,58 @@ const KELAS_ORDER=['TK','1 SD','1 SD Plus','2 SD','2 SD Plus','3 SD','4 SD','5 S
 var _rekordDebounceTimer=null;
 function renderRekordSiswaDebounced(){
   clearTimeout(_rekordDebounceTimer);
-  _rekordDebounceTimer=setTimeout(renderRekordSiswa,300);
+  _rekordDebounceTimer=setTimeout(()=>requestAnimationFrame(renderRekordSiswa),300);
+}
+
+// Cache untuk performa rekord siswa
+let _rekordCache = null;
+let _rekordCacheKey = '';
+
+function buildRekordCache(){
+  const rw = getRiwayat();
+  const spp = getSPP();
+  const cache = {};
+  // Pre-compute per siswa sekali
+  const rwByNama = {};
+  rw.forEach(r=>{
+    const key = r.nama.toLowerCase().trim();
+    if(!rwByNama[key]) rwByNama[key] = [];
+    rwByNama[key].push(r);
+  });
+  // Hitung sisa pendaftaran per siswa
+  Object.entries(rwByNama).forEach(([namaLower, records])=>{
+    let totalTagihan=0, totalDibayar=0, found=false;
+    records.forEach(r=>{
+      if(r.tipe==='Pendaftaran'){
+        const t=r.tagihan||0;
+        if(t>totalTagihan) totalTagihan=t;
+        totalDibayar+=(r.nominalBayar||0);
+        found=true;
+      } else if(r.items&&r.items.length){
+        r.items.forEach(it=>{
+          if(it.tipe==='Pendaftaran'){
+            const t=it.tagihan||0;
+            if(t>totalTagihan) totalTagihan=t;
+            totalDibayar+=(it.dibayar||0);
+            found=true;
+          }
+        });
+      }
+    });
+    cache[namaLower] = {
+      daftarSisa: found ? Math.max(0, totalTagihan-totalDibayar) : 0,
+      totBayar: records.reduce((a,r)=>a+(r.nominalBayar||0),0),
+      records
+    };
+    // SPP sisa (simplified: sum r.sisa for SPP records)
+    let sppSisa = 0;
+    const sisamap = getSppSisaPerBulan(records[0]?.nama||namaLower);
+    Object.values(sisamap).forEach(v=>sppSisa+=v);
+    cache[namaLower].sppSisa = sppSisa;
+    cache[namaLower].totSisa = cache[namaLower].daftarSisa + sppSisa +
+      records.filter(r=>r.tipe!=='Pendaftaran'&&r.tipe!=='SPP').reduce((a,r)=>a+(r.sisa||0),0);
+  });
+  return {cache, rwByNama, rw};
 }
 
 function renderRekordSiswa(){
@@ -5343,21 +5413,28 @@ function renderRekordSiswa(){
     });
   }
 
+  // Build cache sekali sebelum render (bukan per siswa)
+  const {cache: _rekordCacheData} = buildRekordCache();
+
   const wrap=document.getElementById('rekord-siswa-list');
   if(!siswa.length){wrap.innerHTML='<div class="hist-empty">Tidak ada siswa ditemukan</div>';return;}
 
   wrap.innerHTML=`<table class="siswa-table">
     <thead><tr><th>#</th><th>Nama</th><th>Kelas</th><th>Total Bayar</th><th>Tunggakan</th><th>Aksi</th></tr></thead>
     <tbody>`+siswa.map((s,i)=>{
-      const sr=rw.filter(r=>r.nama.toLowerCase()===s.nama.toLowerCase());
-      const totBayar=sr.reduce((a,r)=>a+(r.nominalBayar||0),0);
-      // Hitung sisa aktual dengan akumulasi pendaftaran
+      const namaKey=s.nama.toLowerCase();
+      const cached=_rekordCacheData&&_rekordCacheData[namaKey];
+      const sr=rwByNama[namaKey]||[];
+      const totBayar=cached?cached.totBayar:sr.reduce((a,r)=>a+(r.nominalBayar||0),0);
       let totSisa=0;
-      const aktualDaftarRow=getSisaAktualPendaftaran(s.nama);
-      if(aktualDaftarRow) totSisa+=aktualDaftarRow.sisaAktual;
-      // SPP: NET sisa per bulan
-      const sppNetRow=getSppSisaPerBulan(s.nama);
-      Object.values(sppNetRow).forEach(v=>totSisa+=v);
+      if(cached){
+        totSisa=cached.totSisa;
+      } else {
+        const aktualDaftarRow=getSisaAktualPendaftaran(s.nama);
+        if(aktualDaftarRow) totSisa+=aktualDaftarRow.sisaAktual;
+        const sppNetRow=getSppSisaPerBulan(s.nama);
+        Object.values(sppNetRow).forEach(v=>totSisa+=v);
+      }
       sr.filter(r=>r.tipe!=='Pendaftaran'&&r.tipe!=='SPP').forEach(r=>totSisa+=(r.sisa||0));
       const hasTung=totSisa>0;
       return `<tr>
