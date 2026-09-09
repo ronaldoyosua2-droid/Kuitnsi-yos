@@ -254,18 +254,22 @@ function renderLogAktivitas(){
   };
 
   wrap.innerHTML = `<table class="siswa-table">
-    <thead><tr><th>Waktu</th><th>Aktivitas</th><th>Nama</th><th>Keterangan</th></tr></thead>
+    <thead><tr><th>Entry</th><th>Tgl Kwitansi</th><th>Aktivitas</th><th>Nama</th><th>Keterangan</th></tr></thead>
     <tbody>`+logs.map(l=>{
     const waktu = new Date(l.waktu);
     const tglStr = waktu.toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'2-digit'});
-    const rawJam = waktu.toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'});
-    const jamStr = (rawJam==='00.00'||rawJam==='00:00') ? '' : rawJam;
+    const rawJam = l.hasJam ? waktu.toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Jakarta'}) : '';
+    const jamStr = (rawJam==='00.00'||rawJam==='00:00'||!rawJam) ? '' : rawJam;
     const icon = JENIS_ICON[l.jenis]||'📝';
     const color = JENIS_COLOR[l.jenis]||'var(--text2)';
     return `<tr>
-      <td style="font-size:12px;white-space:nowrap">
-        <div style="font-weight:600">${tglStr}</div>
-        ${jamStr?`<div style="color:var(--text2)">${jamStr}</div>`:''}
+      <td style="font-size:11px;color:var(--text2);white-space:nowrap">
+        ${tglStr}${jamStr?`<br><span style="font-size:10px">${jamStr}</span>`:''}
+      </td>
+      <td style="font-size:13px;font-weight:600;white-space:nowrap">
+        ${l.waktu&&l.entryTime&&l.waktu!==l.entryTime
+          ? new Date(l.waktu).toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'2-digit'})
+          : '—'}
       </td>
       <td><span style="font-size:12px;font-weight:600;color:${color}">${icon} ${l.jenis?.replace('_',' ')||'—'}</span></td>
       <td style="font-weight:500;font-size:13px">${l.nama||'—'}</td>
