@@ -160,6 +160,188 @@ input[readonly]{background:var(--gray-light);color:var(--gray)}
 // Safe wrappers defined early to avoid "not defined" errors
 function doManualSync(){ if(typeof manualSync==='function') manualSync(); }
 
+// ===================== TEMA & TAMPILAN =====================
+const TEMA_DEFAULT = {
+  blue:'#1a56a0', green:'#15803d', orange:'#c2410c', danger:'#dc2626',
+  bg:'#f1f5f9', navbar:'#1a56a0', font:"'Segoe UI',Arial,sans-serif",
+  fontsize:14, radius:12, dark:false
+};
+
+const TEMA_PRESETS = {
+  default: {blue:'#1a56a0',green:'#15803d',orange:'#c2410c',danger:'#dc2626',bg:'#f1f5f9',navbar:'#1a56a0',font:"'Segoe UI',Arial,sans-serif",fontsize:14,radius:12,dark:false},
+  hijau:   {blue:'#166534',green:'#15803d',orange:'#92400e',danger:'#dc2626',bg:'#f0fdf4',navbar:'#166534',font:"'Segoe UI',Arial,sans-serif",fontsize:14,radius:12,dark:false},
+  ungu:    {blue:'#7c3aed',green:'#15803d',orange:'#c2410c',danger:'#dc2626',bg:'#faf5ff',navbar:'#7c3aed',font:"'Segoe UI',Arial,sans-serif",fontsize:14,radius:14,dark:false},
+  merah:   {blue:'#b91c1c',green:'#15803d',orange:'#c2410c',danger:'#dc2626',bg:'#fff5f5',navbar:'#b91c1c',font:"'Segoe UI',Arial,sans-serif",fontsize:14,radius:8,dark:false},
+  gelap:   {blue:'#60a5fa',green:'#4ade80',orange:'#fb923c',danger:'#f87171',bg:'#0f172a',navbar:'#1e293b',font:"'Segoe UI',Arial,sans-serif",fontsize:14,radius:12,dark:true},
+  coklat:  {blue:'#92400e',green:'#15803d',orange:'#b45309',danger:'#dc2626',bg:'#fffbeb',navbar:'#78350f',font:"Georgia,serif",fontsize:14,radius:8,dark:false},
+};
+
+function hexToRgb(hex){
+  const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
+  return `${r} ${g} ${b}`;
+}
+
+function lighten(hex, pct){
+  const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
+  const lr=Math.min(255,Math.round(r+(255-r)*pct));
+  const lg=Math.min(255,Math.round(g+(255-g)*pct));
+  const lb=Math.min(255,Math.round(b+(255-b)*pct));
+  return '#'+lr.toString(16).padStart(2,'0')+lg.toString(16).padStart(2,'0')+lb.toString(16).padStart(2,'0');
+}
+
+function applyTema(){
+  const t = getTemaValues();
+  const root = document.documentElement;
+  root.style.setProperty('--blue', t.blue);
+  root.style.setProperty('--blue-light', lighten(t.blue, 0.88));
+  root.style.setProperty('--green', t.green);
+  root.style.setProperty('--green-light', lighten(t.green, 0.88));
+  root.style.setProperty('--orange', t.orange);
+  root.style.setProperty('--orange-light', lighten(t.orange, 0.88));
+  root.style.setProperty('--danger', t.danger);
+  root.style.setProperty('--danger-light', lighten(t.danger, 0.88));
+  root.style.setProperty('--card-radius', t.radius+'px');
+  document.body.style.background = t.bg;
+  document.body.style.fontFamily = t.font;
+  document.body.style.fontSize = t.fontsize+'px';
+  // Navbar
+  const navbar = document.querySelector('.navbar');
+  if(navbar) navbar.style.background = t.navbar;
+  // Dark mode
+  if(t.dark){
+    root.style.setProperty('--white', '#1e293b');
+    root.style.setProperty('--text', '#e2e8f0');
+    root.style.setProperty('--text2', '#94a3b8');
+    root.style.setProperty('--border', '#334155');
+    root.style.setProperty('--gray-light', '#0f172a');
+    document.body.style.color = '#e2e8f0';
+  } else {
+    root.style.setProperty('--white', '#fff');
+    root.style.setProperty('--text', '#111827');
+    root.style.setProperty('--text2', '#6b7280');
+    root.style.setProperty('--border', '#d1d5db');
+    root.style.setProperty('--gray-light', '#f3f4f6');
+    document.body.style.color = '#111827';
+  }
+  // Card radius
+  document.querySelectorAll('.card,.btn,.badge').forEach(el=>{
+    if(el.classList.contains('card')) el.style.borderRadius = t.radius+'px';
+  });
+}
+
+function getTemaValues(){
+  return {
+    blue: document.getElementById('tema-blue')?.value || TEMA_DEFAULT.blue,
+    green: document.getElementById('tema-green')?.value || TEMA_DEFAULT.green,
+    orange: document.getElementById('tema-orange')?.value || TEMA_DEFAULT.orange,
+    danger: document.getElementById('tema-danger')?.value || TEMA_DEFAULT.danger,
+    bg: document.getElementById('tema-bg')?.value || TEMA_DEFAULT.bg,
+    navbar: document.getElementById('tema-navbar')?.value || TEMA_DEFAULT.navbar,
+    font: document.getElementById('tema-font')?.value || TEMA_DEFAULT.font,
+    fontsize: parseInt(document.getElementById('tema-fontsize')?.value) || TEMA_DEFAULT.fontsize,
+    radius: parseInt(document.getElementById('tema-radius')?.value) || TEMA_DEFAULT.radius,
+    dark: document.getElementById('tema-dark')?.checked || false,
+  };
+}
+
+function syncColorToHex(colorId, hexId){
+  const v = document.getElementById(colorId)?.value;
+  const h = document.getElementById(hexId);
+  if(h && v) h.value = v;
+}
+
+function syncColorFromHex(colorId, hexId){
+  const v = document.getElementById(hexId)?.value;
+  if(!v || !/^#[0-9a-fA-F]{6}$/.test(v)) return;
+  const c = document.getElementById(colorId);
+  if(c) c.value = v;
+  applyTema();
+}
+
+function applyPreset(name){
+  const p = TEMA_PRESETS[name] || TEMA_DEFAULT;
+  const ids = ['blue','green','orange','danger','bg','navbar'];
+  ids.forEach(id=>{
+    const el = document.getElementById('tema-'+id);
+    const hex = document.getElementById('tema-'+id+'-hex');
+    if(el && p[id]) el.value = p[id];
+    if(hex && p[id]) hex.value = p[id];
+  });
+  if(document.getElementById('tema-font')) document.getElementById('tema-font').value = p.font;
+  if(document.getElementById('tema-fontsize')){
+    document.getElementById('tema-fontsize').value = p.fontsize;
+    document.getElementById('tema-fontsize-label').textContent = p.fontsize+'px';
+  }
+  if(document.getElementById('tema-radius')){
+    document.getElementById('tema-radius').value = p.radius;
+    document.getElementById('tema-radius-label').textContent = p.radius+'px';
+  }
+  if(document.getElementById('tema-dark')) document.getElementById('tema-dark').checked = p.dark;
+  applyTema();
+}
+
+function saveTema(){
+  const t = getTemaValues();
+  localStorage.setItem('ya_tema', JSON.stringify(t));
+  const al = document.getElementById('tema-saved');
+  if(al){al.textContent='✅ Tema berhasil disimpan!';al.classList.add('show');setTimeout(()=>al.classList.remove('show'),2500);}
+}
+
+function resetTema(){
+  if(!confirm('Reset tampilan ke default?')) return;
+  localStorage.removeItem('ya_tema');
+  applyPreset('default');
+  saveTema();
+}
+
+function loadTema(){
+  const saved = localStorage.getItem('ya_tema');
+  if(!saved) return;
+  try{
+    const t = JSON.parse(saved);
+    const ids = ['blue','green','orange','danger','bg','navbar'];
+    ids.forEach(id=>{
+      const el = document.getElementById('tema-'+id);
+      const hex = document.getElementById('tema-'+id+'-hex');
+      if(el && t[id]) el.value = t[id];
+      if(hex && t[id]) hex.value = t[id];
+    });
+    if(document.getElementById('tema-font') && t.font) document.getElementById('tema-font').value = t.font;
+    if(document.getElementById('tema-fontsize') && t.fontsize){
+      document.getElementById('tema-fontsize').value = t.fontsize;
+      const lbl = document.getElementById('tema-fontsize-label');
+      if(lbl) lbl.textContent = t.fontsize+'px';
+    }
+    if(document.getElementById('tema-radius') && t.radius){
+      document.getElementById('tema-radius').value = t.radius;
+      const lbl = document.getElementById('tema-radius-label');
+      if(lbl) lbl.textContent = t.radius+'px';
+    }
+    if(document.getElementById('tema-dark')) document.getElementById('tema-dark').checked = !!t.dark;
+    // Apply CSS
+    const root = document.documentElement;
+    if(t.blue) root.style.setProperty('--blue', t.blue);
+    if(t.blue) root.style.setProperty('--blue-light', lighten(t.blue, 0.88));
+    if(t.green) root.style.setProperty('--green', t.green);
+    if(t.green) root.style.setProperty('--green-light', lighten(t.green, 0.88));
+    if(t.orange) root.style.setProperty('--orange', t.orange);
+    if(t.orange) root.style.setProperty('--orange-light', lighten(t.orange, 0.88));
+    if(t.danger) root.style.setProperty('--danger', t.danger);
+    if(t.bg) document.body.style.background = t.bg;
+    if(t.font) document.body.style.fontFamily = t.font;
+    if(t.fontsize) document.body.style.fontSize = t.fontsize+'px';
+    if(t.navbar){ const nb=document.querySelector('.navbar'); if(nb) nb.style.background=t.navbar; }
+    if(t.dark){
+      root.style.setProperty('--white','#1e293b');
+      root.style.setProperty('--text','#e2e8f0');
+      root.style.setProperty('--text2','#94a3b8');
+      root.style.setProperty('--border','#334155');
+      root.style.setProperty('--gray-light','#0f172a');
+      document.body.style.color='#e2e8f0';
+    }
+  }catch(e){}
+}
+
 // ===================== LOG AKTIVITAS =====================
 function importRiwayatKeLog(){
   // Import riwayat kwitansi yang sudah ada ke log (sekali saja, tandai dengan flag)
@@ -270,7 +452,7 @@ function renderLogAktivitas(){
     const color = JENIS_COLOR[l.jenis]||'var(--text2)';
     return `<tr>
       <td style="font-size:11px;color:var(--text2);white-space:nowrap">
-        ${tglStr}${jamStr?`<br><span style="font-size:10px">${jamStr}</span>`:''}
+        ${l.entryTime ? tglStr+(jamStr?`<br><span style="font-size:10px">${jamStr}</span>`:'') : '—'}
       </td>
       <td style="font-size:13px;font-weight:600;white-space:nowrap">
         ${l.waktu ? new Date(l.waktu).toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'2-digit'}) : '—'}
@@ -617,7 +799,10 @@ function doConfirmLoadCloud(){ if(typeof confirmLoadCloud==='function') confirmL
       <span id="sync-label">Offline</span>
     </div>
   </div>
-    <p>kmp. Durian Blok B no.36, Kel.Sadai, Kec.Bengkong, Batam</p>
+    <div style="display:flex;align-items:center;gap:12px">
+      <p style="margin:0">kmp. Durian Blok B no.36, Kel.Sadai, Kec.Bengkong, Batam</p>
+      <span id="live-clock" style="font-size:12px;font-weight:700;background:rgba(255,255,255,0.15);padding:3px 10px;border-radius:20px;letter-spacing:0.5px;font-family:monospace;white-space:nowrap"></span>
+    </div>
   </div>
   <div class="nav-btns">
     <button class="nav-btn active" onclick="showPage('kwitansi')">Kwitansi</button>
@@ -1274,6 +1459,7 @@ function doConfirmLoadCloud(){ if(typeof confirmLoadCloud==='function') confirmL
       <div class="tab" onclick="switchTab('rekordSiswa')">&#128203; Rekord Siswa</div>
       <div class="tab" onclick="switchTab('laporanHarian')">&#128197; Transaksi Harian</div>
       <div class="tab" onclick="switchTab('laporanJenjang')">&#127891; Per Jenjang</div>
+      <div class="tab" onclick="switchTab('tema')">&#127912; Tema</div>
       <div class="tab" onclick="switchTab('modalAwal')">&#128176; Kas Awal Harian</div>
       <div class="tab" onclick="switchTab('pengeluaran')">&#128184; Pengeluaran</div>
       <div class="tab" onclick="switchTab('pinjaman')">&#129309; Pinjaman</div>
@@ -1505,6 +1691,90 @@ function doConfirmLoadCloud(){ if(typeof confirmLoadCloud==='function') confirmL
     </div>
 
     <!-- TAB: LAPORAN HARIAN -->
+    <div class="tab-content" id="tab-tema">
+        <div class="card">
+          <div class="card-title">🎨 Tema & Tampilan</div>
+          <p style="font-size:13px;color:var(--text2);margin-bottom:16px">Kustomisasi tampilan sesuai selera. Tidak mempengaruhi data apapun.</p>
+          <div class="row2" style="gap:20px">
+            <div>
+              <div style="font-weight:700;font-size:13px;margin-bottom:12px">🎨 Warna</div>
+              <div class="field"><label>Warna Utama</label>
+                <div style="display:flex;align-items:center;gap:8px">
+                  <input type="color" id="tema-blue" value="#1a56a0" oninput="syncColorToHex('tema-blue','tema-blue-hex');applyTema()" style="width:44px;height:34px;border:none;border-radius:6px;cursor:pointer;padding:2px">
+                  <input type="text" id="tema-blue-hex" value="#1a56a0" oninput="syncColorFromHex('tema-blue','tema-blue-hex')" style="width:85px;padding:6px;font-size:12px;border:1px solid var(--border);border-radius:6px;font-family:monospace">
+                </div>
+              </div>
+              <div class="field"><label>Warna Sukses (Hijau)</label>
+                <div style="display:flex;align-items:center;gap:8px">
+                  <input type="color" id="tema-green" value="#15803d" oninput="syncColorToHex('tema-green','tema-green-hex');applyTema()" style="width:44px;height:34px;border:none;border-radius:6px;cursor:pointer;padding:2px">
+                  <input type="text" id="tema-green-hex" value="#15803d" oninput="syncColorFromHex('tema-green','tema-green-hex')" style="width:85px;padding:6px;font-size:12px;border:1px solid var(--border);border-radius:6px;font-family:monospace">
+                </div>
+              </div>
+              <div class="field"><label>Warna Aksen (Orange)</label>
+                <div style="display:flex;align-items:center;gap:8px">
+                  <input type="color" id="tema-orange" value="#c2410c" oninput="syncColorToHex('tema-orange','tema-orange-hex');applyTema()" style="width:44px;height:34px;border:none;border-radius:6px;cursor:pointer;padding:2px">
+                  <input type="text" id="tema-orange-hex" value="#c2410c" oninput="syncColorFromHex('tema-orange','tema-orange-hex')" style="width:85px;padding:6px;font-size:12px;border:1px solid var(--border);border-radius:6px;font-family:monospace">
+                </div>
+              </div>
+              <div class="field"><label>Warna Bahaya (Merah)</label>
+                <div style="display:flex;align-items:center;gap:8px">
+                  <input type="color" id="tema-danger" value="#dc2626" oninput="syncColorToHex('tema-danger','tema-danger-hex');applyTema()" style="width:44px;height:34px;border:none;border-radius:6px;cursor:pointer;padding:2px">
+                  <input type="text" id="tema-danger-hex" value="#dc2626" oninput="syncColorFromHex('tema-danger','tema-danger-hex')" style="width:85px;padding:6px;font-size:12px;border:1px solid var(--border);border-radius:6px;font-family:monospace">
+                </div>
+              </div>
+              <div class="field"><label>Warna Background</label>
+                <div style="display:flex;align-items:center;gap:8px">
+                  <input type="color" id="tema-bg" value="#f1f5f9" oninput="syncColorToHex('tema-bg','tema-bg-hex');applyTema()" style="width:44px;height:34px;border:none;border-radius:6px;cursor:pointer;padding:2px">
+                  <input type="text" id="tema-bg-hex" value="#f1f5f9" oninput="syncColorFromHex('tema-bg','tema-bg-hex')" style="width:85px;padding:6px;font-size:12px;border:1px solid var(--border);border-radius:6px;font-family:monospace">
+                </div>
+              </div>
+              <div class="field"><label>Warna Navbar</label>
+                <div style="display:flex;align-items:center;gap:8px">
+                  <input type="color" id="tema-navbar" value="#1a56a0" oninput="syncColorToHex('tema-navbar','tema-navbar-hex');applyTema()" style="width:44px;height:34px;border:none;border-radius:6px;cursor:pointer;padding:2px">
+                  <input type="text" id="tema-navbar-hex" value="#1a56a0" oninput="syncColorFromHex('tema-navbar','tema-navbar-hex')" style="width:85px;padding:6px;font-size:12px;border:1px solid var(--border);border-radius:6px;font-family:monospace">
+                </div>
+              </div>
+            </div>
+            <div>
+              <div style="font-weight:700;font-size:13px;margin-bottom:12px">✏️ Font & Layout</div>
+              <div class="field"><label>Font</label>
+                <select id="tema-font" onchange="applyTema()" style="width:100%;padding:8px;font-size:13px;border:1px solid var(--border);border-radius:7px">
+                  <option value="'Segoe UI',Arial,sans-serif">Segoe UI (Default)</option>
+                  <option value="Arial,sans-serif">Arial</option>
+                  <option value="'Poppins',sans-serif">Poppins</option>
+                  <option value="'Inter',sans-serif">Inter</option>
+                  <option value="Georgia,serif">Georgia</option>
+                </select>
+              </div>
+              <div class="field"><label>Ukuran Font: <span id="tema-fontsize-label">14px</span></label>
+                <input type="range" id="tema-fontsize" min="12" max="18" value="14" oninput="document.getElementById('tema-fontsize-label').textContent=this.value+'px';applyTema()" style="width:100%">
+              </div>
+              <div class="field"><label>Sudut Card: <span id="tema-radius-label">12px</span></label>
+                <input type="range" id="tema-radius" min="0" max="24" value="12" oninput="document.getElementById('tema-radius-label').textContent=this.value+'px';applyTema()" style="width:100%">
+              </div>
+              <div class="field"><label style="display:flex;align-items:center;gap:10px;cursor:pointer">
+                <input type="checkbox" id="tema-dark" onchange="applyTema()" style="width:16px;height:16px">
+                <span>Dark Mode</span></label>
+              </div>
+              <div style="font-weight:700;font-size:13px;margin:16px 0 10px">🎯 Preset</div>
+              <div style="display:flex;gap:6px;flex-wrap:wrap">
+                <button class="btn" onclick="applyPreset('default')" style="font-size:11px">🔵 Default</button>
+                <button class="btn" onclick="applyPreset('hijau')" style="font-size:11px;background:#dcfce7;border-color:#86efac;color:#15803d">🟢 Hijau</button>
+                <button class="btn" onclick="applyPreset('ungu')" style="font-size:11px;background:#f3e8ff;border-color:#c084fc;color:#7c3aed">🟣 Ungu</button>
+                <button class="btn" onclick="applyPreset('merah')" style="font-size:11px;background:#fee2e2;border-color:#fca5a5;color:#dc2626">🔴 Merah</button>
+                <button class="btn" onclick="applyPreset('gelap')" style="font-size:11px;background:#1e293b;border-color:#475569;color:#e2e8f0">⚫ Gelap</button>
+                <button class="btn" onclick="applyPreset('coklat')" style="font-size:11px;background:#fef3c7;border-color:#fcd34d;color:#92400e">🟤 Coklat</button>
+              </div>
+            </div>
+          </div>
+          <div class="btn-row" style="margin-top:20px">
+            <button class="btn btn-primary" onclick="saveTema()">💾 Simpan Tema</button>
+            <button class="btn" onclick="resetTema()">↺ Reset Default</button>
+          </div>
+          <div class="alert alert-success" id="tema-saved" style="margin-top:10px"></div>
+        </div>
+      </div>
+
     <div class="tab-content" id="tab-laporanHarian">
       <div class="card">
         <div class="card-title">Transaksi Harian</div>
@@ -3916,6 +4186,18 @@ function getLogoHTML(w=64){
 document.getElementById('inp-tanggal').value=today();
   setTimeout(initSidebarDrag, 500);
   syncTanggalText(today());
+  setTimeout(loadTema, 200);
+  // Live clock
+  function updateClock(){
+    const el = document.getElementById('live-clock');
+    if(!el) return;
+    const now = new Date();
+    const jam = now.toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    const tgl = now.toLocaleDateString('id-ID',{weekday:'short',day:'numeric',month:'short'});
+    el.textContent = tgl+' · '+jam;
+  }
+  updateClock();
+  setInterval(updateClock, 1000);
   // Set filter riwayat ke hari ini saat pertama load
   const _dari=document.getElementById('all-filter-dari');
   const _sampai=document.getElementById('all-filter-sampai');
