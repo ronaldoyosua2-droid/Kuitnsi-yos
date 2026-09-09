@@ -160,6 +160,121 @@ input[readonly]{background:var(--gray-light);color:var(--gray)}
 // Safe wrappers defined early to avoid "not defined" errors
 function doManualSync(){ if(typeof manualSync==='function') manualSync(); }
 
+// ===================== LOG AKTIVITAS =====================
+function importRiwayatKeLog(){
+  // Import riwayat kwitansi yang sudah ada ke log (sekali saja, tandai dengan flag)
+  if(localStorage.getItem('ya_log_imported')==='2') return;
+  // Pertahankan log yang punya entryTime (aktivitas baru yang dicatat setelah update)
+  const existingLogs = JSON.parse(localStorage.getItem('ya_log')||'[]');
+  const newActivityLogs = existingLogs.filter(l=>l.entryTime!==null&&l.entryTime!==undefined);
+  localStorage.setItem('ya_log', JSON.stringify(newActivityLogs));
+  const rw = getRiwayat();
+  if(!rw.length) return;
+  const logs = JSON.parse(localStorage.getItem('ya_log')||'[]');
+  const existingIds = new Set(logs.map(l=>l.id));
+  let added = 0;
+  rw.forEach(r=>{
+    if(!r.tanggal||!r.nama) return;
+    const id = r.no||r.tanggal+r.nama;
+    if(existingIds.has(id)) return;
+    // Pakai jam dari field r.jam kalau ada, kalau tidak skip jam (jangan tulis 00:00)
+    const jamPart = r.jam && r.jam !== '00:00' ? 'T'+r.jam+':00' : 'T00:00:00';
+    logs.push({
+      id,
+      entryTime: null, // data lama, tidak ada waktu entry
+      waktu: r.tanggal+jamPart,
+      hasJam: !!(r.jam && r.jam !== '00:00'),
+      jenis: 'kwitansi',
+      nama: r.nama,
+      detail: (r.tipe||'')+' · '+(r.bayarLabel||r.keterangan||'')+(r.nominalBayar?' · Rp '+r.nominalBayar.toLocaleString('id-ID'):'')
+    });
+    added++;
+  });
+  if(added > 0){
+    // Sort by id desc (id = no kwitansi = urutan entry sebenarnya)
+    logs.sort((a,b)=>(b.id||'').toString().localeCompare((a.id||'').toString()));
+    if(logs.length > 500) logs.splice(500);
+    localStorage.setItem('ya_log', JSON.stringify(logs));
+  }
+  localStorage.setItem('ya_log_imported','2'); // versi 2: include jam
+}
+
+function addLog(jenis, nama, detail){
+  try{
+    const logs = JSON.parse(localStorage.getItem('ya_log')||'[]');
+    logs.unshift({
+      id: Date.now(),
+      entryTime: new Date().toISOString(), // waktu saat dicatat (untuk sort)
+      waktu: new Date().toISOString(),
+      jenis,   // 'kwitansi','siswa_baru','siswa_edit','naik_kelas','hapus'
+      nama,    // nama siswa / subjek
+      detail   // keterangan tambahan
+    });
+    // Simpan max 500 log terakhir
+    if(logs.length > 500) logs.splice(500);
+    localStorage.setItem('ya_log', JSON.stringify(logs));
+  }catch(e){}
+}
+
+function renderLogAktivitas(){
+  const dari = document.getElementById('log-filter-dari')?.value||'';
+  const sampai = document.getElementById('log-filter-sampai')?.value||'';
+  const jenis = document.getElementById('log-filter-jenis')?.value||'';
+  const nama = (document.getElementById('log-filter-nama')?.value||'').toLowerCase();
+  const wrap = document.getElementById('log-aktivitas-wrap');
+  if(!wrap) return;
+
+  let logs = JSON.parse(localStorage.getItem('ya_log')||'[]');
+  // Sort: aktivitas baru (punya entryTime) di atas, lama (id=no kwitansi) di bawah
+  logs.sort((a,b)=>{
+    const ta = a.entryTime||'';
+    const tb = b.entryTime||'';
+    if(ta&&tb) return tb.localeCompare(ta); // keduanya baru: sort by entryTime
+    if(tb&&!ta) return 1;  // b baru, a lama: b di atas
+    if(ta&&!tb) return -1; // a baru, b lama: a di atas
+    return (b.id||'').toString().localeCompare((a.id||'').toString()); // keduanya lama: sort by no kwitansi
+  });
+  if(dari) logs = logs.filter(l=>l.waktu&&l.waktu.slice(0,10)>=dari);
+  if(sampai) logs = logs.filter(l=>l.waktu&&l.waktu.slice(0,10)<=sampai);
+  if(jenis) logs = logs.filter(l=>l.jenis===jenis);
+  if(nama) logs = logs.filter(l=>(l.nama||'').toLowerCase().includes(nama)||(l.detail||'').toLowerCase().includes(nama));
+
+  if(!logs.length){
+    wrap.innerHTML='<div class="hist-empty">Tidak ada log aktivitas ditemukan</div>';
+    return;
+  }
+
+  const JENIS_ICON = {
+    kwitansi:'🧾', siswa_baru:'➕', siswa_edit:'✏️',
+    naik_kelas:'🎓', hapus:'🗑️', lainnya:'📝'
+  };
+  const JENIS_COLOR = {
+    kwitansi:'var(--blue)', siswa_baru:'var(--green)', siswa_edit:'var(--orange)',
+    naik_kelas:'#7c3aed', hapus:'var(--danger)', lainnya:'var(--text2)'
+  };
+
+  wrap.innerHTML = `<table class="siswa-table">
+    <thead><tr><th>Waktu</th><th>Aktivitas</th><th>Nama</th><th>Keterangan</th></tr></thead>
+    <tbody>`+logs.map(l=>{
+    const waktu = new Date(l.waktu);
+    const tglStr = waktu.toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'2-digit'});
+    const rawJam = waktu.toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'});
+    const jamStr = (rawJam==='00.00'||rawJam==='00:00') ? '' : rawJam;
+    const icon = JENIS_ICON[l.jenis]||'📝';
+    const color = JENIS_COLOR[l.jenis]||'var(--text2)';
+    return `<tr>
+      <td style="font-size:12px;white-space:nowrap">
+        <div style="font-weight:600">${tglStr}</div>
+        ${jamStr?`<div style="color:var(--text2)">${jamStr}</div>`:''}
+      </td>
+      <td><span style="font-size:12px;font-weight:600;color:${color}">${icon} ${l.jenis?.replace('_',' ')||'—'}</span></td>
+      <td style="font-weight:500;font-size:13px">${l.nama||'—'}</td>
+      <td style="font-size:12px;color:var(--text2)">${l.detail||'—'}</td>
+    </tr>`;
+  }).join('')+'</tbody></table>'
+  +`<p style="font-size:12px;color:var(--text2);margin-top:8px">Menampilkan ${logs.length} aktivitas</p>`;
+}
+
 // ===================== SIDEBAR DAFTAR SISWA =====================
 // ===================== SIDEBAR DRAG & RESIZE =====================
 function initSidebarDrag(){
@@ -263,6 +378,53 @@ function initSidebarDrag(){
     e.stopPropagation();
     e.preventDefault();
   });
+}
+
+function renderRecentEntryBar(){
+  const bar = document.getElementById('recent-entry-list');
+  if(!bar) return;
+  const rw = getRiwayat();
+  // Ambil 6 siswa unik terakhir berdasarkan tanggal transaksi
+  const seen = new Set();
+  const recent = [];
+  // Urut berdasarkan nomor kwitansi (no) = urutan entry, bukan tanggal kwitansi
+  rw.sort((a,b)=>(b.no||'').localeCompare(a.no||''));
+  for(const r of rw){
+    if(!r.nama) continue;
+    const key = r.nama.toLowerCase();
+    if(seen.has(key)) continue;
+    seen.add(key);
+    recent.push(r);
+    if(recent.length >= 6) break;
+  }
+  if(!recent.length){
+    bar.innerHTML='<span style="font-size:12px;color:var(--text2)">Belum ada transaksi</span>';
+    return;
+  }
+  bar.innerHTML = recent.map(r=>{
+    const tgl = r.tanggal ? new Date(r.tanggal).toLocaleDateString('id-ID',{day:'numeric',month:'short'}) : '';
+    const jamBar = r.jam && r.jam !== '00:00' ? ' · '+r.jam.substring(0,5) : '';
+    // Ambil jam dari field jam atau dari no kwitansi
+    const jam = r.jam ? r.jam.substring(0,5) : '';
+    return `<button onclick="quickSelectSiswaByName('${r.nama.replace(/'/g,"\'")}','${r.kelas||''}')"
+      style="flex-shrink:0;padding:3px 8px;font-size:11px;border:1px solid var(--border);border-radius:12px;background:#f8fafc;cursor:pointer;display:flex;flex-direction:column;align-items:flex-start;gap:0;text-align:left;white-space:nowrap"
+      title="Klik untuk pilih siswa ini">
+      <span style="font-weight:600;color:var(--blue);font-size:11px">${r.nama}</span>
+      <span style="font-size:9px;color:var(--text2)">${r.kelas||''} · ${tgl}${jamBar}</span>
+    </button>`;
+  }).join('');
+}
+
+function quickSelectSiswaByName(nama, kelas){
+  // Set nama di input dan trigger
+  const inp = document.querySelector('#inp-nama-siswa, [placeholder*="Nama siswa"]');
+  if(inp){ inp.value = nama; inp.dispatchEvent(new Event('input')); }
+  const siswa = getSiswa().find(s=>s.nama===nama&&(s.kelas===kelas||!kelas));
+  if(siswa){
+    siswaList = [siswa];
+    renderItemForms();
+    renderRecentEntryBar();
+  }
 }
 
 function renderSidebarSiswa(){
@@ -455,6 +617,7 @@ function doConfirmLoadCloud(){ if(typeof confirmLoadCloud==='function') confirmL
     <button class="nav-btn" onclick="showPage('siswaPindah')">&#128661; Siswa Pindah</button>
     <button class="nav-btn" onclick="showPage('riwayat')">Riwayat</button>
     <button class="nav-btn" onclick="showPage('admin')">Admin</button>
+      <button class="nav-btn" onclick="showPage('aktivitas')">📋 Aktivitas</button>
     <button class="nav-btn" id="nav-preview-btn" onclick="showPage('preview')" style="display:none;background:var(--orange);color:#fff">&#128196; Preview</button>
   </div>
 </div>
@@ -462,6 +625,12 @@ function doConfirmLoadCloud(){ if(typeof confirmLoadCloud==='function') confirmL
 <!-- ==================== PAGE: KWITANSI ==================== -->
 <div class="page active" id="page-kwitansi">
 <div class="kw-main">
+  <!-- RECENTLY PROCESSED -->
+  <div id="recent-entry-bar" style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:5px 12px;margin-bottom:10px;display:flex;align-items:center;gap:8px;overflow:hidden">
+    <span style="font-size:11px;font-weight:600;color:var(--text2);white-space:nowrap">🕐 Terakhir:</span>
+    <div id="recent-entry-list" style="display:flex;gap:4px;overflow:hidden;flex:1;min-width:0"></div>
+  </div>
+
   <!-- SISWA LIST -->
   <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
@@ -678,6 +847,36 @@ function doConfirmLoadCloud(){ if(typeof confirmLoadCloud==='function') confirmL
     <div id="sidebar-siswa-list" style="font-size:13px;color:var(--text2);text-align:center;padding:20px 0">
       Pilih kelas untuk melihat daftar siswa
     </div>
+  </div>
+</div>
+
+<!-- ==================== PAGE: AKTIVITAS ==================== -->
+<div class="page" id="page-aktivitas">
+  <div class="card">
+    <div class="card-title">📋 Log Aktivitas</div>
+    <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:flex-end">
+      <div>
+        <label style="font-size:11px;color:var(--text2);display:block;margin-bottom:3px">Dari Tanggal</label>
+        <input type="date" id="log-filter-dari" onchange="renderLogAktivitas()" style="padding:7px 10px;font-size:13px;border:1px solid var(--border);border-radius:7px;outline:none">
+      </div>
+      <div>
+        <label style="font-size:11px;color:var(--text2);display:block;margin-bottom:3px">Sampai Tanggal</label>
+        <input type="date" id="log-filter-sampai" onchange="renderLogAktivitas()" style="padding:7px 10px;font-size:13px;border:1px solid var(--border);border-radius:7px;outline:none">
+      </div>
+      <select id="log-filter-jenis" onchange="renderLogAktivitas()" style="padding:8px 10px;font-size:13px;border:1px solid var(--border);border-radius:7px;outline:none">
+        <option value="">Semua Aktivitas</option>
+        <option value="kwitansi">🧾 Buat Kwitansi</option>
+        <option value="siswa_baru">➕ Tambah Siswa</option>
+        <option value="siswa_edit">✏️ Edit Siswa</option>
+        <option value="naik_kelas">🎓 Naik Kelas</option>
+        <option value="hapus">🗑️ Hapus</option>
+      </select>
+      <input type="text" id="log-filter-nama" placeholder="Cari nama..." oninput="renderLogAktivitas()"
+        style="padding:8px 10px;font-size:13px;border:1px solid var(--border);border-radius:7px;outline:none;min-width:160px">
+      <button class="btn" onclick="document.getElementById('log-filter-dari').value='';document.getElementById('log-filter-sampai').value='';document.getElementById('log-filter-jenis').value='';document.getElementById('log-filter-nama').value='';renderLogAktivitas()">✕ Reset</button>
+      <button class="btn btn-primary" onclick="renderLogAktivitas()" style="font-size:12px">🔄 Refresh</button>
+    </div>
+    <div id="log-aktivitas-wrap"></div>
   </div>
 </div>
 
@@ -1685,6 +1884,12 @@ function showPage(p){
     if(dari&&!dari.value) dari.value=t;
     if(sampai&&!sampai.value) sampai.value=t;
     filterAllRiwayat();
+  }
+  if(p==='kwitansi') setTimeout(renderRecentEntryBar, 100);
+  if(p==='aktivitas'){
+    // Tidak set filter tanggal default — tampilkan semua log
+    importRiwayatKeLog();
+    renderLogAktivitas();
   }
   // Highlight matching nav btn without relying on event.target
   document.querySelectorAll('.nav-btn').forEach(function(btn){
@@ -3358,6 +3563,24 @@ function buatKwitansiSiswaBaru(){
 
   newRecs.forEach(r=>rw.unshift(r));
   setRiwayat(rw);
+  // Log aktivitas kwitansi
+  newRecs.forEach(r=>{
+    const logs2=JSON.parse(localStorage.getItem('ya_log')||'[]');
+    const now2=new Date().toISOString();
+    logs2.unshift({
+      id: Date.now()+Math.random(),
+      entryTime: now2,
+      waktu: now2,
+      hasJam: true,
+      jenis:'kwitansi',
+      nama: r.nama,
+      detail: r.tipe+' · '+r.bayarLabel+' · Rp '+((r.nominalBayar||0).toLocaleString('id-ID')),
+      noKwitansi: r.no
+    });
+    if(logs2.length>500) logs2.splice(500);
+    localStorage.setItem('ya_log',JSON.stringify(logs2));
+  });
+  renderRecentEntryBar();
 
   document.getElementById('sb-kwitansi-pages').innerHTML=pages.join('');
   document.getElementById('sb-preview-wrap').style.display='block';
@@ -4662,6 +4885,24 @@ function buatKwitansi(){
   newRecs.forEach(r=>rw.unshift(r));
   setRiwayat(rw);
   window._lastNewRecs = newRecs;
+  // Log aktivitas kwitansi
+  newRecs.forEach(r=>{
+    const logs2=JSON.parse(localStorage.getItem('ya_log')||'[]');
+    const now2=new Date().toISOString();
+    logs2.unshift({
+      id: Date.now()+Math.random(),
+      entryTime: now2,
+      waktu: now2,
+      hasJam: true,
+      jenis:'kwitansi',
+      nama: r.nama,
+      detail: r.tipe+' · '+r.bayarLabel+' · Rp '+((r.nominalBayar||0).toLocaleString('id-ID')),
+      noKwitansi: r.no
+    });
+    if(logs2.length>500) logs2.splice(500);
+    localStorage.setItem('ya_log',JSON.stringify(logs2));
+  });
+  renderRecentEntryBar();
 
   // Show multi preview
   // multi-preview-label removed
@@ -5420,7 +5661,7 @@ function renderRekordSiswa(){
   if(!siswa.length){wrap.innerHTML='<div class="hist-empty">Tidak ada siswa ditemukan</div>';return;}
 
   wrap.innerHTML=`<table class="siswa-table">
-    <thead><tr><th>#</th><th>Nama</th><th>Kelas</th><th>Total Bayar</th><th>Tunggakan</th><th>Aksi</th></tr></thead>
+    <thead><tr><th>#</th><th>Nama</th><th>Kelas</th><th>Total Bayar</th><th>Tunggakan</th><th>Terakhir</th><th>Aksi</th></tr></thead>
     <tbody>`+siswa.map((s,i)=>{
       const namaKey=s.nama.toLowerCase();
       const cached=_rekordCacheData&&_rekordCacheData[namaKey];
@@ -5443,6 +5684,7 @@ function renderRekordSiswa(){
         <td><span class="badge ${s.kelas.includes('Plus')?'badge-orange':'badge-blue'}">${s.kelas}</span></td>
         <td style="color:var(--green);font-weight:500">${sr.length?fmt(totBayar):'—'}</td>
         <td>${hasTung?`<span style="color:var(--danger);font-weight:600">${fmt(totSisa)}</span>`:'<span style="color:var(--green)">Lunas</span>'}</td>
+        <td>${(()=>{const sr2=(rwByNama[s.nama.toLowerCase()]||[]).sort((a,b)=>(b.tanggal||'').localeCompare(a.tanggal||''));const lt=sr2[0];return lt?`<div style="font-size:11px;font-weight:600">${lt.tanggal?new Date(lt.tanggal).toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'2-digit'}):'—'}</div><div style="font-size:10px;color:var(--text2)">${lt.tipe||''}</div>`:'<span style="color:var(--text2);font-size:11px">—</span>';})()} </td>
         <td><button class="btn" style="font-size:11px;padding:3px 10px" onclick="bukaRekordModal('${encodeURIComponent(s.nama)}','${encodeURIComponent(s.kelas)}')">&#128203; Lihat</button></td>
       </tr>`;
     }).join('')+`</tbody></table>
@@ -6680,12 +6922,15 @@ function renderAdminSiswa(){
   const showingAll = q || filtered.length<=50;
   document.getElementById('admin-siswa-wrap').innerHTML=`
     <table class="siswa-table">
-      <thead><tr><th>#</th><th>Nama</th><th>Kelas</th><th>Aksi</th></tr></thead>
+      <thead><tr><th>#</th><th>Nama</th><th>Kelas</th><th>Ditambah</th><th>Aksi</th></tr></thead>
       <tbody>`+display.map((s,i)=>{
         const realIdx=siswa.indexOf(s);
+        const tglAdd=s.createdAt?new Date(s.createdAt).toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'2-digit'}):'—';
+        const tglUpd=s.updatedAt&&s.updatedAt!==s.createdAt?'<br><span style="color:var(--orange);font-size:10px">Edit: '+new Date(s.updatedAt).toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'2-digit'})+'</span>':'';
         return `<tr><td style="color:var(--text2);font-size:12px">${realIdx+1}</td>
           <td>${s.nama}</td>
           <td><span class="badge ${s.kelas.includes('Plus')?'badge-orange':'badge-blue'}">${s.kelas}</span></td>
+          <td style="font-size:11px;color:var(--text2)">${tglAdd}${tglUpd}</td>
           <td style="display:flex;gap:6px">
             <button class="btn" style="font-size:11px;padding:3px 8px" onclick="editSiswa(${realIdx})">&#9998; Edit</button>
             <button class="btn btn-danger" style="font-size:11px;padding:3px 8px" onclick="hapusSiswa(${realIdx})">&#128465;</button>
@@ -6729,9 +6974,20 @@ function saveSiswa(){
   if(!nama){al.textContent='Nama tidak boleh kosong.';al.classList.add('show');return}
   if(!kelas){al.textContent='Pilih kelas.';al.classList.add('show');return}
   const siswa=getSiswa();
-  if(editSiswaIdx!==null){siswa[editSiswaIdx]={...siswa[editSiswaIdx],nama,kelas,mulaiPendidikan,sppKhusus}}
-  else{siswa.push({nama,kelas,mulaiPendidikan:mulaiPendidikan||null,sppKhusus:sppKhusus||null});siswa.sort((a,b)=>a.nama.localeCompare(b.nama))}
+  const now=new Date().toISOString();
+  if(editSiswaIdx!==null){
+    siswa[editSiswaIdx]={...siswa[editSiswaIdx],nama,kelas,mulaiPendidikan,sppKhusus,updatedAt:now};
+  } else {
+    siswa.push({nama,kelas,mulaiPendidikan:mulaiPendidikan||null,sppKhusus:sppKhusus||null,createdAt:now,updatedAt:now});
+    siswa.sort((a,b)=>a.nama.localeCompare(b.nama));
+  }
   setSiswa(siswa);
+  // Log aktivitas
+  if(editSiswaIdx!==null){
+    addLog('siswa_edit', nama, 'Kelas: '+kelas);
+  } else {
+    addLog('siswa_baru', nama, 'Kelas: '+kelas);
+  }
   document.getElementById('form-siswa-card').style.display='none';
   renderAdminSiswa();
 }
@@ -6739,6 +6995,7 @@ function saveSiswa(){
 function hapusSiswa(idx){
   const s=getSiswa()[idx];
   if(!confirm('Hapus siswa: '+s.nama+'?'))return;
+  addLog('hapus', s.nama, 'Kelas: '+(s.kelas||'—'));
   const siswa=getSiswa();siswa.splice(idx,1);setSiswa(siswa);renderAdminSiswa();
 }
 
@@ -6824,6 +7081,7 @@ function prosesNaikKelasSemua(){
 
   setSiswa(updated);
   const lulusInfo=lulusList.length>0?' · '+lulusList.length+' siswa 12 SMK diarsipkan':'';
+  addLog('naik_kelas','Semua Siswa',updated.length+' siswa naik kelas'+lulusInfo);
   al.innerHTML='✅ Naik kelas SEMUA jenjang berhasil! '+updated.length+' siswa aktif diperbarui'+lulusInfo+'. '
     +'<button onclick="undoNaikKelas()" style="margin-left:8px;padding:3px 10px;font-size:11px;border-radius:5px;background:#fff;border:1px solid currentColor;cursor:pointer;color:inherit">↩ Undo</button>';
   al.classList.add('show');
