@@ -574,18 +574,44 @@ function renderRecentEntryBar(){
   const bar = document.getElementById('recent-entry-list');
   if(!bar) return;
   const rw = getRiwayat();
-  // Ambil 6 siswa unik terakhir berdasarkan tanggal transaksi
+  const rwByNo = {};
+  rw.forEach(r=>{ if(r.no) rwByNo[r.no]=r; });
+  // Pakai ya_log sebagai sumber agar konsisten dengan Log Aktivitas
+  const logs = JSON.parse(localStorage.getItem('ya_log')||'[]');
+  const sorted = [...logs].sort((a,b)=>{
+    const ta=a.entryTime||'', tb=b.entryTime||'';
+    if(ta&&tb) return tb.localeCompare(ta);
+    if(tb&&!ta) return 1;
+    if(ta&&!tb) return -1;
+    return (b.id||'').toString().localeCompare((a.id||'').toString());
+  });
   const seen = new Set();
   const recent = [];
-  // Urut berdasarkan nomor kwitansi (no) = urutan entry, bukan tanggal kwitansi
-  rw.sort((a,b)=>(b.no||'').localeCompare(a.no||''));
-  for(const r of rw){
-    if(!r.nama) continue;
-    const key = r.nama.toLowerCase();
+  for(const l of sorted){
+    if(!l.nama) continue;
+    const key = l.nama.toLowerCase();
     if(seen.has(key)) continue;
     seen.add(key);
-    recent.push(r);
-    if(recent.length >= 6) break;
+    const rwRef = l.noKwitansi ? rwByNo[l.noKwitansi] : rw.find(r=>r.nama===l.nama);
+    recent.push({
+      nama: l.nama,
+      kelas: rwRef?.kelas||'',
+      tanggal: rwRef?.tanggal||l.waktu?.slice(0,10)||'',
+      entryTime: l.entryTime||null
+    });
+    if(recent.length>=6) break;
+  }
+  // Fallback ke riwayat jika log kosong
+  if(!recent.length){
+    const rwSorted=[...rw].sort((a,b)=>(b.no||'').localeCompare(a.no||''));
+    for(const r of rwSorted){
+      if(!r.nama) continue;
+      const key=r.nama.toLowerCase();
+      if(seen.has(key)) continue;
+      seen.add(key);
+      recent.push({nama:r.nama,kelas:r.kelas||'',tanggal:r.tanggal||'',entryTime:null});
+      if(recent.length>=6) break;
+    }
   }
   if(!recent.length){
     bar.innerHTML='<span style="font-size:12px;color:var(--text2)">Belum ada transaksi</span>';
@@ -593,9 +619,7 @@ function renderRecentEntryBar(){
   }
   bar.innerHTML = recent.map(r=>{
     const tgl = r.tanggal ? new Date(r.tanggal).toLocaleDateString('id-ID',{day:'numeric',month:'short'}) : '';
-    const jamBar = r.jam && r.jam !== '00:00' ? ' · '+r.jam.substring(0,5) : '';
-    // Ambil jam dari field jam atau dari no kwitansi
-    const jam = r.jam ? r.jam.substring(0,5) : '';
+    const jamBar = r.entryTime ? ' · '+new Date(r.entryTime).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'}) : '';
     return `<button onclick="quickSelectSiswaByName('${r.nama.replace(/'/g,"\'")}','${r.kelas||''}')"
       style="flex-shrink:0;padding:3px 8px;font-size:11px;border:1px solid var(--border);border-radius:12px;background:#f8fafc;cursor:pointer;display:flex;flex-direction:column;align-items:flex-start;gap:0;text-align:left;white-space:nowrap"
       title="Klik untuk pilih siswa ini">
