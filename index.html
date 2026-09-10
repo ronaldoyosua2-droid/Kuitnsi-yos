@@ -7290,7 +7290,15 @@ function saveSiswa(){
   const siswa=getSiswa();
   const now=new Date().toISOString();
   if(editSiswaIdx!==null){
+    const namaLama = siswa[editSiswaIdx].nama;
     siswa[editSiswaIdx]={...siswa[editSiswaIdx],nama,kelas,mulaiPendidikan,sppKhusus,updatedAt:now};
+    // Update nama di riwayat jika nama berubah
+    if(namaLama !== nama){
+      const rw = getRiwayat();
+      let rwChanged = 0;
+      rw.forEach(r=>{ if(r.nama===namaLama){ r.nama=nama; rwChanged++; } });
+      if(rwChanged>0){ setRiwayat(rw); console.log('Riwayat diupdate:', rwChanged, 'transaksi'); }
+    }
   } else {
     siswa.push({nama,kelas,mulaiPendidikan:mulaiPendidikan||null,sppKhusus:sppKhusus||null,createdAt:now,updatedAt:now});
     siswa.sort((a,b)=>a.nama.localeCompare(b.nama));
