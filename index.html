@@ -617,13 +617,22 @@ function renderRecentEntryBar(){
     bar.innerHTML='<span style="font-size:12px;color:var(--text2)">Belum ada transaksi</span>';
     return;
   }
+  // Ambil metode pembayaran terakhir per siswa dari riwayat
+  const rwMetode = {};
+  rw.forEach(r=>{ if(r.nama&&r.metode) rwMetode[r.nama.toLowerCase()]=r.metode; });
+
   bar.innerHTML = recent.map(r=>{
     const tgl = r.tanggal ? new Date(r.tanggal).toLocaleDateString('id-ID',{day:'numeric',month:'short'}) : '';
     const jamBar = r.entryTime ? ' · '+new Date(r.entryTime).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'}) : '';
+    const metode = rwMetode[r.nama.toLowerCase()]||'Kas';
+    const isTransfer = metode==='Transfer';
+    const btnBg = isTransfer ? '#fef9c3' : '#f8fafc';
+    const btnBorder = isTransfer ? '#fcd34d' : 'var(--border)';
+    const metodeIcon = isTransfer ? '🏦' : '💵';
     return `<button onclick="quickSelectSiswaByName('${r.nama.replace(/'/g,"\'")}','${r.kelas||''}')"
-      style="flex-shrink:0;padding:3px 8px;font-size:11px;border:1px solid var(--border);border-radius:12px;background:#f8fafc;cursor:pointer;display:flex;flex-direction:column;align-items:flex-start;gap:0;text-align:left;white-space:nowrap"
-      title="Klik untuk pilih siswa ini">
-      <span style="font-weight:600;color:var(--blue);font-size:11px">${r.nama}</span>
+      style="flex-shrink:0;padding:3px 8px;font-size:11px;border:1px solid ${btnBorder};border-radius:12px;background:${btnBg};cursor:pointer;display:flex;flex-direction:column;align-items:flex-start;gap:0;text-align:left;white-space:nowrap"
+      title="Metode: ${metode}">
+      <span style="font-weight:600;color:var(--blue);font-size:11px">${metodeIcon} ${r.nama}</span>
       <span style="font-size:9px;color:var(--text2)">${r.kelas||''} · ${tgl}${jamBar}</span>
     </button>`;
   }).join('');
