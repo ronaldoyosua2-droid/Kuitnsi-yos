@@ -11,6 +11,53 @@ body{background:#f1f5f9;min-height:100vh;cursor:default}
 *:not(input):not(textarea):not(select):not(a):not(button){cursor:default;user-select:none;-webkit-user-select:none}
 input,textarea,select{cursor:auto}
 button,[onclick],label{cursor:pointer!important}
+
+/* ===== CATATAN POPUP ===== */
+#note-fab{position:fixed;bottom:20px;right:20px;z-index:999;width:44px;height:44px;border-radius:50%;background:#1a56a0;color:#fff;border:none;font-size:20px;cursor:pointer;box-shadow:0 3px 12px rgba(0,0,0,.25);display:flex;align-items:center;justify-content:center;transition:.2s}
+#note-fab:hover{background:#144781;transform:scale(1.08)}
+#note-popup{position:fixed;bottom:72px;right:20px;z-index:998;width:280px;background:#fff;border-radius:14px;box-shadow:0 8px 32px rgba(0,0,0,.18);border:1px solid #e2e8f0;display:none;flex-direction:column;max-height:480px;overflow:hidden}
+#note-popup.open{display:flex}
+.np-header{display:flex;align-items:center;gap:8px;padding:10px 12px;background:#1a56a0;border-radius:14px 14px 0 0;color:#fff}
+.np-header span{font-size:13px;font-weight:700;flex:1}
+.np-header button{background:none;border:none;color:#fff;cursor:pointer;font-size:13px;opacity:.8;padding:2px 6px;border-radius:5px}
+.np-header button:hover{opacity:1;background:rgba(255,255,255,.2)}
+.np-body{flex:1;overflow-y:auto;padding:10px}
+.np-body::-webkit-scrollbar{width:4px}
+.np-body::-webkit-scrollbar-thumb{background:#e2e8f0;border-radius:4px}
+.np-mini{padding:8px 12px;background:#fff;border-top:1px solid #f1f5f9}
+.np-mini-notes{display:flex;flex-direction:column;gap:6px}
+.np-mini-item{padding:6px 10px;border-radius:8px;font-size:11px;cursor:pointer;border:1px solid rgba(0,0,0,.08)}
+.np-mini-item:hover{filter:brightness(.95)}
+.np-mini-title{font-weight:700;color:rgba(0,0,0,.75);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.np-mini-body{color:rgba(0,0,0,.5);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:10px;margin-top:1px}
+/* note di popup */
+.pnote{border-radius:9px;padding:9px 9px 30px;position:relative;margin-bottom:8px;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.pnote.locked *{cursor:default!important;pointer-events:none;user-select:none}
+.pnote.locked::after{content:'';position:absolute;inset:0;border-radius:9px;z-index:5}
+.pnhead{display:flex;gap:3px;align-items:center;margin-bottom:6px}
+.pdot{width:10px;height:10px;border-radius:50%;cursor:pointer;border:1.5px solid rgba(0,0,0,.12);flex-shrink:0}
+.pdot:hover{transform:scale(1.2)}.pdot.on{border-color:rgba(0,0,0,.45)}
+.pndel{margin-left:auto;background:none;border:none;cursor:pointer;font-size:11px;opacity:.35;padding:0 3px}
+.pndel:hover{opacity:1;color:#dc2626}
+.pntitle{font-size:12px;font-weight:700;border:none;background:transparent;width:100%;resize:none;outline:none;font-family:inherit;line-height:1.4;color:rgba(0,0,0,.8);margin-bottom:3px}
+.pnbody{font-size:11px;border:none;background:transparent;width:100%;resize:none;outline:none;font-family:inherit;line-height:1.5;color:rgba(0,0,0,.6);min-height:50px}
+.pnfoot{position:absolute;bottom:5px;left:9px;right:9px;display:flex;align-items:center;gap:4px}
+.pndate{font-size:9px;color:rgba(0,0,0,.3);flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.pnsave{font-size:9px;padding:1px 7px;border:none;border-radius:4px;cursor:pointer;font-weight:600;background:#1a56a0;color:#fff}
+.pnsave.dirty{background:#c2410c}.pnsave.ok{background:#15803d}
+.np-toolbar{display:flex;gap:6px;padding:8px 10px;border-top:1px solid #f1f5f9}
+.np-tb-btn{flex:1;padding:5px;border:1px solid #e2e8f0;border-radius:7px;background:#f8fafc;font-size:11px;cursor:pointer;font-weight:600;color:#374151}
+.np-tb-btn:hover{background:#e0f2fe;border-color:#7dd3fc;color:#0369a1}
+/* Modal PIN di popup */
+.np-modal-bg{position:absolute;inset:0;background:rgba(0,0,0,.4);z-index:20;display:flex;align-items:center;justify-content:center;border-radius:14px}
+.np-modal{background:#fff;border-radius:10px;padding:16px;width:220px;box-shadow:0 4px 16px rgba(0,0,0,.2)}
+.np-modal h3{font-size:13px;margin-bottom:8px;color:#1e293b}
+.np-modal input{width:100%;padding:7px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;outline:none;letter-spacing:2px;font-family:monospace;margin-bottom:4px}
+.np-modal input:focus{border-color:#1a56a0}
+.np-modal-err{font-size:10px;color:#dc2626;min-height:14px;margin-bottom:8px}
+.np-modal-btns{display:flex;gap:6px}
+.np-modal-btns button{flex:1;padding:6px;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-weight:600}
+.npmbtn-ok{background:#1a56a0;color:#fff}.npmbtn-cancel{background:#f1f5f9;color:#374151}
 .page-tabs{background:#fff;border-bottom:1px solid var(--border);padding:0 20px;position:sticky;top:57px;z-index:99;box-shadow:0 1px 4px rgba(0,0,0,.06)}
 .navbar{background:var(--blue);color:#fff;padding:12px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.2)}
 .navbar-top{display:flex;align-items:center;justify-content:space-between;width:100%}
@@ -159,6 +206,231 @@ input[readonly]{background:var(--gray-light);color:var(--gray)}
 <script>
 // Safe wrappers defined early to avoid "not defined" errors
 function doManualSync(){ if(typeof manualSync==='function') manualSync(); }
+
+// ===== CATATAN POPUP =====
+var NP_KEY='np_catatan_v1', NP_PIN_KEY='np_catatan_pin';
+var npNotes=[], npEdit=false, npSaveT=null, npDelIdx=-1;
+var npPopupOpen=false;
+var NP_CL=[{c:'y',b:'#fef08a'},{c:'o',b:'#fed7aa'},{c:'g',b:'#bbf7d0'},{c:'b',b:'#bfdbfe'},{c:'p',b:'#e9d5ff'},{c:'r',b:'#fecaca'},{c:'t',b:'#99f6e4'},{c:'w',b:'#ffffff'}];
+var NP_CM={};NP_CL.forEach(function(x){NP_CM[x.c]=x.b;});
+
+function npLoad(){
+  try{var d=JSON.parse(localStorage.getItem(NP_KEY)||'{}');npNotes=d.notes||[];}
+  catch(e){npNotes=[];}
+  npEdit=false;
+}
+
+function npSave(){
+  try{localStorage.setItem(NP_KEY,JSON.stringify({notes:npNotes}));}catch(e){}
+}
+
+function npFmt(iso){
+  if(!iso)return'';
+  var d=new Date(iso);
+  return d.toLocaleDateString('id-ID',{day:'numeric',month:'short'})
+    +' '+d.toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'});
+}
+function npAr(ta){ta.style.height='auto';ta.style.height=Math.max(ta.scrollHeight,18)+'px';}
+
+function toggleNotePopup(){
+  npPopupOpen=!npPopupOpen;
+  var popup=document.getElementById('note-popup');
+  var mini=document.getElementById('note-mini');
+  if(npPopupOpen){
+    popup.classList.add('open');
+    mini.style.display='none';
+    npRender();
+  } else {
+    popup.classList.remove('open');
+    npRenderMini();
+    mini.style.display='flex';
+  }
+}
+
+function npRenderMini(){
+  var mini=document.getElementById('note-mini');
+  if(!npNotes.length){mini.style.display='none';return;}
+  var show=npNotes.slice(0,2);
+  mini.innerHTML='';
+  show.forEach(function(n){
+    var el=document.createElement('div');
+    el.className='np-mini-item';
+    el.style.background=NP_CM[n.color]||'#fef08a';
+    el.innerHTML='<div class="np-mini-title">'+(n.title||'(tanpa judul)')+'</div>'
+      +'<div class="np-mini-body">'+(n.body||'')+'</div>';
+    el.onclick=function(){toggleNotePopup();};
+    mini.appendChild(el);
+  });
+  mini.style.display='flex';
+}
+
+function npSetMode(edit){
+  npEdit=edit;
+  var lockBtn=document.getElementById('np-lock-btn');
+  var addBtn=document.getElementById('np-add-btn');
+  var lockTb=document.getElementById('np-lock-tb');
+  if(edit){
+    if(lockBtn)lockBtn.textContent='🔒 Kunci';
+    if(addBtn)addBtn.style.display='';
+    if(lockTb)lockTb.textContent='🔒 Kunci';
+  } else {
+    if(lockBtn)lockBtn.textContent='🔒 Terkunci';
+    if(addBtn)addBtn.style.display='none';
+    if(lockTb)lockTb.textContent='🔓 Buka Edit';
+  }
+  npRender();
+}
+
+function npToggleLock(){
+  if(!npEdit){
+    npShowPinModal('unlock');
+  } else {
+    npSave();npSetMode(false);
+    if(!npPopupOpen) npRenderMini();
+  }
+}
+
+function npShowPinModal(mode){
+  var modal=document.getElementById('np-pin-modal');
+  var inp=document.getElementById('np-pin-input');
+  var title=document.getElementById('np-modal-title');
+  document.getElementById('np-pin-err').textContent='';
+  inp.value='';
+  title.textContent=mode==='unlock'?'🔓 Masukkan PIN':'🔑 Verifikasi PIN';
+  modal.dataset.mode=mode||'unlock';
+  modal.style.display='flex';
+  setTimeout(function(){inp.focus();},100);
+}
+
+function npHideModal(){
+  document.getElementById('np-pin-modal').style.display='none';
+}
+
+function npModalOk(){
+  var pin=document.getElementById('np-pin-input').value;
+  var saved=localStorage.getItem(NP_PIN_KEY)||'1234';
+  if(pin!==saved){document.getElementById('np-pin-err').textContent='❌ PIN salah';return;}
+  npHideModal();
+  npSetMode(true);
+}
+
+function npShowPinModal(mode){
+  if(mode==='pin'){
+    document.getElementById('np-old-pin').value='';
+    document.getElementById('np-new-pin').value='';
+    document.getElementById('np-chpin-err').textContent='';
+    document.getElementById('np-chpin-modal').style.display='flex';
+    setTimeout(function(){document.getElementById('np-old-pin').focus();},100);
+    return;
+  }
+  var modal=document.getElementById('np-pin-modal');
+  document.getElementById('np-pin-err').textContent='';
+  document.getElementById('np-pin-input').value='';
+  modal.style.display='flex';
+  setTimeout(function(){document.getElementById('np-pin-input').focus();},100);
+}
+
+function npSavePin(){
+  var old=document.getElementById('np-old-pin').value;
+  var nw=document.getElementById('np-new-pin').value;
+  var saved=localStorage.getItem(NP_PIN_KEY)||'1234';
+  if(old!==saved){document.getElementById('np-chpin-err').textContent='❌ PIN lama salah';return;}
+  if(!nw||!/^\d{4,8}$/.test(nw)){document.getElementById('np-chpin-err').textContent='❌ PIN harus 4-8 angka';return;}
+  localStorage.setItem(NP_PIN_KEY,nw);
+  document.getElementById('np-chpin-modal').style.display='none';
+}
+
+function npAddNote(){
+  if(!npEdit)return;
+  var now=new Date().toISOString();
+  npNotes.unshift({id:Date.now(),title:'',body:'',color:'y',createdAt:now,updatedAt:now});
+  npRender();npSave();
+  setTimeout(function(){var t=document.querySelector('.pntitle');if(t)t.focus();},50);
+}
+
+function npUpd(i,f,v){
+  if(!npEdit||!npNotes[i])return;
+  npNotes[i][f]=v;npNotes[i].updatedAt=new Date().toISOString();
+  var nd=document.getElementById('npd'+i);
+  if(nd)nd.textContent=npFmt(npNotes[i].updatedAt);
+  var ns=document.getElementById('nps'+i);
+  if(ns){ns.textContent='💾*';ns.className='pnsave dirty';}
+  clearTimeout(npSaveT);npSaveT=setTimeout(function(){npSave();},3000);
+}
+
+function npChColor(i,c){
+  if(!npEdit||!npNotes[i])return;
+  npNotes[i].color=c;npNotes[i].updatedAt=new Date().toISOString();
+  npRender();npSave();
+}
+
+function npDelNote(i){
+  npNotes.splice(i,1);npRender();npSave();
+  if(!npPopupOpen)npRenderMini();
+}
+
+function npSaveNote(i){
+  npSave();
+  var ns=document.getElementById('nps'+i);
+  if(ns){ns.textContent='✅';ns.className='pnsave ok';
+    setTimeout(function(){if(ns){ns.textContent='💾';ns.className='pnsave';}},1500);}
+}
+
+function npRender(){
+  var bd=document.getElementById('np-body');
+  if(!bd)return;
+  if(!npNotes.length){
+    bd.innerHTML='<div style="text-align:center;padding:24px;font-size:12px;color:#94a3b8">'
+      +(npEdit?'Belum ada catatan.<br>Klik "+ Baru".':'Belum ada catatan.')+'</div>';
+    return;
+  }
+  bd.innerHTML='';
+  npNotes.forEach(function(n,i){
+    var wrap=document.createElement('div');
+    wrap.className='pnote'+(npEdit?'':' locked');
+    wrap.style.background=NP_CM[n.color]||'#fef08a';
+    if(npEdit){
+      var head=document.createElement('div');head.className='pnhead';
+      NP_CL.forEach(function(cl){
+        var dot=document.createElement('div');
+        dot.className='pdot'+(n.color===cl.c?' on':'');
+        dot.style.background=cl.b;
+        (function(idx,code){dot.addEventListener('click',function(){npChColor(idx,code);});})(i,cl.c);
+        head.appendChild(dot);
+      });
+      var del=document.createElement('button');del.className='pndel';del.textContent='✕';
+      (function(idx){del.addEventListener('click',function(){
+        if(window.confirm){if(!confirm('Hapus?'))return;}
+        npDelNote(idx);
+      });})(i);
+      head.appendChild(del);wrap.appendChild(head);
+    }
+    var title=document.createElement('textarea');
+    title.className='pntitle';title.rows=1;title.placeholder='Judul...';title.value=n.title||'';
+    title.readOnly=!npEdit;title.style.cursor=npEdit?'text':'default';
+    if(npEdit)(function(idx){title.addEventListener('input',function(){npAr(this);npUpd(idx,'title',this.value);});})(i);
+    wrap.appendChild(title);setTimeout(function(){npAr(title);},0);
+    var body=document.createElement('textarea');
+    body.className='pnbody';body.placeholder=npEdit?'Tulis...':'';body.value=n.body||'';
+    body.readOnly=!npEdit;body.style.cursor=npEdit?'text':'default';
+    if(npEdit)(function(idx){body.addEventListener('input',function(){npAr(this);npUpd(idx,'body',this.value);});})(i);
+    wrap.appendChild(body);setTimeout(function(){npAr(body);},0);
+    var foot=document.createElement('div');foot.className='pnfoot';
+    var date=document.createElement('span');date.className='pndate';date.id='npd'+i;
+    date.textContent=npFmt(n.updatedAt||n.createdAt);
+    foot.appendChild(date);
+    if(npEdit){
+      var sbtn=document.createElement('button');sbtn.className='pnsave';sbtn.id='nps'+i;sbtn.textContent='💾';
+      (function(idx){sbtn.addEventListener('click',function(){npSaveNote(idx);});})(i);
+      foot.appendChild(sbtn);
+    }
+    wrap.appendChild(foot);bd.appendChild(wrap);
+  });
+}
+
+// Init catatan popup
+npLoad();
+if(npNotes.length>0) setTimeout(npRenderMini,500);
 
 // ===================== TEMA & TAMPILAN =====================
 const TEMA_DEFAULT = {
@@ -8008,6 +8280,51 @@ function resetDariPreview(){
     </div>
   </div>
 </div>
+
+<!-- ===== CATATAN POPUP ===== -->
+<button id="note-fab" onclick="toggleNotePopup()" title="Catatan Cepat">📝</button>
+
+<div id="note-popup">
+  <div class="np-header">
+    <span>📝 Catatan</span>
+    <button onclick="npToggleLock()" id="np-lock-btn">🔒 Terkunci</button>
+    <button onclick="npAddNote()" id="np-add-btn" style="display:none">+ Baru</button>
+    <button onclick="toggleNotePopup()">✕</button>
+  </div>
+  <div class="np-body" id="np-body"></div>
+  <div class="np-toolbar">
+    <button class="np-tb-btn" onclick="npToggleLock()" id="np-lock-tb">🔓 Buka Edit</button>
+    <button class="np-tb-btn" onclick="npShowPinModal()" style="color:#6b7280">🔑 PIN</button>
+  </div>
+  <!-- Modal PIN -->
+  <div class="np-modal-bg" id="np-pin-modal" style="display:none">
+    <div class="np-modal">
+      <h3 id="np-modal-title">🔓 Masukkan PIN</h3>
+      <input type="password" id="np-pin-input" maxlength="8" placeholder="PIN...">
+      <div class="np-modal-err" id="np-pin-err"></div>
+      <div class="np-modal-btns">
+        <button class="npmbtn-cancel" onclick="npHideModal()">Batal</button>
+        <button class="npmbtn-ok" id="np-modal-ok" onclick="npModalOk()">OK</button>
+      </div>
+    </div>
+  </div>
+  <!-- Modal PIN baru (ganti) -->
+  <div class="np-modal-bg" id="np-chpin-modal" style="display:none">
+    <div class="np-modal">
+      <h3>🔑 Ganti PIN</h3>
+      <input type="password" id="np-old-pin" maxlength="8" placeholder="PIN lama...">
+      <input type="password" id="np-new-pin" maxlength="8" placeholder="PIN baru (4-8 angka)..." style="margin-top:6px">
+      <div class="np-modal-err" id="np-chpin-err"></div>
+      <div class="np-modal-btns">
+        <button class="npmbtn-cancel" onclick="document.getElementById('np-chpin-modal').style.display='none'">Batal</button>
+        <button class="npmbtn-ok" onclick="npSavePin()">Simpan</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Mini notes (saat popup tertutup) -->
+<div id="note-mini" style="position:fixed;bottom:72px;right:20px;z-index:997;width:200px;display:none;flex-direction:column;gap:5px"></div>
 
 </body>
 </html>
