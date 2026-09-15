@@ -6203,9 +6203,12 @@ function buildRekordCache(){
         });
       }
     });
+    // totBayar: hitung hanya record yang kelasnya cocok (kalau ada kelas)
+    const s_kelas = (getSiswa().find(s=>s.nama.toLowerCase()===namaLower)||{}).kelas;
+    const matchedRecs = s_kelas ? records.filter(r=>!r.kelas||r.kelas===s_kelas) : records;
     cache[namaLower] = {
       daftarSisa: found ? Math.max(0, totalTagihan-totalDibayar) : 0,
-      totBayar: records.reduce((a,r)=>a+(r.nominalBayar||0),0),
+      totBayar: matchedRecs.reduce((a,r)=>a+(r.nominalBayar||0),0),
       records
     };
     // SPP sisa (simplified: sum r.sisa for SPP records)
@@ -6227,9 +6230,17 @@ function renderRekordSiswa(){
   const rw=getRiwayat();
   const rwByNama={};
   rw.forEach(r=>{
+    // Key: nama saja (untuk backward compat), tapi juga simpan by nama+kelas
     const key=r.nama.toLowerCase();
     if(!rwByNama[key]) rwByNama[key]=[];
     rwByNama[key].push(r);
+  });
+  // Juga buat index by nama+kelas untuk siswa duplikat nama
+  const rwByNamaKelas={};
+  rw.forEach(r=>{
+    const key=(r.nama+'|'+(r.kelas||'')).toLowerCase();
+    if(!rwByNamaKelas[key]) rwByNamaKelas[key]=[];
+    rwByNamaKelas[key].push(r);
   });
   let siswa=[...getSiswa()];
   const hasFilter=q||filterKelas||sortMode==='tunggakan';
@@ -6279,7 +6290,7 @@ function renderRekordSiswa(){
         <td><span class="badge ${s.kelas.includes('Plus')?'badge-orange':'badge-blue'}">${s.kelas}</span></td>
         <td style="color:var(--green);font-weight:500">${sr.length?fmt(totBayar):'—'}</td>
         <td>${hasTung?`<span style="color:var(--danger);font-weight:600">${fmt(totSisa)}</span>`:'<span style="color:var(--green)">Lunas</span>'}</td>
-        <td>${(()=>{const sr2=(rwByNama[s.nama.toLowerCase()]||[]).sort((a,b)=>(b.tanggal||'').localeCompare(a.tanggal||''));const lt=sr2[0];return lt?`<div style="font-size:11px;font-weight:600">${lt.tanggal?new Date(lt.tanggal).toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'2-digit'}):'—'}</div><div style="font-size:10px;color:var(--text2)">${lt.tipe||''}</div>`:'<span style="color:var(--text2);font-size:11px">—</span>';})()} </td>
+        <td>${(()=>{const sr2=((rwByNamaKelas[(s.nama+'|'+(s.kelas||'')).toLowerCase()]||rwByNama[s.nama.toLowerCase()])||[]).sort((a,b)=>(b.tanggal||'').localeCompare(a.tanggal||''));const lt=sr2[0];return lt?`<div style="font-size:11px;font-weight:600">${lt.tanggal?new Date(lt.tanggal).toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'2-digit'}):'—'}</div><div style="font-size:10px;color:var(--text2)">${lt.tipe||''}</div>`:'<span style="color:var(--text2);font-size:11px">—</span>';})()} </td>
         <td><button class="btn" style="font-size:11px;padding:3px 10px" onclick="bukaRekordModal('${encodeURIComponent(s.nama)}','${encodeURIComponent(s.kelas)}')">&#128203; Lihat</button></td>
       </tr>`;
     }).join('')+`</tbody></table>
@@ -7751,7 +7762,8 @@ function renderTunggakan(){
   const items=[];
   siswa.forEach(s=>{
     if(q&&!s.nama.toLowerCase().includes(q))return;
-    const srAll=rw.filter(r=>r.nama.toLowerCase()===s.nama.toLowerCase());
+    // Cocokkan nama dan kelas untuk menghindari tercampur dengan siswa lain yang namanya sama
+    const srAll=rw.filter(r=>r.nama.toLowerCase()===s.nama.toLowerCase()&&(!r.kelas||!s.kelas||r.kelas===s.kelas));
     let total=0;
     const detailParts=[];
     // Pendaftaran: gunakan sisa akumulasi
