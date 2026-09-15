@@ -6203,12 +6203,9 @@ function buildRekordCache(){
         });
       }
     });
-    // totBayar: hitung hanya record yang kelasnya cocok (kalau ada kelas)
-    const s_kelas = (getSiswa().find(s=>s.nama.toLowerCase()===namaLower)||{}).kelas;
-    const matchedRecs = s_kelas ? records.filter(r=>!r.kelas||r.kelas===s_kelas) : records;
     cache[namaLower] = {
       daftarSisa: found ? Math.max(0, totalTagihan-totalDibayar) : 0,
-      totBayar: matchedRecs.reduce((a,r)=>a+(r.nominalBayar||0),0),
+      totBayar: records.reduce((a,r)=>a+(r.nominalBayar||0),0),
       records
     };
     // SPP sisa (simplified: sum r.sisa for SPP records)
@@ -7762,8 +7759,7 @@ function renderTunggakan(){
   const items=[];
   siswa.forEach(s=>{
     if(q&&!s.nama.toLowerCase().includes(q))return;
-    // Cocokkan nama dan kelas untuk menghindari tercampur dengan siswa lain yang namanya sama
-    const srAll=rw.filter(r=>r.nama.toLowerCase()===s.nama.toLowerCase()&&(!r.kelas||!s.kelas||r.kelas===s.kelas));
+    const srAll=rw.filter(r=>r.nama.toLowerCase()===s.nama.toLowerCase());
     let total=0;
     const detailParts=[];
     // Pendaftaran: gunakan sisa akumulasi
