@@ -889,9 +889,13 @@ function renderRecentEntryBar(){
     bar.innerHTML='<span style="font-size:12px;color:var(--text2)">Belum ada transaksi</span>';
     return;
   }
-  // Ambil metode pembayaran terakhir per siswa dari riwayat
+  // Ambil metode pembayaran dari transaksi TERBARU per siswa (sort by no desc)
   const rwMetode = {};
-  rw.forEach(r=>{ if(r.nama&&r.metode) rwMetode[r.nama.toLowerCase()]=r.metode; });
+  const rwSortedMetode = [...rw].sort((a,b)=>(b.no||'').localeCompare(a.no||''));
+  rwSortedMetode.forEach(r=>{
+    const key = r.nama?.toLowerCase();
+    if(key && r.metode && !rwMetode[key]) rwMetode[key] = r.metode;
+  });
 
   bar.innerHTML = recent.map(r=>{
     const tgl = r.tanggal ? new Date(r.tanggal).toLocaleDateString('id-ID',{day:'numeric',month:'short'}) : '';
@@ -939,7 +943,7 @@ function renderSidebarSiswa(){
   if(!kelas&&!q){ wrap.innerHTML='<div style="color:var(--text2);font-size:12px;text-align:center;padding:16px 0">Pilih kelas atau cari nama</div>'; return; }
   if(!siswa.length){ wrap.innerHTML='<div style="color:var(--text2);font-size:12px;text-align:center;padding:16px 0">Tidak ada siswa</div>'; return; }
   
-  wrap.innerHTML = siswa.map(s=>`<div class="siswa-quick-item" onclick="quickSelectSiswa('${s.nama.replace(/'/g,"\'")}','${s.kelas}')"><span style="display:flex;align-items:center;gap:4px;overflow:hidden"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${s.nama}</span>${s.kelas.includes('Plus')?'<span style="flex-shrink:0;font-size:9px;color:#92400e;background:#fef3c7;padding:1px 4px;border-radius:3px;white-space:nowrap">Plus</span>':''}</span></div>`).join('');
+  wrap.innerHTML = siswa.map(s=>`<div class="siswa-quick-item" onclick="quickSelectSiswa('${s.nama.replace(/'/g,"\'")}','${s.kelas}')"><span style="display:flex;align-items:center;gap:4px;overflow:hidden;justify-content:space-between;width:100%"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${s.nama}${s.kelas.includes('Plus')?'<span style="flex-shrink:0;font-size:9px;color:#92400e;background:#fef3c7;padding:1px 4px;border-radius:3px;white-space:nowrap;margin-left:3px">Plus</span>':''}</span><span style="flex-shrink:0;font-size:10px;color:var(--text2);white-space:nowrap;margin-left:4px">${s.kelas.replace(' Plus','')}</span></span></div>`).join('');
 }
 
 function quickSelectSiswa(nama, kelas){
