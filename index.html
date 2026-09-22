@@ -7,7 +7,7 @@
 <style>
 *{box-sizing:border-box;margin:0;padding:0;font-family:'Segoe UI',Arial,sans-serif}
 :root{--blue:#1a56a0;--blue-light:#e8f0fb;--green:#15803d;--green-light:#dcfce7;--orange:#c2410c;--orange-light:#fff7ed;--gray:#6b7280;--gray-light:#f3f4f6;--border:#d1d5db;--white:#fff;--text:#111827;--text2:#6b7280;--danger:#dc2626;--danger-light:#fee2e2}
-body{background:#f1f5f9;min-height:100vh;cursor:default}
+body{background:#f1f5f9;min-height:100vh;cursor:default;padding-top:57px}
 *:not(input):not(textarea):not(select):not(a):not(button){cursor:default;user-select:none;-webkit-user-select:none}
 input,textarea,select{cursor:auto}
 button,[onclick],label{cursor:pointer!important}
@@ -58,8 +58,8 @@ button,[onclick],label{cursor:pointer!important}
 .np-modal-btns{display:flex;gap:6px}
 .np-modal-btns button{flex:1;padding:6px;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-weight:600}
 .npmbtn-ok{background:#1a56a0;color:#fff}.npmbtn-cancel{background:#f1f5f9;color:#374151}
-.page-tabs{background:#fff;border-bottom:1px solid var(--border);padding:0 20px;position:sticky;top:57px;z-index:99;box-shadow:0 1px 4px rgba(0,0,0,.06)}
-.navbar{background:var(--blue);color:#fff;padding:12px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.2)}
+.page-tabs{background:#fff;border-bottom:1px solid var(--border);padding:0 20px;position:fixed;top:57px;left:0;right:0;z-index:99;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.navbar{background:var(--blue);color:#fff;padding:12px 24px;display:flex;align-items:center;justify-content:space-between;position:fixed;top:0;left:0;right:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.2)}
 .navbar-top{display:flex;align-items:center;justify-content:space-between;width:100%}
 .navbar h1{font-size:16px;font-weight:600;letter-spacing:.3px}
 .navbar p{font-size:11px;opacity:.8;margin-top:1px}
@@ -67,7 +67,7 @@ button,[onclick],label{cursor:pointer!important}
 .nav-btn{padding:7px 16px;border:none;border-radius:7px;background:rgba(0,0,0,.3);color:#fff;font-size:12px;font-weight:700;cursor:pointer;transition:.15s}
 .nav-btn:hover{background:rgba(0,0,0,.5);color:#fff}
 .nav-btn.active{background:#fff;color:#1a56a0;font-weight:700;box-shadow:0 1px 4px rgba(0,0,0,.2)}
-.page{display:none;padding:28px 20px;max-width:900px;margin:0 auto}
+.page{display:none;padding:28px 20px;max-width:900px;margin:0 auto;margin-top:44px}
 #page-kwitansi{max-width:calc(100% - 216px)!important}
 .kw-main{padding-right:216px;max-width:calc(100% - 0px)}
 .kw-sidebar{position:fixed;right:8px;top:110px;width:220px;z-index:50;padding:0}
@@ -262,6 +262,10 @@ function npRenderMini(){
     mini.appendChild(el);
   });
   mini.style.display='flex';
+  mini.style.opacity='1';
+  // Fade out setelah 5 detik
+  clearTimeout(mini._fadeT);
+  mini._fadeT=setTimeout(function(){mini.style.opacity='0.15';},5000);
 }
 
 function npSetMode(edit){
@@ -850,6 +854,9 @@ function renderRecentEntryBar(){
   rw.forEach(r=>{ if(r.no) rwByNo[r.no]=r; });
   // Pakai ya_log sebagai sumber agar konsisten dengan Log Aktivitas
   const logs = JSON.parse(localStorage.getItem('ya_log')||'[]');
+  // Buat set nama yang masih punya riwayat (belum dihapus)
+  const validNama = new Set(rw.map(r=>r.nama?.toLowerCase()).filter(Boolean));
+
   const sorted = [...logs].sort((a,b)=>{
     const ta=a.entryTime||'', tb=b.entryTime||'';
     if(ta&&tb) return tb.localeCompare(ta);
@@ -861,6 +868,8 @@ function renderRecentEntryBar(){
   const recent = [];
   for(const l of sorted){
     if(!l.nama) continue;
+    // Skip kalau riwayat sudah dihapus
+    if(!validNama.has(l.nama.toLowerCase())) continue;
     const key = l.nama.toLowerCase();
     if(seen.has(key)) continue;
     seen.add(key);
@@ -8336,7 +8345,7 @@ function resetDariPreview(){
 </div>
 
 <!-- Mini notes (saat popup tertutup) -->
-<div id="note-mini" style="position:fixed;bottom:72px;right:20px;z-index:997;width:200px;display:none;flex-direction:column;gap:5px"></div>
+<div id="note-mini" style="position:fixed;bottom:72px;right:20px;z-index:997;width:200px;display:none;flex-direction:column;gap:5px;transition:opacity 0.5s" onmouseenter="this.style.opacity='1'" onmouseleave="this.style.opacity='0.15'"></div>
 
 </body>
 </html>
