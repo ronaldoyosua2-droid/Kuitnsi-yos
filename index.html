@@ -2913,8 +2913,22 @@ const NAIK_MAP = {
 
 const BULAN = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
 
-function lsGet(k){try{return JSON.parse(localStorage.getItem(k))}catch{return null}}
-function lsSet(k,v){localStorage.setItem(k,JSON.stringify(v))}
+// Cache baca sementara: selama 1 proses render berat, data yang sama cukup di-parse 1x.
+// Cache otomatis dibuang setelah render selesai & setiap kali ada lsSet.
+let _readCache=null;
+function _lsParse(k){try{return JSON.parse(localStorage.getItem(k))}catch{return null}}
+function lsGet(k){
+  if(_readCache){ if(!(k in _readCache)) _readCache[k]=_lsParse(k); return _readCache[k]; }
+  return _lsParse(k);
+}
+function lsSet(k,v){ if(_readCache) delete _readCache[k]; localStorage.setItem(k,JSON.stringify(v)); }
+function withReadCache(fn){
+  return function(){
+    if(_readCache) return fn.apply(this,arguments);   // sudah di dalam cache (nested)
+    _readCache={};
+    try{ return fn.apply(this,arguments); } finally{ _readCache=null; }
+  };
+}
 
 function getSiswa(){return lsGet('ya_siswa')||DATA_SISWA_AWAL}
 function setSiswa(v){lsSet('ya_siswa',v)}
@@ -8866,5 +8880,11 @@ function resetDariPreview(){
 <!-- Mini notes (saat popup tertutup) -->
 <div id="note-mini" style="position:fixed;bottom:72px;right:20px;z-index:997;width:200px;display:none;flex-direction:column;gap:5px;transition:opacity 0.5s" onmouseenter="this.style.opacity='1'" onmouseleave="this.style.opacity='0.15'"></div>
 
+<script>
+// Percepat render berat (hanya-baca) di Admin & Tagihan dengan cache baca sementara
+['renderTunggakan','renderRekordSiswa','buildRekordCache','generateTagihan'].forEach(function(n){
+  if(typeof window[n]==='function' && typeof withReadCache==='function') window[n]=withReadCache(window[n]);
+});
+</script>
 </body>
 </html>
