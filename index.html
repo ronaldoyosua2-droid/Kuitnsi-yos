@@ -68,7 +68,7 @@ button,[onclick],label{cursor:pointer!important}
 .nav-btn{padding:7px 16px;border:none;border-radius:7px;background:rgba(0,0,0,.3);color:#fff;font-size:12px;font-weight:700;cursor:pointer;transition:.15s}
 .nav-btn:hover{background:rgba(0,0,0,.5);color:#fff}
 .nav-btn.active{background:#fff;color:#1a56a0;font-weight:700;box-shadow:0 1px 4px rgba(0,0,0,.2)}
-.page{display:none;padding:28px 20px;max-width:900px;margin:0 auto;margin-top:44px}
+.page{display:none;padding:16px 20px;max-width:900px;margin:0 auto;margin-top:8px}
 #page-kwitansi{max-width:calc(100% - 216px)!important}
 .kw-main{padding-right:216px;max-width:calc(100% - 0px)}
 .kw-sidebar{position:fixed;right:8px;top:110px;width:220px;z-index:50;padding:0}
@@ -326,7 +326,12 @@ function generateTagihan(){
     renderTagihanPreview([{siswa:tgSelectedSiswa, items}]);
   } else {
     // Semua siswa yang punya tunggakan
-    const semua = getSiswa();
+    const filterKelas = document.getElementById('tg-kelas')?.value||'';
+    let semua = getSiswa();
+    if(filterKelas){
+      // Filter reguler + plus untuk kelas yang dipilih
+      semua = semua.filter(s=>s.kelas===filterKelas||s.kelas===filterKelas+' Plus');
+    }
     const hasil = [];
     semua.forEach(s=>{
       const items = getTunggakanSiswa(s.nama, s.kelas);
@@ -1190,7 +1195,7 @@ function renderSidebarSiswa(){
   if(!kelas&&!q){ wrap.innerHTML='<div style="color:var(--text2);font-size:12px;text-align:center;padding:16px 0">Pilih kelas atau cari nama</div>'; return; }
   if(!siswa.length){ wrap.innerHTML='<div style="color:var(--text2);font-size:12px;text-align:center;padding:16px 0">Tidak ada siswa</div>'; return; }
   
-  wrap.innerHTML = siswa.map(s=>`<div class="siswa-quick-item" onclick="quickSelectSiswa('${s.nama.replace(/'/g,"\'")}','${s.kelas}')"><span style="display:flex;align-items:center;gap:4px;overflow:hidden;justify-content:space-between;width:100%"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${s.nama}${s.kelas.includes('Plus')?'<span style="flex-shrink:0;font-size:9px;color:#92400e;background:#fef3c7;padding:1px 4px;border-radius:3px;white-space:nowrap;margin-left:3px">Plus</span>':''}</span><span style="flex-shrink:0;font-size:10px;color:var(--text2);white-space:nowrap;margin-left:4px">${s.kelas.replace(' Plus','')}</span></span></div>`).join('');
+  wrap.innerHTML = siswa.map(s=>`<div class="siswa-quick-item" onclick="quickSelectSiswa('${s.nama.replace(/'/g,"\'")}','${s.kelas}')" style="${s.kelas.includes('Plus')?'background:#fffbeb;':''}"><span style="display:flex;align-items:center;gap:4px;overflow:hidden;justify-content:space-between;width:100%"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:${s.kelas.includes('Plus')?'#92400e':'inherit'};font-weight:${s.kelas.includes('Plus')?'600':'400'}">${s.nama}</span><span style="flex-shrink:0;font-size:10px;white-space:nowrap;margin-left:4px;color:${s.kelas.includes('Plus')?'#b45309':'var(--text2)'}">${s.kelas.replace(' Plus','')}${s.kelas.includes('Plus')?'★':''}</span></span></div>`).join('');
 }
 
 function quickSelectSiswa(nama, kelas){
@@ -1611,6 +1616,26 @@ function doConfirmLoadCloud(){ if(typeof confirmLoadCloud==='function') confirmL
         <select id="tg-mode" onchange="renderTagihanForm()" style="padding:8px 12px;font-size:13px;border:1px solid var(--border);border-radius:8px;outline:none">
           <option value="satu">1 Siswa Spesifik</option>
           <option value="semua">Semua Siswa Tunggakan</option>
+        </select>
+      </div>
+      <!-- Filter kelas (semua mode) -->
+      <div id="tg-kelas-wrap">
+        <label style="font-size:12px;color:var(--text2);display:block;margin-bottom:4px">Filter Kelas</label>
+        <select id="tg-kelas" style="padding:8px 12px;font-size:13px;border:1px solid var(--border);border-radius:8px;outline:none">
+          <option value="">Semua Kelas</option>
+          <option value="TK">TK</option>
+          <option value="1 SD">1 SD (Reguler + Plus)</option>
+          <option value="2 SD">2 SD (Reguler + Plus)</option>
+          <option value="3 SD">3 SD (Reguler + Plus)</option>
+          <option value="4 SD">4 SD (Reguler + Plus)</option>
+          <option value="5 SD">5 SD (Reguler + Plus)</option>
+          <option value="6 SD">6 SD (Reguler + Plus)</option>
+          <option value="7 SMP">7 SMP (Reguler + Plus)</option>
+          <option value="8 SMP">8 SMP (Reguler + Plus)</option>
+          <option value="9 SMP">9 SMP (Reguler + Plus)</option>
+          <option value="10 SMK">10 SMK</option>
+          <option value="11 SMK">11 SMK</option>
+          <option value="12 SMK">12 SMK</option>
         </select>
       </div>
       <!-- Pilih siswa (hanya saat mode satu) -->
