@@ -384,12 +384,12 @@ function renderTagihanPreview(data){
 
   preview.innerHTML = html2;
   // Simpan data untuk download
-  window._tagihanData = {data, today};
+  window._tagihanData = {data, today, filterKelas:(document.getElementById('tg-kelas')||{}).value||''};
 }
 
 function downloadTagihanExcel(){
   if(!window._tagihanData){ alert('Generate tagihan dulu!'); return; }
-  const {data, today} = window._tagihanData;
+  const {data, today, filterKelas} = window._tagihanData;
   if(typeof XLSX === 'undefined'){ alert('Library Excel belum loaded, coba refresh.'); return; }
 
   const wb = XLSX.utils.book_new();
@@ -438,8 +438,16 @@ function downloadTagihanExcel(){
   });
 
   // Download
-  const tgl = new Date().toLocaleDateString('id-ID').replace(/\//g,'-');
-  XLSX.writeFile(wb, 'Tagihan_'+tgl+'.xlsx');
+  // Nama file: "Tagihan <kelas>_<dd-mm-yyyy>.xlsx"
+  const d = new Date();
+  const tgl = String(d.getDate()).padStart(2,'0')+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+d.getFullYear();
+  const kelasUnik = [...new Set(data.map(x=>(x.siswa.kelas||'').trim()).filter(Boolean))];
+  let labelKelas;
+  if(kelasUnik.length===1) labelKelas = kelasUnik[0];          // mis. "3 SD Plus"
+  else if(filterKelas) labelKelas = filterKelas;                 // mis. "3 SD" (Reguler + Plus)
+  else labelKelas = 'Semua Kelas';
+  labelKelas = labelKelas.replace(/[\\/:*?"<>|]/g,'-');        // buang karakter terlarang di nama file
+  XLSX.writeFile(wb, 'Tagihan '+labelKelas+'_'+tgl+'.xlsx');
 }
 
 // Tutup dropdown saat klik luar
