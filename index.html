@@ -5031,6 +5031,8 @@ function setSyncStatus(status){
     pending:  {color:'#fb923c', text:'Pending '+(_pendingCount||0)},
     offline:  {color:'#9ca3af', text:'Offline'},
     error:    {color:'#f87171', text:'Error sync'},
+    mismatch: {color:'#f87171', text:'⚠ Cloud tidak cocok'},
+    unverified:{color:'#fbbf24', text:'Terkirim (belum dicek)'},
   };
   const s = map[status]||map.offline;
   dot.style.background = s.color;
@@ -5082,45 +5084,78 @@ function jsonpFetch(url, timeout=10000){
   });
 }
 
+// Hitung isi data (riwayat/siswa bisa berupa array atau string JSON)
+function _cntArr(x){
+  if(Array.isArray(x)) return x.length;
+  if(typeof x==='string'){ try{ const a=JSON.parse(x); return Array.isArray(a)?a.length:0; }catch(e){ return -1; } }
+  return 0;
+}
+
+// Baca balik data cloud (read-only, TIDAK menulis ke localStorage)
+async function fetchCloudCounts(){
+  let json=null;
+  try{
+    const resp=await Promise.race([
+      fetch(SCRIPT_URL+'?action=load_all&_t='+Date.now()),
+      new Promise((_,r)=>setTimeout(()=>r(new Error('timeout')),20000))
+    ]);
+    if(!resp.ok) throw new Error('HTTP '+resp.status);
+    json=await resp.json();
+  }catch(e){
+    json=await jsonpFetch(SCRIPT_URL+'?action=load_all&_t='+Date.now(),20000);
+  }
+  if(!json||!json.ok||!json.data) throw new Error('Respon cloud kosong');
+  return { riwayat:_cntArr(json.data.riwayat), siswa:_cntArr(json.data.siswa) };
+}
+
+let _syncBusy=false, _syncAgain=false;
+// Kembalikan: 'verified' | 'mismatch' | 'unverified' | 'error'
 async function syncToCloud(showStatus=true){
-  if(!SCRIPT_URL) return false;
+  if(!SCRIPT_URL) return 'error';
+  if(_syncBusy){ _syncAgain=true; return 'busy'; }
+  _syncBusy=true;
   if(showStatus) setSyncStatus('syncing');
-  try {
-    // Use JSONP for sync too — send data via GET with encoded payload
-    // Split into chunks if needed, use ping to verify connection first
-    const payload = buildSyncPayload();
-    const result = await jsonpFetch(
-      SCRIPT_URL+'?action=sync_all&data='+encodeURIComponent(JSON.stringify(payload)),
-      15000
-    );
-    if(!result||!result.ok) throw new Error('Sync failed');
+  const payload=buildSyncPayload();
+  const lokal={ riwayat:payload.data.riwayat.length, siswa:payload.data.siswa.length };
+  let result='error';
+  try{
+    let terkirim=false;
+    // 1) JSONP (hanya bila data kecil — URL Google dibatasi panjangnya)
+    const url=SCRIPT_URL+'?action=sync_all&data='+encodeURIComponent(JSON.stringify(payload));
+    if(url.length<7000){
+      try{ const r=await jsonpFetch(url,15000); terkirim=!!(r&&r.ok); }catch(e){}
+    }
+    // 2) POST no-cors (tidak bisa baca jawaban, jadi diverifikasi di langkah 3)
+    if(!terkirim){
+      await fetch(SCRIPT_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+      await new Promise(r=>setTimeout(r,2500)); // beri waktu Apps Script menulis ke Sheets
+    }
+    // 3) Verifikasi: baca balik & bandingkan jumlah
+    try{
+      const cloud=await fetchCloudCounts();
+      window._lastVerify={lokal,cloud,waktu:new Date().toISOString()};
+      result=(cloud.riwayat===lokal.riwayat&&cloud.siswa===lokal.siswa)?'verified':'mismatch';
+    }catch(e){
+      console.warn('Verifikasi cloud gagal:',e.message);
+      window._lastVerify={lokal,cloud:null,waktu:new Date().toISOString()};
+      result='unverified';
+    }
     _isOnline=true;
+  }catch(err){
+    console.error('Sync gagal:',err.message);
+    _isOnline=false; result='error';
+  }
+  if(result==='verified'){
     _pendingCount=0;
     const now=new Date().toISOString();
     lsSet('ya_last_sync',now);
     const lsEl=document.getElementById('last-sync-label');
-    if(lsEl) lsEl.textContent='Terakhir sync: '+new Date(now).toLocaleString('id-ID');
-    setSyncStatus('online');
-    return true;
-  } catch(err){
-    // Fallback: no-cors POST (fire and forget)
-    try {
-      fetch(SCRIPT_URL,{
-        method:'POST',mode:'no-cors',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify(buildSyncPayload())
-      });
-      _isOnline=true;_pendingCount=0;
-      const now=new Date().toISOString();
-      lsSet('ya_last_sync',now);
-      setSyncStatus('online');
-      return true;
-    } catch(e2){
-      _isOnline=false;
-      setSyncStatus('error');
-      return false;
-    }
+    if(lsEl) lsEl.textContent='Terakhir sync: '+new Date(now).toLocaleString('id-ID')+' ✓ '+lokal.riwayat+' transaksi';
   }
+  setSyncStatus(result==='verified'?'online':result);
+  _syncBusy=false;
+  if(_syncAgain){ _syncAgain=false; setTimeout(()=>syncToCloud(true),1000); }
+  return result;
 }
 
 async function loadFromCloud(){
@@ -5209,8 +5244,12 @@ function manualSync(){
   const lastSync = lsGet('ya_last_sync');
   const lastStr = lastSync ? '\nTerakhir sync: '+new Date(lastSync).toLocaleString('id-ID') : '';
   if(confirm('Sinkronisasi data ke Google Sheets sekarang?'+lastStr)){
-    syncToCloud(true).then(ok=>{
-      if(ok) alert('✅ Data berhasil disimpan ke cloud!');
+    syncToCloud(true).then(res=>{
+      const v=window._lastVerify||{};
+      if(res==='verified') alert('✅ Tersimpan & terverifikasi di cloud!\n'+v.cloud.riwayat+' transaksi, '+v.cloud.siswa+' siswa (sama dengan data di aplikasi).');
+      else if(res==='mismatch') alert('⚠️ Data terkirim, tapi isi cloud TIDAK sama:\nCloud: '+v.cloud.riwayat+' transaksi, '+v.cloud.siswa+' siswa\nAplikasi: '+v.lokal.riwayat+' transaksi, '+v.lokal.siswa+' siswa\n\nCoba sync ulang beberapa saat lagi.');
+      else if(res==='unverified') alert('⚠️ Data sudah dikirim, tapi cloud belum bisa dicek (koneksi lambat).\nCoba sync ulang untuk memastikan.');
+      else if(res==='busy') alert('⏳ Sync sedang berjalan, akan diulang otomatis setelah selesai.');
       else alert('❌ Gagal sync. Pastikan terhubung internet.');
     });
   }
@@ -7336,11 +7375,10 @@ function setModalAwal(v){
   const all=lsGet('ya_kas_awal_harian')||{};
   all[tgl]=v;
   lsSet('ya_kas_awal_harian',all);
+  if(typeof triggerAutoSync==='function') triggerAutoSync();
 }
 function getPengeluaran(){ return lsGet('ya_pengeluaran')||[]; }
-function setPengeluaran(v){ lsSet('ya_pengeluaran',v); }
 function getPinjaman(){ return lsGet('ya_pinjaman')||[]; }
-function setPinjaman(v){ lsSet('ya_pinjaman',v); }
 
 function initModalAwal(){
   document.getElementById('modal-awal-tanggal').value=today();
