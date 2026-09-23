@@ -408,13 +408,13 @@ function tgLoadExcelJS(){
 }
 
 var TG_XL={
-  cols:[5,13,31,14,16,15],            // lebar A-F (muat A4 portrait tanpa diperkecil)
+  cols:[5,15,40,17,17],            // lebar A-E (muat A4 portrait tanpa diperkecil)
   pageCap:770,                        // tinggi area cetak A4 (pt) dengan margin 0.3"
   rp:'"Rp "#,##0',
   blue:'FF1E3A8A', light:'FFEFF6FF', grey:'FF6B7280', red:'FFB91C1C'
 };
 // Tinggi 1 blok tagihan (pt) — harus sama dengan tinggi baris di tgXlBlock
-function tgXlBlockHeight(nItems, withCut){ return 18+12+16+15+16+nItems*15+16+14*6+(withCut?14:0); }
+function tgXlBlockHeight(nItems, withCut){ return 18+16+15+16+nItems*15+16+14*5+(withCut?14:0); }
 
 // Tulis 1 blok tagihan mulai baris r, kembalikan baris berikutnya yang kosong
 function tgXlBlock(ws, r, siswa, items, today, withCut){
@@ -425,10 +425,9 @@ function tgXlBlock(ws, r, siswa, items, today, withCut){
   function h(row,pt){ ws.getRow(row).height=pt; }
 
   // Kop
-  m(r,1,6); put(r,1,'SEKOLAH SWASTA YOS ANUGERAH',{font:{bold:true,size:13,color:{argb:TG_XL.blue}},alignment:{horizontal:'center',vertical:'middle'}}); h(r,18); r++;
-  m(r,1,6); put(r,1,'Kmp. Durian Blok B No.36, Kel. Sadai, Kec. Bengkong, Batam • Telp. 81372928540',{font:{size:8,color:{argb:TG_XL.grey}},alignment:{horizontal:'center',vertical:'middle'}}); h(r,12); r++;
-  m(r,1,6); put(r,1,'TAGIHAN PEMBAYARAN',{font:{bold:true,size:11},alignment:{horizontal:'center',vertical:'middle'},border:{bottom:{style:'double',color:{argb:TG_XL.blue}}}});
-  for(var c=2;c<=6;c++) ws.getCell(r,c).border={bottom:{style:'double',color:{argb:TG_XL.blue}}};
+  m(r,1,5); put(r,1,'SEKOLAH SWASTA YOS ANUGERAH',{font:{bold:true,size:13,color:{argb:TG_XL.blue}},alignment:{horizontal:'center',vertical:'middle'}}); h(r,18); r++;
+  m(r,1,5); put(r,1,'TAGIHAN PEMBAYARAN',{font:{bold:true,size:11},alignment:{horizontal:'center',vertical:'middle'},border:{bottom:{style:'double',color:{argb:TG_XL.blue}}}});
+  for(var c=2;c<=5;c++) ws.getCell(r,c).border={bottom:{style:'double',color:{argb:TG_XL.blue}}};
   h(r,16); r++;
 
   // Identitas
@@ -436,10 +435,10 @@ function tgXlBlock(ws, r, siswa, items, today, withCut){
   var val={font:{size:10,bold:true},alignment:{vertical:'middle'}};
   m(r,1,2); put(r,1,'Nama Siswa',lbl); put(r,3,': '+siswa.nama,val);
   put(r,4,'Kelas',Object.assign({},lbl,{alignment:{horizontal:'right',vertical:'middle'}}));
-  m(r,5,6); put(r,5,': '+siswa.kelas,val); h(r,15); r++;
+  put(r,5,': '+siswa.kelas,val); h(r,15); r++;
 
   // Header tabel
-  ['No','Jenis Tagihan','Keterangan','Biaya','Waktu','Jumlah'].forEach(function(t,i){
+  ['No','Jenis Tagihan','Keterangan','Biaya','Jumlah'].forEach(function(t,i){
     put(r,i+1,t,{font:{bold:true,size:10,color:{argb:'FFFFFFFF'}},fill:{type:'pattern',pattern:'solid',fgColor:{argb:TG_XL.blue}},alignment:{horizontal:'center',vertical:'middle'},border:box});
   }); h(r,16); r++;
 
@@ -452,34 +451,32 @@ function tgXlBlock(ws, r, siswa, items, today, withCut){
     put(r,2,it.jenis||'',cell);
     put(r,3,it.keterangan||'',cell);
     put(r,4,Number(it.biaya)||0,num);
-    put(r,5,it.waktu||'',Object.assign({},cell,{alignment:{horizontal:'center',vertical:'middle',shrinkToFit:true}}));
-    put(r,6,Number(it.jumlah)||0,num);
+    put(r,5,Number(it.jumlah)||0,num);
     total+=Number(it.jumlah)||0;
     h(r,15); r++;
   });
 
   // Total
-  m(r,1,5); put(r,1,'TOTAL TAGIHAN',{font:{bold:true,size:10},fill:{type:'pattern',pattern:'solid',fgColor:{argb:TG_XL.light}},alignment:{horizontal:'right',vertical:'middle'},border:box});
-  for(var c2=2;c2<=5;c2++) ws.getCell(r,c2).border=box;
-  put(r,6,total,{font:{bold:true,size:10,color:{argb:TG_XL.red}},fill:{type:'pattern',pattern:'solid',fgColor:{argb:TG_XL.light}},numFmt:TG_XL.rp,alignment:{horizontal:'right',vertical:'middle'},border:box});
+  m(r,1,4); put(r,1,'TOTAL TAGIHAN',{font:{bold:true,size:10},fill:{type:'pattern',pattern:'solid',fgColor:{argb:TG_XL.light}},alignment:{horizontal:'right',vertical:'middle'},border:box});
+  for(var c2=2;c2<=4;c2++) ws.getCell(r,c2).border=box;
+  put(r,5,total,{font:{bold:true,size:10,color:{argb:TG_XL.red}},fill:{type:'pattern',pattern:'solid',fgColor:{argb:TG_XL.light}},numFmt:TG_XL.rp,alignment:{horizontal:'right',vertical:'middle'},border:box});
   h(r,16); r++;
 
-  // Catatan (kiri) + TTD (kanan) — 6 baris
+  // Catatan (kiri) + TTD (kanan) — 5 baris
   var s0=r;
   ws.mergeCells(s0,1,s0+2,3);
   put(s0,1,'Catatan: Jika merasa sudah membayar, mohon sertakan bukti transaksi atau kuitansi.',{font:{size:8,italic:true,color:{argb:TG_XL.grey}},alignment:{wrapText:true,vertical:'top'}});
   var ttd={font:{size:10},alignment:{horizontal:'center',vertical:'middle'}};
-  m(s0,5,6);   put(s0,5,'Batam, '+today,ttd);
-  m(s0+1,5,6); put(s0+1,5,'Hormat kami,',ttd);
-  m(s0+2,5,6); m(s0+3,5,6);                                   // ruang tanda tangan
-  m(s0+4,5,6); put(s0+4,5,'( ______________________ )',ttd);
-  m(s0+5,5,6); put(s0+5,5,'Bendahara Sekolah',{font:{size:9,color:{argb:TG_XL.grey}},alignment:{horizontal:'center',vertical:'top'}});
-  for(var k=0;k<6;k++) h(s0+k,14);
-  r=s0+6;
+  m(s0,4,5);   put(s0,4,'Batam, '+today,ttd);
+  m(s0+1,4,5); put(s0+1,4,'Hormat kami,',ttd);
+  m(s0+2,4,5); m(s0+3,4,5);                                   // ruang tanda tangan
+  m(s0+4,4,5); put(s0+4,4,'( ______________________ )',ttd);
+  for(var k=0;k<5;k++) h(s0+k,14);
+  r=s0+5;
 
   // Garis potong antar tagihan
   if(withCut){
-    for(var c3=1;c3<=6;c3++) ws.getCell(r,c3).border={bottom:{style:'dashed',color:{argb:'FFBFBFBF'}}};
+    for(var c3=1;c3<=5;c3++) ws.getCell(r,c3).border={bottom:{style:'dashed',color:{argb:'FFBFBFBF'}}};
     h(r,14); r++;
   }
   return r;
@@ -489,7 +486,7 @@ function tgXlSetup(ws, lastRow){
   ws.columns=TG_XL.cols.map(function(w){return {width:w};});
   ws.pageSetup={paperSize:9,orientation:'portrait',scale:100,horizontalCentered:true,
     margins:{left:0.3,right:0.3,top:0.3,bottom:0.3,header:0,footer:0},
-    printArea:'A1:F'+Math.max(lastRow,1)};
+    printArea:'A1:E'+Math.max(lastRow,1)};
   ws.views=[{showGridLines:false}];
 }
 
