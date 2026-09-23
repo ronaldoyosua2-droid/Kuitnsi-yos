@@ -347,7 +347,8 @@ function renderTagihanPreview(data){
   const today = new Date().toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'});
   let html2 = `<div style="margin-bottom:12px;display:flex;gap:8px;align-items:center">
     <span style="font-size:13px;color:var(--text2)">${data.length} siswa dengan tunggakan</span>
-    <button class="btn btn-primary" onclick="downloadTagihanExcel()" style="font-size:12px">⬇️ Download Excel</button>
+    <button class="btn btn-primary" onclick="downloadTagihanExcel('sheet')" style="font-size:12px" title="Setiap siswa di sheet terpisah">⬇️ Excel (per siswa)</button>
+    <button class="btn btn-green" onclick="downloadTagihanExcel('print')" style="font-size:12px" title="Semua siswa di 1 sheet, maks 3 tagihan per kertas A4">🖨️ Excel 1 Sheet (3 per A4)</button>
   </div>`;
 
   data.forEach(({siswa, items})=>{
@@ -387,7 +388,184 @@ function renderTagihanPreview(data){
   window._tagihanData = {data, today, filterKelas:(document.getElementById('tg-kelas')||{}).value||''};
 }
 
-function downloadTagihanExcel(){
+// ===== TAGIHAN EXCEL RAPI (ExcelJS: tabel, border, TTD, siap print A4) =====
+var TG_EXCELJS_URLS=[
+  'https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js',
+  'https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js'
+];
+function tgLoadExcelJS(){
+  if(window.ExcelJS) return Promise.resolve(window.ExcelJS);
+  return new Promise(function(resolve,reject){
+    var i=0;
+    (function next(){
+      if(i>=TG_EXCELJS_URLS.length){ reject(new Error('Library ExcelJS gagal dimuat')); return; }
+      var s=document.createElement('script'); s.src=TG_EXCELJS_URLS[i++];
+      s.onload=function(){ window.ExcelJS?resolve(window.ExcelJS):next(); };
+      s.onerror=function(){ s.remove(); next(); };
+      document.head.appendChild(s);
+    })();
+  });
+}
+
+var TG_XL={
+  cols:[5,13,31,14,16,15],            // lebar A-F (muat A4 portrait tanpa diperkecil)
+  pageCap:770,                        // tinggi area cetak A4 (pt) dengan margin 0.3"
+  rp:'"Rp "#,##0',
+  blue:'FF1E3A8A', light:'FFEFF6FF', grey:'FF6B7280', red:'FFB91C1C'
+};
+// Tinggi 1 blok tagihan (pt) — harus sama dengan tinggi baris di tgXlBlock
+function tgXlBlockHeight(nItems, withCut){ return 18+12+16+15+16+nItems*15+16+14*6+(withCut?14:0); }
+
+// Tulis 1 blok tagihan mulai baris r, kembalikan baris berikutnya yang kosong
+function tgXlBlock(ws, r, siswa, items, today, withCut){
+  var thin={style:'thin',color:{argb:'FF9CA3AF'}};
+  var box={top:thin,left:thin,bottom:thin,right:thin};
+  function m(row,c1,c2){ if(c1!==c2) ws.mergeCells(row,c1,row,c2); }
+  function put(row,col,val,style){ var c=ws.getCell(row,col); c.value=val; if(style){ for(var k in style) c[k]=style[k]; } return c; }
+  function h(row,pt){ ws.getRow(row).height=pt; }
+
+  // Kop
+  m(r,1,6); put(r,1,'SEKOLAH SWASTA YOS ANUGERAH',{font:{bold:true,size:13,color:{argb:TG_XL.blue}},alignment:{horizontal:'center',vertical:'middle'}}); h(r,18); r++;
+  m(r,1,6); put(r,1,'Kmp. Durian Blok B No.36, Kel. Sadai, Kec. Bengkong, Batam • Telp. 81372928540',{font:{size:8,color:{argb:TG_XL.grey}},alignment:{horizontal:'center',vertical:'middle'}}); h(r,12); r++;
+  m(r,1,6); put(r,1,'TAGIHAN PEMBAYARAN',{font:{bold:true,size:11},alignment:{horizontal:'center',vertical:'middle'},border:{bottom:{style:'double',color:{argb:TG_XL.blue}}}});
+  for(var c=2;c<=6;c++) ws.getCell(r,c).border={bottom:{style:'double',color:{argb:TG_XL.blue}}};
+  h(r,16); r++;
+
+  // Identitas
+  var lbl={font:{size:10,color:{argb:TG_XL.grey}},alignment:{vertical:'middle'}};
+  var val={font:{size:10,bold:true},alignment:{vertical:'middle'}};
+  m(r,1,2); put(r,1,'Nama Siswa',lbl); put(r,3,': '+siswa.nama,val);
+  put(r,4,'Kelas',Object.assign({},lbl,{alignment:{horizontal:'right',vertical:'middle'}}));
+  m(r,5,6); put(r,5,': '+siswa.kelas,val); h(r,15); r++;
+
+  // Header tabel
+  ['No','Jenis Tagihan','Keterangan','Biaya','Waktu','Jumlah'].forEach(function(t,i){
+    put(r,i+1,t,{font:{bold:true,size:10,color:{argb:'FFFFFFFF'}},fill:{type:'pattern',pattern:'solid',fgColor:{argb:TG_XL.blue}},alignment:{horizontal:'center',vertical:'middle'},border:box});
+  }); h(r,16); r++;
+
+  // Isi
+  var total=0;
+  items.forEach(function(it,i){
+    var cell={font:{size:10},alignment:{vertical:'middle',shrinkToFit:true},border:box};
+    var num=Object.assign({},cell,{numFmt:TG_XL.rp,alignment:{horizontal:'right',vertical:'middle'}});
+    put(r,1,i+1,Object.assign({},cell,{alignment:{horizontal:'center',vertical:'middle'}}));
+    put(r,2,it.jenis||'',cell);
+    put(r,3,it.keterangan||'',cell);
+    put(r,4,Number(it.biaya)||0,num);
+    put(r,5,it.waktu||'',Object.assign({},cell,{alignment:{horizontal:'center',vertical:'middle',shrinkToFit:true}}));
+    put(r,6,Number(it.jumlah)||0,num);
+    total+=Number(it.jumlah)||0;
+    h(r,15); r++;
+  });
+
+  // Total
+  m(r,1,5); put(r,1,'TOTAL TAGIHAN',{font:{bold:true,size:10},fill:{type:'pattern',pattern:'solid',fgColor:{argb:TG_XL.light}},alignment:{horizontal:'right',vertical:'middle'},border:box});
+  for(var c2=2;c2<=5;c2++) ws.getCell(r,c2).border=box;
+  put(r,6,total,{font:{bold:true,size:10,color:{argb:TG_XL.red}},fill:{type:'pattern',pattern:'solid',fgColor:{argb:TG_XL.light}},numFmt:TG_XL.rp,alignment:{horizontal:'right',vertical:'middle'},border:box});
+  h(r,16); r++;
+
+  // Catatan (kiri) + TTD (kanan) — 6 baris
+  var s0=r;
+  ws.mergeCells(s0,1,s0+2,3);
+  put(s0,1,'Catatan: Jika merasa sudah membayar, mohon sertakan bukti transaksi atau kuitansi.',{font:{size:8,italic:true,color:{argb:TG_XL.grey}},alignment:{wrapText:true,vertical:'top'}});
+  var ttd={font:{size:10},alignment:{horizontal:'center',vertical:'middle'}};
+  m(s0,5,6);   put(s0,5,'Batam, '+today,ttd);
+  m(s0+1,5,6); put(s0+1,5,'Hormat kami,',ttd);
+  m(s0+2,5,6); m(s0+3,5,6);                                   // ruang tanda tangan
+  m(s0+4,5,6); put(s0+4,5,'( ______________________ )',ttd);
+  m(s0+5,5,6); put(s0+5,5,'Bendahara Sekolah',{font:{size:9,color:{argb:TG_XL.grey}},alignment:{horizontal:'center',vertical:'top'}});
+  for(var k=0;k<6;k++) h(s0+k,14);
+  r=s0+6;
+
+  // Garis potong antar tagihan
+  if(withCut){
+    for(var c3=1;c3<=6;c3++) ws.getCell(r,c3).border={bottom:{style:'dashed',color:{argb:'FFBFBFBF'}}};
+    h(r,14); r++;
+  }
+  return r;
+}
+
+function tgXlSetup(ws, lastRow){
+  ws.columns=TG_XL.cols.map(function(w){return {width:w};});
+  ws.pageSetup={paperSize:9,orientation:'portrait',scale:100,horizontalCentered:true,
+    margins:{left:0.3,right:0.3,top:0.3,bottom:0.3,header:0,footer:0},
+    printArea:'A1:F'+Math.max(lastRow,1)};
+  ws.views=[{showGridLines:false}];
+}
+
+function tgXlSheetName(nama, kelas, used){
+  var base=(nama.substring(0,20)+' '+kelas.substring(0,7)).replace(/[\[\]:*?\/\\]/g,'-').trim().substring(0,31)||'Tagihan';
+  var name=base, n=2;
+  while(used[name.toLowerCase()]){ var suf=' ('+(n++)+')'; name=base.substring(0,31-suf.length)+suf; }
+  used[name.toLowerCase()]=1; return name;
+}
+
+// Susun workbook. mode: 'sheet' (1 siswa per sheet) | 'print' (1 sheet, maks 3 siswa per A4)
+function tgBuildWorkbook(ExcelJS, data, today, mode){
+  var wb=new ExcelJS.Workbook();
+  wb.creator='Kwitansi Yos Anugerah';
+  if(mode==='print'){
+    var ws=wb.addWorksheet('Tagihan');
+    var r=1, used=0, perPage=0;
+    data.forEach(function(d, idx){
+      var hNoCut=tgXlBlockHeight(d.items.length,false);
+      // Pindah halaman bila sudah 3 siswa atau sisa tinggi tidak cukup
+      if(perPage>0 && (perPage>=3 || used+hNoCut>TG_XL.pageCap)){
+        ws.getRow(r-1).addPageBreak();
+        used=0; perPage=0;
+      }
+      var next=data[idx+1];
+      var cut = !!next && perPage<2 && (used+tgXlBlockHeight(d.items.length,true)+tgXlBlockHeight(next.items.length,false))<=TG_XL.pageCap;
+      r=tgXlBlock(ws, r, d.siswa, d.items, today, cut);
+      used+=tgXlBlockHeight(d.items.length,cut); perPage++;
+    });
+    tgXlSetup(ws, r-1);
+  } else {
+    var names={};
+    data.forEach(function(d){
+      var ws2=wb.addWorksheet(tgXlSheetName(d.siswa.nama,d.siswa.kelas,names));
+      var end=tgXlBlock(ws2, 1, d.siswa, d.items, today, false);
+      tgXlSetup(ws2, end-1);
+    });
+  }
+  return wb;
+}
+
+function tgNamaFileTagihan(data, filterKelas){
+  var d=new Date();
+  var tgl=String(d.getDate()).padStart(2,'0')+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+d.getFullYear();
+  var kelasUnik=[...new Set(data.map(function(x){return (x.siswa.kelas||'').trim();}).filter(Boolean))];
+  var label = kelasUnik.length===1 ? kelasUnik[0] : (filterKelas || 'Semua Kelas');
+  label=label.replace(/[\\/:*?"<>|]/g,'-');
+  return 'Tagihan '+label+'_'+tgl+'.xlsx';
+}
+
+// Download tagihan rapi. mode: 'sheet' = 1 siswa per sheet, 'print' = 1 sheet siap print (maks 3 per A4)
+async function downloadTagihanExcel(mode){
+  if(!window._tagihanData){ alert('Generate tagihan dulu!'); return; }
+  const {data, today, filterKelas} = window._tagihanData;
+  let ExcelJS;
+  try{ ExcelJS = await tgLoadExcelJS(); }
+  catch(e){
+    if(confirm('Library Excel rapi gagal dimuat (cek internet).\nDownload versi sederhana (tanpa tabel/TTD)?')) downloadTagihanExcelRaw();
+    return;
+  }
+  try{
+    const wb = tgBuildWorkbook(ExcelJS, data, today, mode==='print'?'print':'sheet');
+    const buf = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = tgNamaFileTagihan(data, filterKelas);
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 2000);
+  }catch(e){
+    console.error(e); alert('Gagal membuat Excel: '+e.message);
+  }
+}
+
+// Versi lama (tanpa format) — dipakai sebagai cadangan bila ExcelJS tidak bisa dimuat
+function downloadTagihanExcelRaw(){
   if(!window._tagihanData){ alert('Generate tagihan dulu!'); return; }
   const {data, today, filterKelas} = window._tagihanData;
   if(typeof XLSX === 'undefined'){ alert('Library Excel belum loaded, coba refresh.'); return; }
@@ -437,17 +615,7 @@ function downloadTagihanExcel(){
     XLSX.utils.book_append_sheet(wb, ws, sheetName);
   });
 
-  // Download
-  // Nama file: "Tagihan <kelas>_<dd-mm-yyyy>.xlsx"
-  const d = new Date();
-  const tgl = String(d.getDate()).padStart(2,'0')+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+d.getFullYear();
-  const kelasUnik = [...new Set(data.map(x=>(x.siswa.kelas||'').trim()).filter(Boolean))];
-  let labelKelas;
-  if(kelasUnik.length===1) labelKelas = kelasUnik[0];          // mis. "3 SD Plus"
-  else if(filterKelas) labelKelas = filterKelas;                 // mis. "3 SD" (Reguler + Plus)
-  else labelKelas = 'Semua Kelas';
-  labelKelas = labelKelas.replace(/[\\/:*?"<>|]/g,'-');        // buang karakter terlarang di nama file
-  XLSX.writeFile(wb, 'Tagihan '+labelKelas+'_'+tgl+'.xlsx');
+  XLSX.writeFile(wb, tgNamaFileTagihan(data, filterKelas));
 }
 
 // Tutup dropdown saat klik luar
