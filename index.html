@@ -1622,7 +1622,7 @@ function doConfirmLoadCloud(){ if(typeof confirmLoadCloud==='function') confirmL
           <span id="inp-tanggal-status" style="font-size:11px;color:var(--green);display:none">✅</span>
         </div>
       </div>
-      <div class="field" style="margin-bottom:0">
+      <div class="field" id="kw-metode-field" style="margin-bottom:0;display:none">
         <label>Metode Pembayaran</label>
         <div style="display:flex;gap:8px;margin-top:4px">
           <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:500;cursor:pointer;padding:7px 14px;border:1.5px solid var(--border);border-radius:7px;background:#fff" id="lbl-kas">
@@ -2047,7 +2047,7 @@ function doConfirmLoadCloud(){ if(typeof confirmLoadCloud==='function') confirmL
           <div class="nominal-box" id="sb-sisa-dp" style="background:var(--danger-light);color:var(--danger)">—</div>
         </div>
       </div>
-      <div class="field" style="margin-top:10px;margin-bottom:0">
+      <div class="field" id="sb-metode-field" style="margin-top:10px;margin-bottom:0;display:none">
         <label>Metode Pembayaran DP</label>
         <div style="display:flex;gap:8px;margin-top:4px">
           <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:500;cursor:pointer;padding:7px 14px;border:1.5px solid var(--border);border-radius:7px;background:#fff" id="sb-lbl-kas">
@@ -4620,7 +4620,6 @@ function buatKwitansiSiswaBaru(){
   const isPlus=document.getElementById('sb-plus').value==='plus';
   const tanggal=document.getElementById('sb-tanggal').value;
   const dp=parseInt(document.getElementById('sb-dp').value)||0;
-  const metode=document.querySelector('input[name="sb-metode"]:checked')?.value||'Kas';
   const withSpp=document.getElementById('sb-spp-check').checked;
   const sppBulan=document.getElementById('sb-spp-bulan').value;
 
@@ -4635,6 +4634,8 @@ function buatKwitansiSiswaBaru(){
     al.textContent='Catatan wajib diisi jika formulir sudah dibayar sebelumnya.';al.classList.add('show');return;
   }
   if(withSpp&&!sppBulan){al.textContent='Pilih bulan SPP.';al.classList.add('show');return;}
+  if(!pilihMetodeDulu('sb','sb-metode',buatKwitansiSiswaBaru)) return;   // popup Kas / Transfer
+  const metode=document.querySelector('input[name="sb-metode"]:checked')?.value||'Kas';
 
   const biaya=parseInt(document.getElementById('sb-biaya-input').value)||0;
   const dPct=parseFloat(document.getElementById('sb-diskon-input').value)||0;
@@ -5877,6 +5878,7 @@ function buatKwitansi(){
   }
 
   const tanggal = document.getElementById('inp-tanggal').value;
+  if(!pilihMetodeDulu('kw','inp-metode',buatKwitansi)) return;   // popup Kas / Transfer
   const metode = document.querySelector('input[name="inp-metode"]:checked')?.value || 'Kas';
   const tglFmtStr = tglFmt(tanggal);
 
@@ -8909,5 +8911,191 @@ function resetDariPreview(){
   if(typeof window[n]==='function' && typeof withReadCache==='function') window[n]=withReadCache(window[n]);
 });
 </script>
+<!-- ===== POPUP METODE PEMBAYARAN ===== -->
+<div id="metode-modal" style="display:none;position:fixed;inset:0;z-index:2000;background:rgba(15,23,42,.45);align-items:center;justify-content:center;padding:16px">
+  <div class="card" style="margin:0;border-radius:14px;box-shadow:0 20px 50px rgba(0,0,0,.25);width:100%;max-width:400px;padding:22px">
+    <div style="font-size:16px;font-weight:700;margin-bottom:4px">Metode Pembayaran</div>
+    <div id="metode-modal-sub" style="font-size:12px;color:var(--text2);margin-bottom:16px">Pilih cara pembayaran untuk kwitansi ini</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <button type="button" class="btn metode-opt" data-m="Kas" onclick="_metodePilih('Kas')" style="flex-direction:column;justify-content:center;gap:6px;padding:18px 10px;border-width:1.5px;font-size:15px;font-weight:700">💵 Kas<span style="font-size:11px;font-weight:400;color:var(--text2)">Tunai · tekan K</span></button>
+      <button type="button" class="btn metode-opt" data-m="Transfer" onclick="_metodePilih('Transfer')" style="flex-direction:column;justify-content:center;gap:6px;padding:18px 10px;border-width:1.5px;font-size:15px;font-weight:700">🏦 Transfer<span style="font-size:11px;font-weight:400;color:var(--text2)">Bank · tekan T</span></button>
+    </div>
+    <div style="font-size:11px;color:#92400e;background:#fef3c7;border:1px solid #fcd34d;padding:7px 10px;border-radius:7px;margin-top:12px">Transfer dicatat di riwayat tapi <strong>tidak dihitung</strong> dalam total kas harian.</div>
+    <div style="text-align:right;margin-top:14px"><button type="button" class="btn" onclick="_metodeTutup()">Batal</button></div>
+  </div>
+</div>
+<style>
+#metode-modal .metode-opt[data-m="Kas"]:hover{border-color:var(--blue);background:var(--blue-light)}
+#metode-modal .metode-opt[data-m="Transfer"]:hover{border-color:#f59e0b;background:#fef3c7}
+#metode-modal .metode-opt .ui-ico{width:28px;height:28px;margin:0}
+</style>
+<script>
+// Popup Kas / Transfer saat klik "Buat Kwitansi".
+// Dipanggil dari dalam fungsi buat kwitansi SETELAH validasi lolos:
+//   false  -> popup ditampilkan, fungsi berhenti; setelah memilih, fungsi dijalankan ulang
+//   true   -> metode sudah dipilih, lanjut membuat kwitansi
+var _metodeOk={}, _metodeCtx=null;
+function pilihMetodeDulu(key, radioName, rerun){
+  if(_metodeOk[key]){ _metodeOk[key]=false; return true; }
+  _metodeCtx={key:key, radioName:radioName, rerun:rerun};
+  var m=document.getElementById('metode-modal');
+  m.style.display='flex';
+  setTimeout(function(){ var b=m.querySelector('.metode-opt[data-m="Kas"]'); if(b) b.focus(); },50);
+  return false;
+}
+function _metodePilih(val){
+  if(!_metodeCtx) return;
+  var c=_metodeCtx; _metodeCtx=null;
+  document.querySelectorAll('input[name="'+c.radioName+'"]').forEach(function(r){ r.checked=(r.value===val); });
+  document.getElementById('metode-modal').style.display='none';
+  _metodeOk[c.key]=true;
+  try{ c.rerun(); } finally { _metodeOk[c.key]=false; }
+}
+function _metodeTutup(){ _metodeCtx=null; document.getElementById('metode-modal').style.display='none'; }
+document.addEventListener('keydown',function(e){
+  var m=document.getElementById('metode-modal');
+  if(!m||m.style.display!=='flex') return;
+  var k=(e.key||'').toLowerCase();
+  if(k==='k'){ e.preventDefault(); _metodePilih('Kas'); }
+  else if(k==='t'){ e.preventDefault(); _metodePilih('Transfer'); }
+  else if(k==='escape'){ e.preventDefault(); _metodeTutup(); }
+});
+document.addEventListener('click',function(e){ if(e.target&&e.target.id==='metode-modal') _metodeTutup(); });
+</script>
+<style>
+.ui-ico{width:1.15em;height:1.15em;vertical-align:-0.2em;flex-shrink:0;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;margin-right:.4em}
+.ui-ico.solo{margin-right:0}
+.ui-ico .f{fill:currentColor;stroke:none}
+.nav-btn,.tab{display:inline-flex;align-items:center}
+</style>
+<script>
+// ===================== IKON MODERN (pengganti emoji di seluruh tampilan) =====================
+(function(){
+  var P={
+    file:'<path d="M14 3H6v18h12V7z"/><path d="M14 3v4h4M9 13h6M9 17h6"/>',
+    receipt:'<path d="M6 2.5h12V21l-3-2-3 2-3-2-3 2z"/><path d="M9 7h6M9 11h6M9 15h3.5"/>',
+    userPlus:'<circle cx="9" cy="8" r="4"/><path d="M2 21v-.5A6.5 6.5 0 0 1 8.5 14h1A6.5 6.5 0 0 1 16 20.5v.5M19 8v6M16 11h6"/>',
+    user:'<circle cx="12" cy="8" r="4"/><path d="M4 21v-.5A6.5 6.5 0 0 1 10.5 14h3a6.5 6.5 0 0 1 6.5 6.5v.5"/>',
+    doorOut:'<path d="M13 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h7"/><path d="M10 12h11M17 8l4 4-4 4"/>',
+    history:'<path d="M3.5 12a8.5 8.5 0 1 0 2.5-6"/><path d="M3 4v4.5h4.5M12 7.5V12l3 2"/>',
+    shield:'<path d="M12 3l8 3v6c0 4.8-3.4 8-8 9-4.6-1-8-4.2-8-9V6z"/><path d="M9 12l2 2 4-4"/>',
+    list:'<path d="M9 6h11M9 12h11M9 18h11"/><circle class="f" cx="4.5" cy="6" r="1.3"/><circle class="f" cx="4.5" cy="12" r="1.3"/><circle class="f" cx="4.5" cy="18" r="1.3"/>',
+    download:'<path d="M12 3v12M7 10l5 5 5-5M4 20h16"/>',
+    upload:'<path d="M12 16V4M7 9l5-5 5 5M4 20h16"/>',
+    x:'<path d="M6 6l12 12M18 6L6 18"/>',
+    printer:'<path d="M7 8V3h10v5"/><rect x="3" y="8" width="18" height="9" rx="2"/><path d="M7 14h10v7H7z"/>',
+    trash:'<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>',
+    refresh:'<path d="M20 12a8 8 0 1 1-2.4-5.7"/><path d="M20 4v5h-5"/>',
+    search:'<circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/>',
+    lock:'<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
+    unlock:'<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.6-1.7"/>',
+    eye:'<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+    undo:'<path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/>',
+    chart:'<path d="M3 21h18M6 17v-6M11 17V6M16 17v-9M21 17v-3"/>',
+    image:'<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 8"/>',
+    checkSq:'<rect x="3" y="3" width="18" height="18" rx="4"/><path d="M8 12l3 3 5-6"/>',
+    square:'<rect x="3" y="3" width="18" height="18" rx="4"/>',
+    award:'<circle cx="12" cy="9" r="6"/><path d="M8.5 14L7 22l5-3 5 3-1.5-8"/>',
+    grad:'<path d="M2 9l10-5 10 5-10 5z"/><path d="M6 11v5c3 2.2 9 2.2 12 0v-5M22 9v6"/>',
+    cloudUp:'<path d="M7 18a5 5 0 1 1 1.2-9.8A6 6 0 0 1 19.5 10 4 4 0 0 1 18 18"/><path d="M12 12v8M9 15l3-3 3 3"/>',
+    cloudDown:'<path d="M7 17a5 5 0 1 1 1.2-9.8A6 6 0 0 1 19.5 9 4 4 0 0 1 18 17"/><path d="M12 11v9M9 17l3 3 3-3"/>',
+    pencil:'<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M14 6l4 4"/>',
+    key:'<circle cx="8" cy="15" r="4"/><path d="M10.8 12.2L20 3M16.5 6.5l3 3M14 9l2 2"/>',
+    cash:'<rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 10v4M18 10v4"/>',
+    coins:'<ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6"/>',
+    moneyOut:'<rect x="2" y="8" width="14" height="10" rx="2"/><circle cx="9" cy="13" r="2"/><path d="M15 3h6v6M21 3l-6 6"/>',
+    users:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14a6.5 6.5 0 0 1 3.5 6"/>',
+    cart:'<circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/><path d="M2 3h3l2.6 12.5h11.6L21.5 7H6"/>',
+    alert:'<path d="M12 3.5L2.5 20h19z"/><path d="M12 10v4M12 17v.1"/>',
+    calendar:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
+    layers:'<path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/>',
+    palette:'<path d="M12 3a9 9 0 1 0 0 18c1.4 0 2-1 1.5-2.2-.6-1.4.3-2.8 1.8-2.8H18a3 3 0 0 0 3-3c0-5.5-4-10-9-10z"/><circle class="f" cx="7.5" cy="11" r="1.3"/><circle class="f" cx="10" cy="7" r="1.3"/><circle class="f" cx="15" cy="7.5" r="1.3"/>',
+    check:'<path d="M5 12.5l4.5 4.5L19 7"/>',
+    dot:'<circle class="f" cx="12" cy="12" r="7"/>',
+    school:'<path d="M3 21h18M5 21V10l7-5 7 5v11"/><path d="M10 21v-5h4v5M12 5V2.5h3"/><circle cx="12" cy="11" r="1.6"/>',
+    clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+    bank:'<path d="M3 10l9-6 9 6M4 21h16M6 10v8M10 10v8M14 10v8M18 10v8"/>',
+    bulb:'<path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/>',
+    inbox:'<path d="M3 13l2.5-8h13L21 13v6a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><path d="M3 13h5l1 2h6l1-2h5"/>',
+    coin:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/>',
+    scale:'<path d="M12 3v18M7 21h10M4 7h16M6 7l-3 7a3 3 0 0 0 6 0zM18 7l-3 7a3 3 0 0 0 6 0z"/>',
+    target:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle class="f" cx="12" cy="12" r="1.6"/>'
+  };
+  // Emoji -> [ikon, warna khusus (opsional)]
+  var M={
+    '📄':'file','🧾':'receipt','🆕':'userPlus','🚕':'doorOut','📋':'list','💾':'download','⬇':'download','⇩':'cloudDown',
+    '📤':'upload','✕':'x','✖':'x','❌':'x','🖶':'printer','🖨':'printer','🗑':'trash','↻':'refresh','🔄':'refresh','↺':'refresh',
+    '🔍':'search','🔒':'lock','🔓':'unlock','👁':'eye','↩':'undo','📊':'chart','📷':'image','✅':'checkSq','☐':'square',
+    '🏆':'award','🏉':'grad','🎓':'layers','☁':'cloudUp','✎':'pencil','✏':'pencil','📝':'pencil','🔑':'key',
+    '💵':'cash','💰':'coins','💸':'moneyOut','🤝':'users','👤':'user','⚠':'alert','📅':'calendar','🎨':'palette','🛒':'cart','🏫':'school','🕐':'clock','🏦':'bank','💡':'bulb','📥':'inbox','🪙':'coin','⚖':'scale','🎯':'target',
+    '🔵':['dot','#2563eb'],'🟢':['dot','#16a34a'],'🟣':['dot','#7c3aed'],'🔴':['dot','#dc2626'],'⚫':['dot','#94a3b8'],'🟤':['dot','#92400e']
+  };
+  var NAV_DEFAULT={kwitansi:'file',riwayat:'history',admin:'shield'};
+  var keys=Object.keys(M).sort(function(a,b){return b.length-a.length;});
+  var RE=new RegExp('('+keys.map(function(k){return k.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');}).join('|')+')\\uFE0F?[ \\u00A0]?','g');
+  var SEL='button,.btn,.nav-btn,.tab';
+  // Area yang TIDAK boleh diubah: isian user, catatan, dropdown, script
+  var SKIP='textarea,input,select,option,script,style,svg,[contenteditable],[contenteditable] *,#note-mini,.pnbody,.pntitle';
+  var NS='http://www.w3.org/2000/svg';
+
+  function mkIcon(name,color){
+    var svg=document.createElementNS(NS,'svg');
+    svg.setAttribute('viewBox','0 0 24 24'); svg.setAttribute('class','ui-ico'); svg.setAttribute('aria-hidden','true');
+    svg.innerHTML=P[name]||'';
+    if(color) svg.style.color=color;
+    return svg;
+  }
+  function processEl(el){
+    if(!el||el.nodeType!==1||el.closest(SKIP)) return;
+    var w=document.createTreeWalker(el,NodeFilter.SHOW_TEXT,null), nodes=[], n;
+    while((n=w.nextNode())){ RE.lastIndex=0; if(RE.test(n.nodeValue)&&!(n.parentElement&&n.parentElement.closest(SKIP))) nodes.push(n); }
+    nodes.forEach(function(t){
+      var txt=t.nodeValue, frag=document.createDocumentFragment(), last=0, m;
+      RE.lastIndex=0;
+      while((m=RE.exec(txt))){
+        if(m.index>last) frag.appendChild(document.createTextNode(txt.slice(last,m.index)));
+        var map=M[m[1]], name=Array.isArray(map)?map[0]:map, col=Array.isArray(map)?map[1]:null;
+        frag.appendChild(mkIcon(name,col));
+        last=m.index+m[0].length;
+      }
+      if(last<txt.length) frag.appendChild(document.createTextNode(txt.slice(last)));
+      t.parentNode.replaceChild(frag,t);
+    });
+    // Tombol nav tanpa ikon -> beri ikon default
+    if(el.classList.contains('nav-btn')&&!el.querySelector('svg.ui-ico')){
+      var oc=el.getAttribute('onclick')||'', pm=oc.match(/showPage\('(\w+)'\)/);
+      if(pm&&NAV_DEFAULT[pm[1]]) el.insertBefore(mkIcon(NAV_DEFAULT[pm[1]]),el.firstChild);
+    }
+    // Ikon tanpa teks (tombol ikon saja) -> tanpa jarak kanan
+    if(el.matches(SEL)){
+      var hasText=(el.textContent||'').trim().length>0;
+      el.querySelectorAll('svg.ui-ico').forEach(function(s){ s.classList.toggle('solo',!hasText); });
+    }
+  }
+  function scan(root){
+    if(!root||root.nodeType!==1||!root.isConnected) return;
+    processEl(root);
+    if(root.matches(SEL)) return;
+    root.querySelectorAll(SEL).forEach(function(b){ if(b.classList.contains('nav-btn')||b.querySelector('svg.ui-ico')) processEl(b); });
+  }
+  var pending=new Set(), scheduled=false;
+  function flush(){ scheduled=false; var arr=Array.from(pending); pending.clear(); arr.forEach(scan); }
+  function queue(el){ if(!el) return; pending.add(el); if(!scheduled){ scheduled=true; requestAnimationFrame(flush);} }
+  function start(){
+    scan(document.body);
+    new MutationObserver(function(muts){
+      muts.forEach(function(m){
+        if(m.type==='characterData'){ var p=m.target.parentElement; if(p) queue(p.closest(SEL)||p); return; }
+        m.addedNodes.forEach(function(nd){
+          if(nd.nodeType===1){ queue((nd.closest&&nd.closest(SEL))||nd); }
+          else if(nd.nodeType===3){ var pe=nd.parentElement; if(pe) queue(pe.closest(SEL)||pe); }
+        });
+      });
+    }).observe(document.body,{childList:true,subtree:true,characterData:true});
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',start); else start();
+})();
+</script>
+
 </body>
 </html>
