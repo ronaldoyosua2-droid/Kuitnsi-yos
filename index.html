@@ -65,6 +65,10 @@ button,[onclick],label{cursor:pointer!important}
 .navbar h1{font-size:16px;font-weight:600;letter-spacing:.3px}
 .navbar p{font-size:11px;opacity:.8;margin-top:1px}
 .nav-btns{display:flex;gap:4px;align-items:center;background:rgba(255,255,255,.15);padding:4px;border-radius:10px}
+/* Menu tab tetap di atas saat di-scroll (seperti freeze panes di Excel) */
+.nav-btns{position:sticky;top:var(--navbar-h,57px);z-index:99;background:inherit;flex-wrap:wrap;padding:8px 4px;border-radius:0;transition:box-shadow .2s}
+.nav-btns.stuck{box-shadow:0 4px 10px -6px rgba(0,0,0,.25)}
+.card,.tab-content{scroll-margin-top:120px}
 .nav-btn{padding:7px 16px;border:none;border-radius:7px;background:rgba(0,0,0,.3);color:#fff;font-size:12px;font-weight:700;cursor:pointer;transition:.15s}
 .nav-btn:hover{background:rgba(0,0,0,.5);color:#fff}
 .nav-btn.active{background:#fff;color:#1a56a0;font-weight:700;box-shadow:0 1px 4px rgba(0,0,0,.2)}
@@ -9097,5 +9101,18 @@ document.addEventListener('click',function(e){ if(e.target&&e.target.id==='metod
 })();
 </script>
 
+<script>
+// Tinggi navbar bisa berubah (lebar layar/tema) -> hitung otomatis untuk posisi menu tab
+(function(){
+  function upd(){
+    var nb=document.querySelector('.navbar'), bar=document.querySelector('.nav-btns');
+    if(nb) document.documentElement.style.setProperty('--navbar-h', nb.offsetHeight+'px');
+    if(bar&&nb) bar.classList.toggle('stuck', window.scrollY>4);
+  }
+  window.addEventListener('resize',upd); window.addEventListener('scroll',upd,{passive:true});
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',upd); else upd();
+  setTimeout(upd,500);
+})();
+</script>
 </body>
 </html>
