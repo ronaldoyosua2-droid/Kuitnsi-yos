@@ -1090,13 +1090,48 @@ function addLog(jenis, nama, detail){
   }catch(e){}
 }
 
+// Catat aktivitas yang berkaitan dengan kwitansi (buat / edit / hapus) lengkap dengan metode bayar
+function logKwitansi(jenis, rec, detail){
+  try{
+    const logs = JSON.parse(localStorage.getItem('ya_log')||'[]');
+    const now = new Date().toISOString();
+    logs.unshift({
+      id: Date.now()+Math.random(),
+      entryTime: now, waktu: now, hasJam: true,
+      jenis, nama: rec.nama,
+      detail: detail!=null ? detail : (rec.tipe+' · '+rec.bayarLabel+' · Rp '+((rec.nominalBayar||0).toLocaleString('id-ID'))),
+      noKwitansi: rec.no, metode: rec.metode||'Kas', tglKwitansi: rec.tanggal||null
+    });
+    if(logs.length > 500) logs.splice(500);
+    localStorage.setItem('ya_log', JSON.stringify(logs));
+  }catch(e){}
+}
+
 function renderLogAktivitas(){
   const dari = document.getElementById('log-filter-dari')?.value||'';
   const sampai = document.getElementById('log-filter-sampai')?.value||'';
   const jenis = document.getElementById('log-filter-jenis')?.value||'';
+  const fMetode = document.getElementById('log-filter-metode')?.value||'';
   const nama = (document.getElementById('log-filter-nama')?.value||'').toLowerCase();
   const wrap = document.getElementById('log-aktivitas-wrap');
   if(!wrap) return;
+  // Peta No. Kwitansi -> metode (untuk log lama yang belum menyimpan metode)
+  const _metodeByNo = {}, _tglByNo = {};
+  getRiwayat().forEach(r=>{ if(r.no){ _metodeByNo[r.no]=r.metode||'Kas'; if(r.tanggal) _tglByNo[r.no]=r.tanggal; } });
+  JSON.parse(localStorage.getItem('ya_log')||'[]').forEach(l=>{
+    if(l.noKwitansi&&l.metode&&!_metodeByNo[l.noKwitansi]) _metodeByNo[l.noKwitansi]=l.metode;
+    if(l.noKwitansi&&l.tglKwitansi&&!_tglByNo[l.noKwitansi]) _tglByNo[l.noKwitansi]=l.tglKwitansi;
+  });
+  // Tanggal yang tertulis di kwitansi (bukan tanggal entry/edit)
+  const logTglKwitansi = l => {
+    if(!(l.jenis||'').includes('kwitansi')) return l.waktu;
+    return l.tglKwitansi || _tglByNo[l.noKwitansi||l.id] || l.waktu;
+  };
+  const logMetode = l => {
+    if(l.metode) return l.metode;
+    if(!(l.jenis||'').includes('kwitansi')) return '';
+    return _metodeByNo[l.noKwitansi||l.id]||'';
+  };
 
   let logs = JSON.parse(localStorage.getItem('ya_log')||'[]');
   // Sort: aktivitas baru (punya entryTime) di atas, lama (id=no kwitansi) di bawah
@@ -1111,7 +1146,8 @@ function renderLogAktivitas(){
   if(dari) logs = logs.filter(l=>l.waktu&&l.waktu.slice(0,10)>=dari);
   if(sampai) logs = logs.filter(l=>l.waktu&&l.waktu.slice(0,10)<=sampai);
   if(jenis) logs = logs.filter(l=>l.jenis===jenis);
-  if(nama) logs = logs.filter(l=>(l.nama||'').toLowerCase().includes(nama)||(l.detail||'').toLowerCase().includes(nama));
+  if(fMetode) logs = logs.filter(l=>logMetode(l)===fMetode);
+  if(nama) logs = logs.filter(l=>(l.nama||'').toLowerCase().includes(nama)||(l.detail||'').toLowerCase().includes(nama)||String(l.noKwitansi||'').toLowerCase().includes(nama));
 
   if(!logs.length){
     wrap.innerHTML='<div class="hist-empty">Tidak ada log aktivitas ditemukan</div>';
@@ -1120,15 +1156,17 @@ function renderLogAktivitas(){
 
   const JENIS_ICON = {
     kwitansi:'🧾', siswa_baru:'➕', siswa_edit:'✏️',
-    naik_kelas:'🎓', hapus:'🗑️', lainnya:'📝'
+    naik_kelas:'🎓', hapus:'🗑️', lainnya:'📝',
+    edit_kwitansi:'✏️', hapus_kwitansi:'🗑️'
   };
   const JENIS_COLOR = {
     kwitansi:'var(--blue)', siswa_baru:'var(--green)', siswa_edit:'var(--orange)',
-    naik_kelas:'#7c3aed', hapus:'var(--danger)', lainnya:'var(--text2)'
+    naik_kelas:'#7c3aed', hapus:'var(--danger)', lainnya:'var(--text2)',
+    edit_kwitansi:'var(--orange)', hapus_kwitansi:'var(--danger)'
   };
 
   wrap.innerHTML = `<table class="siswa-table">
-    <thead><tr><th>Entry</th><th>Tgl Kwitansi</th><th>Aktivitas</th><th>Nama</th><th>Keterangan</th></tr></thead>
+    <thead><tr><th>Entry</th><th>Tgl Kwitansi</th><th>Aktivitas</th><th>Metode</th><th>Nama</th><th>Keterangan</th></tr></thead>
     <tbody>`+logs.map(l=>{
     // Entry time = waktu dicatat, Waktu kwitansi = tanggal di kwitansi
     const entryDt = l.entryTime ? new Date(l.entryTime) : null;
@@ -1147,11 +1185,13 @@ function renderLogAktivitas(){
         ${l.entryTime ? tglStr+(jamStr?`<br><span style="font-size:10px">${jamStr}</span>`:'') : '—'}
       </td>
       <td style="font-size:13px;font-weight:600;white-space:nowrap">
-        ${l.waktu ? new Date(l.waktu).toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'2-digit'}) : '—'}
+        ${(()=>{const t=logTglKwitansi(l); return t ? new Date(t).toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'2-digit'}) : '—';})()}
       </td>
       <td><span style="font-size:12px;font-weight:600;color:${color}">${icon} ${l.jenis?.replace('_',' ')||'—'}</span></td>
+      <td>${(()=>{const m=logMetode(l); if(!m) return '<span style="color:var(--text2)">—</span>';
+        const t=m==='Transfer'; return `<span style="font-size:11px;padding:2px 8px;border-radius:10px;font-weight:600;white-space:nowrap;background:${t?'#fef3c7':'var(--green-light)'};color:${t?'#92400e':'var(--green)'}">${t?'🏦 Transfer':'💵 Kas'}</span>`;})()}</td>
       <td style="font-weight:500;font-size:13px">${l.nama||'—'}</td>
-      <td style="font-size:12px;color:var(--text2)">${l.detail||'—'}</td>
+      <td style="font-size:12px;color:var(--text2)">${l.detail||'—'}${l.noKwitansi?`<div style="font-size:10px;color:var(--text2);margin-top:2px">No. ${l.noKwitansi}</div>`:''}</td>
     </tr>`;
   }).join('')+'</tbody></table>'
   +`<p style="font-size:12px;color:var(--text2);margin-top:8px">Menampilkan ${logs.length} aktivitas</p>`;
@@ -1856,11 +1896,18 @@ function doConfirmLoadCloud(){ if(typeof confirmLoadCloud==='function') confirmL
         <option value="siswa_baru">➕ Tambah Siswa</option>
         <option value="siswa_edit">✏️ Edit Siswa</option>
         <option value="naik_kelas">🎓 Naik Kelas</option>
-        <option value="hapus">🗑️ Hapus</option>
+        <option value="hapus">🗑️ Hapus Siswa</option>
+        <option value="edit_kwitansi">✏️ Edit Kwitansi</option>
+        <option value="hapus_kwitansi">🗑️ Hapus Kwitansi</option>
+      </select>
+      <select id="log-filter-metode" onchange="renderLogAktivitas()" style="padding:8px 10px;font-size:13px;border:1px solid var(--border);border-radius:7px;outline:none">
+        <option value="">Semua Metode</option>
+        <option value="Kas">💵 Kas</option>
+        <option value="Transfer">🏦 Transfer</option>
       </select>
       <input type="text" id="log-filter-nama" placeholder="Cari nama..." oninput="renderLogAktivitas()"
         style="padding:8px 10px;font-size:13px;border:1px solid var(--border);border-radius:7px;outline:none;min-width:160px">
-      <button class="btn" onclick="document.getElementById('log-filter-dari').value='';document.getElementById('log-filter-sampai').value='';document.getElementById('log-filter-jenis').value='';document.getElementById('log-filter-nama').value='';renderLogAktivitas()">✕ Reset</button>
+      <button class="btn" onclick="document.getElementById('log-filter-dari').value='';document.getElementById('log-filter-sampai').value='';document.getElementById('log-filter-jenis').value='';document.getElementById('log-filter-metode').value='';document.getElementById('log-filter-nama').value='';renderLogAktivitas()">✕ Reset</button>
       <button class="btn btn-primary" onclick="renderLogAktivitas()" style="font-size:12px">🔄 Refresh</button>
     </div>
     <div id="log-aktivitas-wrap"></div>
@@ -4294,6 +4341,7 @@ function buatKwitansiPindah(){
 
   rw.unshift(rec);
   setRiwayat(rw);
+  logKwitansi('kwitansi', rec);
   window._spLastRec=rec;
 
   // Build custom kwitansi HTML with pindah info
@@ -4650,22 +4698,7 @@ function buatKwitansiSiswaBaru(){
   newRecs.forEach(r=>rw.unshift(r));
   setRiwayat(rw);
   // Log aktivitas kwitansi
-  newRecs.forEach(r=>{
-    const logs2=JSON.parse(localStorage.getItem('ya_log')||'[]');
-    const now2=new Date().toISOString();
-    logs2.unshift({
-      id: Date.now()+Math.random(),
-      entryTime: now2,
-      waktu: now2,
-      hasJam: true,
-      jenis:'kwitansi',
-      nama: r.nama,
-      detail: r.tipe+' · '+r.bayarLabel+' · Rp '+((r.nominalBayar||0).toLocaleString('id-ID')),
-      noKwitansi: r.no
-    });
-    if(logs2.length>500) logs2.splice(500);
-    localStorage.setItem('ya_log',JSON.stringify(logs2));
-  });
+  newRecs.forEach(r=>logKwitansi('kwitansi', r));
   renderRecentEntryBar();
 
   document.getElementById('sb-kwitansi-pages').innerHTML=pages.join('');
@@ -6023,22 +6056,7 @@ function buatKwitansi(){
   setRiwayat(rw);
   window._lastNewRecs = newRecs;
   // Log aktivitas kwitansi
-  newRecs.forEach(r=>{
-    const logs2=JSON.parse(localStorage.getItem('ya_log')||'[]');
-    const now2=new Date().toISOString();
-    logs2.unshift({
-      id: Date.now()+Math.random(),
-      entryTime: now2,
-      waktu: now2,
-      hasJam: true,
-      jenis:'kwitansi',
-      nama: r.nama,
-      detail: r.tipe+' · '+r.bayarLabel+' · Rp '+((r.nominalBayar||0).toLocaleString('id-ID')),
-      noKwitansi: r.no
-    });
-    if(logs2.length>500) logs2.splice(500);
-    localStorage.setItem('ya_log',JSON.stringify(logs2));
-  });
+  newRecs.forEach(r=>logKwitansi('kwitansi', r));
   renderRecentEntryBar();
 
   // Show multi preview
@@ -6665,8 +6683,10 @@ function downloadRiwayatSiswa(){
 // ===================== RIWAYAT HAPUS =====================
 function hapusSatuRiwayat(id){
   if(!confirm('Hapus riwayat kwitansi ini?'))return;
+  const _del=getRiwayat().find(r=>r.id===id);
   const rw=getRiwayat().filter(r=>r.id!==id);
   setRiwayat(rw);
+  if(_del) logKwitansi('hapus_kwitansi', _del, 'Dihapus: '+_del.tipe+' · '+_del.bayarLabel+' · Rp '+((_del.nominalBayar||0).toLocaleString('id-ID')));
   filterAllRiwayat();
   filterRiwayat();
 }
@@ -6686,6 +6706,7 @@ function hapusSemuaRiwayat(){
   const ids=new Set(filtered.map(r=>r.id));
   const newRw=rw.filter(r=>!ids.has(r.id));
   setRiwayat(newRw);
+  filtered.slice(0,200).forEach(r=>logKwitansi('hapus_kwitansi', r, 'Dihapus (massal): '+r.tipe+' · '+r.bayarLabel+' · Rp '+((r.nominalBayar||0).toLocaleString('id-ID'))));
   filterAllRiwayat();
 }
 
@@ -8438,6 +8459,7 @@ function editCatatanInModal(recId, itemIdx){
   const idx = rw.findIndex(x=>x.id===recId);
   if(idx<0) return;
   const val = newCatatan.trim()||null;
+  logKwitansi('edit_kwitansi', rw[idx], 'Edit catatan: "'+(currentCatatan||'—')+'" → "'+(val||'—')+'"');
   if(rw[idx].items && rw[idx].items[itemIdx]!==undefined){
     rw[idx].items[itemIdx].catatan = val;
   }
@@ -8457,6 +8479,7 @@ function saveCatatanEdit(recId, newCatatanVal){
   const rw = getRiwayat();
   const idx = rw.findIndex(r=>String(r.id)===String(recId));
   if(idx<0) return;
+  logKwitansi('edit_kwitansi', rw[idx], 'Edit catatan: "'+(rw[idx].catatan||'—')+'" → "'+(newCatatan||'—')+'"');
   rw[idx].catatan = newCatatan;
   // Update items catatan too if single item
   if(rw[idx].items && rw[idx].items.length===1) rw[idx].items[0].catatan = newCatatan;
