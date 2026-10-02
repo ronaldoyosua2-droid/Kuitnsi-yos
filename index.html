@@ -176,6 +176,8 @@ input[readonly]{background:var(--gray-light);color:var(--gray)}
 .naik-lulus{color:var(--danger)}
 .tunggakan-item{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--danger-light);border-radius:7px;border:1px solid #fca5a5;margin-bottom:6px;font-size:13px}
 .tab-bar{display:flex;gap:4px;margin-bottom:16px;background:var(--gray-light);border-radius:8px;padding:4px}
+/* Tab Admin ikut menempel di bawah menu utama */
+.tab-bar{position:sticky;top:var(--tabs-top,101px);z-index:45;box-shadow:0 0 0 6px var(--page-bg,#f1f5f9)}
 .tab{padding:6px 14px;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer;color:var(--text2);transition:.15s;outline:none;user-select:none;-webkit-user-select:none}
 .tab.active{background:#fff;color:var(--blue);box-shadow:0 1px 4px rgba(0,0,0,.08)}
 .tab-content{display:none}
@@ -7972,7 +7974,10 @@ function logoutAdmin(){
 function switchTab(t){
   document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
   document.querySelectorAll('.tab-content').forEach(x=>x.classList.remove('active'));
-  event.target.classList.add('active');
+  // Tandai tab aktif (aman walau yang diklik ikon di dalam tab)
+  const _tb=(window.event&&window.event.target&&window.event.target.closest&&window.event.target.closest('.tab'))
+    || document.querySelector('.tab[onclick*="switchTab(\''+t+'\')"]');
+  if(_tb) _tb.classList.add('active');
   document.getElementById('tab-'+t).classList.add('active');
   if(t==='tunggakan')renderTunggakan();
   if(t==='naikKelas')buildNaikKelasList();
@@ -9107,11 +9112,54 @@ document.addEventListener('click',function(e){ if(e.target&&e.target.id==='metod
   function upd(){
     var nb=document.querySelector('.navbar'), bar=document.querySelector('.nav-btns');
     if(nb) document.documentElement.style.setProperty('--navbar-h', nb.offsetHeight+'px');
+    if(nb&&bar) document.documentElement.style.setProperty('--tabs-top', (nb.offsetHeight+bar.offsetHeight)+'px');
+    document.documentElement.style.setProperty('--page-bg', getComputedStyle(document.body).backgroundColor);
     if(bar&&nb) bar.classList.toggle('stuck', window.scrollY>4);
   }
   window.addEventListener('resize',upd); window.addEventListener('scroll',upd,{passive:true});
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',upd); else upd();
   setTimeout(upd,500);
+})();
+</script>
+<script>
+// Ingat posisi scroll per halaman & per tab Admin (hanya selama browser tidak di-refresh)
+(function(){
+  var pos={}, curPage='kwitansi', curTab=null;
+  function key(){ return curPage==='admin'&&curTab ? 'admin:'+curTab : curPage; }
+  function restore(k){
+    var y=pos[k]||0, token={}; restore._t=token;
+    // Konten tabel kadang dirender belakangan -> coba beberapa kali sampai posisinya tercapai
+    var tries=[0,60,150,300,600,1000,1500];
+    tries.forEach(function(ms){ setTimeout(function(){
+      if(restore._t!==token) return;                    // sudah pindah halaman lagi
+      if(Math.abs(window.scrollY-y)<=2){ restore._t=null; return; }
+      window.scrollTo(0,y);
+    },ms); });
+    // kalau user scroll sendiri, berhenti mengatur posisi
+    var stop=function(){ if(restore._t===token) restore._t=null; window.removeEventListener('wheel',stop); window.removeEventListener('touchmove',stop); window.removeEventListener('keydown',stop); };
+    window.addEventListener('wheel',stop,{passive:true}); window.addEventListener('touchmove',stop,{passive:true}); window.addEventListener('keydown',stop);
+  }
+  var _show=window.showPage;
+  if(typeof _show==='function') window.showPage=function(p){
+    pos[key()]=window.scrollY;
+    var r=_show.apply(this,arguments);
+    curPage=p;
+    if(p==='preview'){ pos.preview=0; return r; }   // preview kwitansi baru selalu dari atas
+    restore(key());
+    return r;
+  };
+  var _sw=window.switchTab;
+  if(typeof _sw==='function') window.switchTab=function(t){
+    pos[key()]=window.scrollY;
+    var r=_sw.apply(this,arguments);
+    curTab=t; restore(key());
+    return r;
+  };
+  // tab Admin awal yang aktif
+  document.addEventListener('DOMContentLoaded',function(){
+    var a=document.querySelector('.tab.active'); var m=a&&(a.getAttribute('onclick')||'').match(/switchTab\('(\w+)'\)/);
+    if(m) curTab=m[1];
+  });
 })();
 </script>
 </body>
