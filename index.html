@@ -3292,17 +3292,7 @@ function renderItemForms(){
               +(bulanSisa?'<div style="color:#92400e;margin-top:3px;font-size:11px">'+bulanSisa+'</div>':'')
               +(skipBulan.length>0?'<div style="color:#c2410c;margin-top:3px;font-size:11px">⚠️ Belum bayar (skip): <strong>'+skipBulan.join(', ')+'</strong></div>':'')
               +'<div style="color:var(--text2);margin-top:3px;font-size:11px">TA ini: '+sudahTA.length+'/12 bulan'+(berikutnya?' · Berikutnya: <strong style="color:var(--blue)">'+berikutnya+'</strong>':sudahTA.length===12?' · <strong style="color:var(--green)">Lunas semua TA ini! 🎉</strong>':'')+'</div>'
-              +(function(){
-                  // Bulan SPP terakhir yang sudah dibayar (bukan tanggal kwitansi / pengeditan)
-                  var best=null,bestIdx=-1,isPart=false;
-                  [[hist.paid,false],[hist.partial,true]].forEach(function(pr){ pr[0].forEach(function(m){
-                    var mm=String(m).trim().split(/\s+/), bi=BULAN.indexOf(mm[0]), y=parseInt(mm[1]);
-                    if(bi<0||!y) return; var idx=y*12+bi;
-                    if(idx>bestIdx||(idx===bestIdx&&!pr[1])){ bestIdx=idx; best=BULAN[bi]+' '+y; isPart=pr[1]; }
-                  }); });
-                  var txt=best?('<strong style="color:var(--text)">'+best+'</strong>'+(isPart?' (baru sebagian)':'')):lastRw.bayarLabel;
-                  return '<div style="color:var(--text2);margin-top:2px;font-size:11px">Bulan terakhir dibayar: '+txt+'</div>';
-                })()
+              +'<div style="color:var(--text2);margin-top:2px;font-size:11px">Pembayaran terakhir: '+lastRw.bayarLabel+' ('+lastRw.tanggal+')</div>'
               +'</div>';
           } else {
             infoHtml='<div style="margin-top:6px;padding:8px 12px;background:var(--gray-light);border:1px solid var(--border);border-radius:7px;font-size:12px;color:var(--text2)">'
@@ -9334,7 +9324,7 @@ body.sn-collapsed .nav-btns .nav-btn .ui-ico{margin:0!important}
 .ui-search{position:relative;width:min(340px,32vw)}
 .ui-search input{width:100%;height:42px;padding:0 14px 0 42px!important;border-radius:999px!important;border:1px solid var(--line)!important;background:var(--surface)!important;font-size:14px!important}
 .ui-search input:focus{border-color:#cfcfcf!important;box-shadow:0 0 0 4px rgba(0,0,0,.04)}
-.ui-search .s-ico{position:absolute;left:14px;top:50%;transform:translateY(-50%);width:18px;height:18px;fill:none;stroke:#6b6b6b;stroke-width:2;stroke-linecap:round}
+.ui-search .s-ico{pointer-events:none;position:absolute;left:14px;top:50%;transform:translateY(-50%);width:18px;height:18px;fill:none;stroke:#6b6b6b;stroke-width:2;stroke-linecap:round}
 .ui-search kbd{position:absolute;right:12px;top:50%;transform:translateY(-50%);font:600 11px inherit;color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:1px 6px;background:var(--soft)}
 .ui-search-dd{position:absolute;top:48px;right:0;left:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:0 18px 40px rgba(0,0,0,.12);padding:6px;display:none;max-height:420px;overflow:auto;z-index:300}
 .ui-search-dd.show{display:block}
@@ -9372,6 +9362,7 @@ input[type=text]:focus,input[type=date]:focus,input[type=number]:focus,input[typ
 .tab-bar .tab.active{background:var(--sel)!important;color:var(--ink)!important;box-shadow:none!important}
 .kw-sidebar-inner{border-radius:18px!important;border-color:var(--line)!important;box-shadow:0 10px 30px rgba(0,0,0,.08)!important}
 #note-fab,#sidebar-fab{background:var(--ink)!important}
+#metode-modal .metode-opt{border-radius:16px!important}
 /* ruang untuk Daftar Siswa di halaman lebar */
 @media(min-width:1101px){body.sb-open .page:not(#page-kwitansi):not(#page-preview){padding-right:252px}}
 
@@ -9397,7 +9388,7 @@ input[type=text]:focus,input[type=date]:focus,input[type=number]:focus,input[typ
 .rw-pill .nb{min-width:20px;height:20px;border-radius:999px;background:var(--blue);color:#fff;font-size:11px;display:inline-flex;align-items:center;justify-content:center;padding:0 6px}
 .rw-search{position:relative;flex:1;min-width:200px;max-width:340px}
 .rw-search input{box-sizing:border-box;width:100%;height:42px;border-radius:999px!important;padding-left:40px!important;margin:0!important}
-.rw-search svg{position:absolute;left:14px;top:50%;transform:translateY(-50%);width:17px;height:17px;fill:none;stroke:#7a7a7a;stroke-width:2;stroke-linecap:round}
+.rw-search svg{pointer-events:none;position:absolute;left:14px;top:50%;transform:translateY(-50%);width:17px;height:17px;fill:none;stroke:#7a7a7a;stroke-width:2;stroke-linecap:round}
 .rw-tools .grow{flex:1}
 .rw-pop{position:absolute;top:50px;left:0;z-index:400;background:var(--surface);border:1px solid var(--line);border-radius:22px;box-shadow:0 24px 60px rgba(0,0,0,.14),0 2px 6px rgba(0,0,0,.04);display:none;cursor:default;font-weight:400}
 .rw-pop.show{display:block;animation:rwPop .16s ease-out}
@@ -9461,6 +9452,90 @@ input[type=text]:focus,input[type=date]:focus,input[type=number]:focus,input[typ
 .rw-hidden{display:none!important}
 @media(max-width:1100px){.rw-summary{grid-template-columns:1fr}.rw-stat+.rw-stat{border-left:none;border-top:1px solid #f1f1f1}}
 @media print{body{padding:0!important}.navbar,.ui-search{display:none!important}}
+/* ===================== MOBILE (HP) ===================== */
+@media(max-width:700px){
+  :root,body.sn-collapsed{--sidenav-w:0px}
+  body{padding-left:0!important;padding-top:60px!important;padding-bottom:84px!important}
+  /* menu jadi tab bar bawah */
+  .nav-btns{top:auto!important;bottom:0!important;left:0!important;right:0!important;width:100%!important;height:auto;flex-direction:row!important;flex-wrap:nowrap!important;
+    padding:6px 4px calc(6px + env(safe-area-inset-bottom))!important;gap:0!important;border-right:none!important;border-top:1px solid var(--line)!important;
+    justify-content:space-around;overflow:visible!important;box-shadow:0 -6px 18px rgba(0,0,0,.06)!important;background:var(--surface)!important}
+  .sn-brand,.sn-label{display:none!important}
+  .nav-btns .nav-btn{flex:1 1 0!important;width:auto!important;min-width:0;flex-direction:column!important;align-items:center!important;justify-content:center!important;
+    font-size:10px!important;font-weight:500!important;padding:7px 0 5px!important;gap:3px;border-radius:12px!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.1;margin:0!important}
+  .nav-btns .nav-btn .ui-ico{margin:0!important;width:21px!important;height:21px!important}
+  .nav-btns .nav-btn.active{background:var(--blue-light)!important;color:var(--blue)!important}
+  .nav-btns .nav-btn[onclick*="showPage('admin')"]{margin-top:0!important}
+  .nav-btns .nav-btn[onclick*="showPage('admin')"]::before{display:none!important}
+  #nav-preview-btn{position:fixed!important;bottom:84px;left:50%;transform:translateX(-50%);width:auto!important;flex:none!important;font-size:13px!important;flex-direction:row!important;padding:10px 18px!important;gap:6px;box-shadow:0 6px 16px rgba(0,0,0,.2)!important;border-radius:999px!important}
+  /* header ringkas */
+  .navbar{left:0!important;height:60px;padding:0 14px!important;gap:8px}
+  .navbar h1{font-size:19px!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:56vw}
+  .navbar h1 .pt-muted{display:none}
+  #live-clock{display:none!important}
+  #sync-indicator{padding:7px!important;gap:0!important}
+  #sync-label{display:none}
+  .ui-search{width:40px}
+  .ui-search input{padding:0 0 0 40px!important;height:40px;color:transparent}
+  .ui-search input::placeholder{color:transparent}
+  .ui-search kbd{display:none}
+  .ui-search .s-ico{left:11px}
+  .ui-search:focus-within{position:fixed;left:12px;right:12px;top:10px;width:auto;z-index:600}
+  .ui-search:focus-within input{color:var(--ink);padding-right:14px!important;box-shadow:0 10px 30px rgba(0,0,0,.15)!important}
+  .ui-search:focus-within input::placeholder{color:var(--muted)}
+  /* halaman & kartu */
+  .page{padding:12px!important;margin-top:0!important}
+  #page-kwitansi{max-width:100%!important}
+  .card{padding:16px!important;border-radius:16px!important;overflow-x:auto}
+  .page [style*="grid-template-columns"]:not(.rw-summary){grid-template-columns:1fr!important}
+  .page .card div[style*="display:flex"]{flex-wrap:wrap}
+  .page input,.page select,.page textarea{max-width:100%;min-width:0}
+  .card-title{font-size:15px!important}
+  .tab-bar{flex-wrap:nowrap!important;overflow-x:auto;border-radius:14px!important;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .tab-bar::-webkit-scrollbar{display:none}
+  .tab-bar .tab{flex-shrink:0;white-space:nowrap}
+  #note-fab{bottom:88px!important;right:14px!important}
+  /* Riwayat */
+  .rw-summary{grid-template-columns:1fr!important;border-radius:16px}
+  .rw-stat{padding:14px 16px;gap:12px}
+  .rw-stat .ic{width:42px;height:42px}
+  .rw-stat .vl{font-size:18px}
+  .rw-tools{gap:8px}
+  .rw-search{flex-basis:100%;max-width:none}
+  .rw-pill{height:38px;padding:0 13px;font-size:13px}
+  .rw-tools .grow{display:none}
+  .rw-pop{position:fixed!important;left:0!important;right:0!important;bottom:0!important;top:auto!important;width:auto!important;max-width:none!important;
+    border-radius:22px 22px 0 0!important;z-index:1000!important;max-height:82vh;overflow:auto;padding-bottom:env(safe-area-inset-bottom)}
+  .rw-fp .body{grid-template-columns:1fr!important;padding:12px}
+  .rw-fp .cats{display:flex;overflow-x:auto;gap:4px}
+  .rw-fp .cat{white-space:nowrap;flex-shrink:0;padding:9px 12px}
+  .rw-fp .opts{max-height:46vh;padding:6px 6px 0}
+  .rw-fp .foot{padding:10px 14px 16px}
+  .rw-dp{width:auto!important}
+  .rw-table thead{display:none}
+  .rw-table,.rw-table tbody{display:block}
+  .rw-table tr{display:grid;grid-template-columns:auto auto 1fr;grid-template-areas:"who who amt" "ket ket ket" "dt jn mt" "st st st";gap:8px 10px;padding:14px 2px;border-bottom:1px solid var(--line)}
+  .rw-table td{display:block;padding:0!important;border:none!important;background:none!important}
+  .rw-table td:nth-child(1){grid-area:dt;align-self:center;font-size:12.5px}
+  .rw-table td:nth-child(2){grid-area:who}
+  .rw-table td:nth-child(3){grid-area:ket;max-width:none;white-space:normal;font-size:13px}
+  .rw-table td:nth-child(4){grid-area:jn}
+  .rw-table td:nth-child(5){grid-area:mt}
+  .rw-table td:nth-child(6){grid-area:amt;align-self:center;font-size:15px}
+  .rw-table td:nth-child(7){grid-area:st}
+  .rw-cat{font-size:12.5px;gap:5px}
+  .rw-cat .ci{width:22px;height:22px}
+  .rw-who{min-width:0}
+  /* baris siswa di form kwitansi: nama penuh, kelas + hapus di bawahnya */
+  .sf-row > div:first-child{flex:1 1 100%!important;min-width:0!important}
+  .sf-row .sf-kelas{flex:1 1 auto;width:auto!important}
+  /* tabel lain: geser ke samping, jangan diperas */
+  .siswa-table td,.siswa-table th,.hist-table td,.hist-table th{white-space:nowrap}
+  /* label menu versi pendek */
+  .nav-btns .nav-btn .nb-t{font-size:0;display:flex;flex-direction:column;align-items:center;gap:3px}
+  .nav-btns .nav-btn .nb-t::after{content:attr(data-s);font-size:10px}
+}
+
 body.ui-dark .card,body.ui-dark .kw-sidebar-inner,body.ui-dark #recent-entry-bar{background:var(--surface)!important;color:var(--ink)}
 body.ui-dark input,body.ui-dark select,body.ui-dark textarea{background:var(--soft)!important;color:var(--ink)!important}
 body.ui-dark .navbar.scrolled{background:rgba(15,23,42,.85)!important}
@@ -9522,6 +9597,14 @@ body.ui-dark .navbar.scrolled{background:rgba(15,23,42,.85)!important}
     try{ if(localStorage.getItem('ya_sn_collapsed')==='1') document.body.classList.add('sn-collapsed'); }catch(e){}
   }
 
+  // label pendek untuk tab bar HP
+  (function(){
+    var SH={kwitansi:'Kwitansi',siswaBaru:'Baru',siswaPindah:'Pindah',riwayat:'Riwayat',aktivitas:'Log',tagihan:'Tagihan',admin:'Admin',preview:'Preview'};
+    document.querySelectorAll('.nav-btns .nav-btn').forEach(function(b){
+      var m=(b.getAttribute('onclick')||'').match(/showPage\('(\w+)'\)/); if(!m||!SH[m[1]]) return;
+      [].slice.call(b.childNodes).forEach(function(n){ if(n.nodeType===3&&n.nodeValue.trim()){ var sp=document.createElement('span'); sp.className='nb-t'; sp.setAttribute('data-s',SH[m[1]]); sp.textContent=n.nodeValue.trim(); b.replaceChild(sp,n); } });
+    });
+  })();
   // ---------- 3. Header: judul halaman + pencarian ----------
   var nb=document.querySelector('.navbar'), h1=nb&&nb.querySelector('h1');
   var TITLES={kwitansi:['','Buat Kwitansi'],siswaBaru:['','Siswa Baru'],siswaPindah:['','Siswa Pindah'],riwayat:['Semua','Riwayat Pembayaran'],
