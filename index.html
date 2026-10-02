@@ -1656,10 +1656,10 @@ function doConfirmLoadCloud(){ if(typeof confirmLoadCloud==='function') confirmL
 
   <!-- SISWA LIST -->
   <div class="card">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap">
       <div class="card-title" style="margin:0">Daftar Siswa</div>
       <button class="btn btn-primary" style="font-size:12px" onclick="tambahSiswaForm()">+ Tambah Siswa</button>
-      <span id="siswa-wajib-hint" style="font-size:11px;color:var(--text2);display:none">
+      <span id="siswa-wajib-hint" style="font-size:12px;color:var(--text2);display:none;flex-basis:100%;order:3;background:var(--gray-light);border-radius:10px;padding:7px 12px">
         ⚠️ Nama & kelas wajib untuk SPP/Pengembangan/Pendaftaran
       </span>
     </div>
@@ -3292,7 +3292,17 @@ function renderItemForms(){
               +(bulanSisa?'<div style="color:#92400e;margin-top:3px;font-size:11px">'+bulanSisa+'</div>':'')
               +(skipBulan.length>0?'<div style="color:#c2410c;margin-top:3px;font-size:11px">⚠️ Belum bayar (skip): <strong>'+skipBulan.join(', ')+'</strong></div>':'')
               +'<div style="color:var(--text2);margin-top:3px;font-size:11px">TA ini: '+sudahTA.length+'/12 bulan'+(berikutnya?' · Berikutnya: <strong style="color:var(--blue)">'+berikutnya+'</strong>':sudahTA.length===12?' · <strong style="color:var(--green)">Lunas semua TA ini! 🎉</strong>':'')+'</div>'
-              +'<div style="color:var(--text2);margin-top:2px;font-size:11px">Pembayaran terakhir: '+lastRw.bayarLabel+' ('+lastRw.tanggal+')</div>'
+              +(function(){
+                  // Bulan SPP terakhir yang sudah dibayar (bukan tanggal kwitansi / pengeditan)
+                  var best=null,bestIdx=-1,isPart=false;
+                  [[hist.paid,false],[hist.partial,true]].forEach(function(pr){ pr[0].forEach(function(m){
+                    var mm=String(m).trim().split(/\s+/), bi=BULAN.indexOf(mm[0]), y=parseInt(mm[1]);
+                    if(bi<0||!y) return; var idx=y*12+bi;
+                    if(idx>bestIdx||(idx===bestIdx&&!pr[1])){ bestIdx=idx; best=BULAN[bi]+' '+y; isPart=pr[1]; }
+                  }); });
+                  var txt=best?('<strong style="color:var(--text)">'+best+'</strong>'+(isPart?' (baru sebagian)':'')):lastRw.bayarLabel;
+                  return '<div style="color:var(--text2);margin-top:2px;font-size:11px">Bulan terakhir dibayar: '+txt+'</div>';
+                })()
               +'</div>';
           } else {
             infoHtml='<div style="margin-top:6px;padding:8px 12px;background:var(--gray-light);border:1px solid var(--border);border-radius:7px;font-size:12px;color:var(--text2)">'
@@ -9341,6 +9351,7 @@ body.sn-collapsed .nav-btns .nav-btn .ui-ico{margin:0!important}
 .card-title{font-size:16px!important;font-weight:600!important;color:var(--ink)!important;text-transform:none!important;letter-spacing:-.01em!important}
 .card-title::before{display:none!important}
 .btn{border-radius:999px!important;border:1px solid var(--line);font-weight:500;padding:8px 16px;box-shadow:0 1px 2px rgba(0,0,0,.04);transition:background .15s,box-shadow .15s,transform .05s}
+.btn,.card-title{white-space:nowrap}
 .btn:not(.btn-primary):not(.btn-green):not(.btn-danger):hover{background:var(--hover)}
 .btn-danger{background:var(--danger)!important;border-color:transparent!important;color:#fff!important}
 .btn-danger:hover{filter:brightness(.95)}
