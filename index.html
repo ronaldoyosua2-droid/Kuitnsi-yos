@@ -69,6 +69,32 @@ button,[onclick],label{cursor:pointer!important}
 .nav-btns{position:sticky;top:var(--navbar-h,57px);z-index:99;background:inherit;flex-wrap:wrap;padding:8px 4px;border-radius:0;transition:box-shadow .2s}
 .nav-btns.stuck{box-shadow:0 4px 10px -6px rgba(0,0,0,.25)}
 .card,.tab-content{scroll-margin-top:120px}
+/* ===== Menu utama vertikal di sisi kiri ===== */
+:root{--sidenav-w:172px}
+body{padding-left:var(--sidenav-w)}
+.nav-btns{position:fixed;top:var(--navbar-h,57px);left:0;bottom:0;width:var(--sidenav-w);z-index:99;
+  flex-direction:column;flex-wrap:nowrap;align-items:stretch;gap:4px;padding:14px 10px;border-radius:0;
+  background:var(--white,#fff);border-right:1px solid var(--border);box-shadow:2px 0 10px rgba(0,0,0,.04);overflow-y:auto}
+.nav-btns.stuck{box-shadow:2px 0 10px rgba(0,0,0,.04)}
+.nav-btns .nav-btn{background:transparent;color:var(--text2);justify-content:flex-start;text-align:left;
+  padding:10px 12px;border-radius:9px;font-size:13px;font-weight:600;width:100%;white-space:nowrap}
+.nav-btns .nav-btn .ui-ico{width:18px;height:18px;margin-right:10px;flex-shrink:0}
+.nav-btns .nav-btn:hover{background:var(--gray-light);color:var(--text)}
+.nav-btns .nav-btn.active{background:var(--blue-light,#e8f0fb);color:var(--blue);box-shadow:inset 3px 0 0 var(--blue)}
+#nav-preview-btn{color:#fff!important}
+/* Admin di paling bawah menu, dipisah garis tipis */
+.nav-btns .nav-btn[onclick*="showPage('admin')"]{order:99;margin-top:auto;position:relative}
+.nav-btns .nav-btn[onclick*="showPage('admin')"]::before{content:'';position:absolute;left:6px;right:6px;top:-8px;border-top:1px solid var(--border)}
+/* Menu Admin di paling bawah */
+.nav-btns .nav-btn[onclick*="showPage('admin')"]{order:99;margin-top:auto;position:relative}
+.nav-btns .nav-btn[onclick*="showPage('admin')"]::before{content:'';position:absolute;left:6px;right:6px;top:-8px;border-top:1px solid var(--border)}
+/* Layar sempit: menu jadi ikon saja */
+@media(max-width:1000px){
+  :root{--sidenav-w:64px}
+  .nav-btns .nav-btn{flex-direction:column;justify-content:center;align-items:center;font-size:9.5px;padding:8px 2px;white-space:normal;line-height:1.15;text-align:center}
+  .nav-btns .nav-btn .ui-ico{margin:0 0 3px 0}
+}
+@media print{body{padding-left:0!important}.nav-btns{display:none!important}}
 .nav-btn{padding:7px 16px;border:none;border-radius:7px;background:rgba(0,0,0,.3);color:#fff;font-size:12px;font-weight:700;cursor:pointer;transition:.15s}
 .nav-btn:hover{background:rgba(0,0,0,.5);color:#fff}
 .nav-btn.active{background:#fff;color:#1a56a0;font-weight:700;box-shadow:0 1px 4px rgba(0,0,0,.2)}
@@ -1216,7 +1242,8 @@ function renderLogAktivitas(){
 // Batas atas sidebar = tepat di bawah header + menu tab (supaya tidak tertutup)
 function sidebarMinTop(){
   var bar=document.querySelector('.nav-btns'), nb=document.querySelector('.navbar');
-  var b=bar?bar.getBoundingClientRect().bottom:(nb?nb.getBoundingClientRect().bottom:50);
+  var vert=bar&&getComputedStyle(bar).position==='fixed';
+  var b=(bar&&!vert)?bar.getBoundingClientRect().bottom:(nb?nb.getBoundingClientRect().bottom:50);
   return Math.round(Math.max(50,b)+6);
 }
 function initSidebarDrag(){
@@ -9136,7 +9163,8 @@ document.addEventListener('click',function(e){ if(e.target&&e.target.id==='metod
   function upd(){
     var nb=document.querySelector('.navbar'), bar=document.querySelector('.nav-btns');
     if(nb) document.documentElement.style.setProperty('--navbar-h', nb.offsetHeight+'px');
-    if(nb&&bar) document.documentElement.style.setProperty('--tabs-top', (nb.offsetHeight+bar.offsetHeight)+'px');
+    if(nb&&bar){ var vert=getComputedStyle(bar).position==='fixed';
+      document.documentElement.style.setProperty('--tabs-top', (nb.offsetHeight+(vert?0:bar.offsetHeight)+(vert?8:0))+'px'); }
     document.documentElement.style.setProperty('--page-bg', getComputedStyle(document.body).backgroundColor);
     if(bar&&nb) bar.classList.toggle('stuck', window.scrollY>4);
   }
