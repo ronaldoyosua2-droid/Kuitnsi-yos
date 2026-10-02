@@ -77,6 +77,14 @@ button,[onclick],label{cursor:pointer!important}
 .kw-main{padding-right:216px;max-width:calc(100% - 0px)}
 .kw-sidebar{position:fixed;right:8px;top:110px;width:220px;z-index:50;padding:0}
 @media(max-width:1100px){.kw-main{padding-right:0}.kw-sidebar{display:none}}
+/* Minimize Daftar Siswa */
+.sb-min-btn{border:none;background:var(--gray-light);color:var(--text2);width:24px;height:22px;border-radius:6px;cursor:pointer;font-size:16px;font-weight:700;line-height:1;display:inline-flex;align-items:center;justify-content:center;padding:0}
+.sb-min-btn:hover{background:var(--blue);color:#fff}
+.kw-sidebar.sb-minimized{display:none!important}
+#sidebar-fab{position:fixed;bottom:20px;right:72px;z-index:999;height:44px;padding:0 16px 0 14px;border-radius:22px;background:#1a56a0;color:#fff;border:none;font-size:13px;font-weight:600;cursor:pointer;box-shadow:0 3px 12px rgba(0,0,0,.25);display:none;align-items:center;gap:2px;transition:.2s}
+#sidebar-fab:hover{transform:translateY(-2px);box-shadow:0 6px 16px rgba(0,0,0,.3)}
+#sidebar-fab.show{display:inline-flex}
+@media(max-width:1100px){#sidebar-fab.show{display:none}}
 .kw-sidebar-inner{background:#fff;border-radius:12px;border:1px solid var(--border);box-shadow:0 4px 16px rgba(0,0,0,.12);padding:12px 4px 12px 12px;height:calc(100vh - 125px);max-height:calc(100vh - 125px);overflow-y:auto}
 .kw-sidebar-inner::-webkit-scrollbar{width:4px}
 .kw-sidebar-inner::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
@@ -1205,6 +1213,12 @@ function renderLogAktivitas(){
 
 // ===================== SIDEBAR DAFTAR SISWA =====================
 // ===================== SIDEBAR DRAG & RESIZE =====================
+// Batas atas sidebar = tepat di bawah header + menu tab (supaya tidak tertutup)
+function sidebarMinTop(){
+  var bar=document.querySelector('.nav-btns'), nb=document.querySelector('.navbar');
+  var b=bar?bar.getBoundingClientRect().bottom:(nb?nb.getBoundingClientRect().bottom:50);
+  return Math.round(Math.max(50,b)+6);
+}
 function initSidebarDrag(){
   const sidebar = document.querySelector('.kw-sidebar');
   if(!sidebar) return;
@@ -1217,7 +1231,14 @@ function initSidebarDrag(){
   const header = inner.querySelector('div[style*="font-weight:700"]');
   if(header){
     header.style.cursor = 'grab';
-    header.title = 'Drag untuk pindahkan';
+    header.title = 'Drag untuk pindahkan · klik 2x untuk kembali ke posisi awal (samping kanan)';
+    // Klik 2x judul -> kembali ke posisi & ukuran bawaan di samping kanan
+    header.addEventListener('dblclick', function(e){
+      if(e.target.closest('.sb-min-btn')) return;
+      sidebar.style.left=''; sidebar.style.right=''; sidebar.style.top=''; sidebar.style.width='';
+      inner.style.maxHeight=''; inner.style.height='';
+      try{ localStorage.removeItem('ya_sidebar_pos'); }catch(_){}
+    });
   }
 
   let isDragging = false, isResizing = false;
@@ -1228,6 +1249,7 @@ function initSidebarDrag(){
     // Hanya drag dari header (bukan dari select/input)
     if(e.target.tagName==='SELECT'||e.target.tagName==='INPUT'||e.target.closest('.siswa-quick-item')) return;
     if(e.target.closest('[data-resize]')) return;
+    if(e.target.closest('.sb-min-btn')) return;
     isDragging = true;
     startX = e.clientX;
     startY = e.clientY;
@@ -1246,7 +1268,7 @@ function initSidebarDrag(){
       const dx = e.clientX - startX;
       const dy = e.clientY - startY;
       const newLeft = Math.max(0, Math.min(window.innerWidth - sidebar.offsetWidth, startLeft + dx));
-      const newTop = Math.max(50, Math.min(window.innerHeight - 100, startTop + dy));
+      const newTop = Math.max(sidebarMinTop(), Math.min(window.innerHeight - 100, startTop + dy));
       sidebar.style.left = newLeft + 'px';
       sidebar.style.top = newTop + 'px';
     }
@@ -1280,7 +1302,7 @@ function initSidebarDrag(){
     if(saved){
       sidebar.style.right = 'auto';
       sidebar.style.left = Math.max(0, Math.min(window.innerWidth - saved.width, saved.left)) + 'px';
-      sidebar.style.top = Math.max(50, saved.top) + 'px';
+      sidebar.style.top = Math.max(sidebarMinTop(), Math.min(window.innerHeight - 100, saved.top)) + 'px';
       if(saved.width) sidebar.style.width = saved.width + 'px';
       if(saved.height){ inner.style.maxHeight = saved.height + 'px'; inner.style.height = saved.height + 'px'; }
     }
@@ -1797,6 +1819,7 @@ function doConfirmLoadCloud(){ if(typeof confirmLoadCloud==='function') confirmL
   <div class="kw-sidebar-inner">
     <div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center">
       <span>📋 Daftar Siswa</span>
+      <button type="button" class="sb-min-btn" onclick="minimizeSidebar(true)" title="Minimize (sembunyikan ke tombol bawah)">&#8211;</button>
     </div>
     <div style="margin-bottom:8px">
       <select id="sidebar-filter-kelas" onchange="renderSidebarSiswa()" style="width:100%;padding:6px 8px;font-size:12px;border:1px solid var(--border);border-radius:6px;outline:none">
@@ -8871,6 +8894,7 @@ function resetDariPreview(){
 
 <!-- ===== CATATAN POPUP ===== -->
 <button id="note-fab" onclick="toggleNotePopup()" title="Catatan Cepat">📝</button>
+<button id="sidebar-fab" onclick="minimizeSidebar(false)" title="Tampilkan Daftar Siswa">📋 Daftar Siswa</button>
 
 <div id="note-popup">
   <div class="np-header">
@@ -9160,6 +9184,29 @@ document.addEventListener('click',function(e){ if(e.target&&e.target.id==='metod
     var a=document.querySelector('.tab.active'); var m=a&&(a.getAttribute('onclick')||'').match(/switchTab\('(\w+)'\)/);
     if(m) curTab=m[1];
   });
+})();
+</script>
+<script>
+// Minimize / tampilkan kembali Daftar Siswa (status diingat di browser ini)
+function fixSidebarTop(){
+  var sb=document.querySelector('.kw-sidebar'); if(!sb||typeof sidebarMinTop!=='function') return;
+  if(sb.classList.contains('sb-minimized')||getComputedStyle(sb).display==='none') return;   // sedang tersembunyi
+  var r=sb.getBoundingClientRect(), mt=sidebarMinTop();
+  if(r.top<mt){ sb.style.top=mt+'px'; }
+}
+window.addEventListener('resize',function(){ setTimeout(fixSidebarTop,50); });
+setTimeout(fixSidebarTop,700);
+function minimizeSidebar(min){
+  var sb=document.querySelector('.kw-sidebar'), fab=document.getElementById('sidebar-fab');
+  if(!sb||!fab) return;
+  sb.classList.toggle('sb-minimized',!!min);
+  fab.classList.toggle('show',!!min);
+  if(!min) setTimeout(fixSidebarTop,0);
+  try{ localStorage.setItem('ya_sidebar_min', min?'1':'0'); }catch(e){}
+}
+(function(){
+  var st='0'; try{ st=localStorage.getItem('ya_sidebar_min')||'0'; }catch(e){}
+  if(st==='1') minimizeSidebar(true);
 })();
 </script>
 </body>
