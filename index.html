@@ -1174,6 +1174,27 @@ function renderLogAktivitas(){
   };
 
   let logs = JSON.parse(localStorage.getItem('ya_log')||'[]');
+  // Lengkapi log dari data riwayat (yang ikut tersync antar perangkat):
+  // - kwitansi yang belum tercatat di log perangkat ini ditambahkan
+  // - waktu entry diambil dari ID kwitansi (= waktu kwitansi dibuat)
+  (function(){
+    const idTime = id => (typeof id==='number' && id>1.5e12 && id<4e12) ? new Date(id).toISOString() : null;
+    const rwAll = getRiwayat(), byNo = {};
+    rwAll.forEach(r=>{ if(r.no) byNo[r.no]=r; });
+    const have = new Set();
+    logs.forEach(l=>{
+      if(!(l.jenis||'').includes('kwitansi')) return;
+      const no = l.noKwitansi || l.id; have.add(String(no));
+      if(!l.entryTime && byNo[no]){ const t=idTime(byNo[no].id); if(t){ l.entryTime=t; l.waktu=t; l.hasJam=true; } }
+    });
+    rwAll.forEach(r=>{
+      if(!r.no || have.has(String(r.no))) return;
+      const t = idTime(r.id);
+      logs.push({ id:r.no, noKwitansi:r.no, entryTime:t, waktu:t||(r.tanggal+'T00:00:00'), hasJam:!!t, jenis:'kwitansi',
+        nama:r.nama, detail:(r.tipe||'')+' · '+(r.bayarLabel||'')+' · Rp '+((r.nominalBayar||0).toLocaleString('id-ID')),
+        metode:r.metode||'Kas', tglKwitansi:r.tanggal, _dariRiwayat:true });
+    });
+  })();
   // Sort: aktivitas baru (punya entryTime) di atas, lama (id=no kwitansi) di bawah
   logs.sort((a,b)=>{
     const ta = a.entryTime||'';
@@ -3292,7 +3313,17 @@ function renderItemForms(){
               +(bulanSisa?'<div style="color:#92400e;margin-top:3px;font-size:11px">'+bulanSisa+'</div>':'')
               +(skipBulan.length>0?'<div style="color:#c2410c;margin-top:3px;font-size:11px">⚠️ Belum bayar (skip): <strong>'+skipBulan.join(', ')+'</strong></div>':'')
               +'<div style="color:var(--text2);margin-top:3px;font-size:11px">TA ini: '+sudahTA.length+'/12 bulan'+(berikutnya?' · Berikutnya: <strong style="color:var(--blue)">'+berikutnya+'</strong>':sudahTA.length===12?' · <strong style="color:var(--green)">Lunas semua TA ini! 🎉</strong>':'')+'</div>'
-              +'<div style="color:var(--text2);margin-top:2px;font-size:11px">Pembayaran terakhir: '+lastRw.bayarLabel+' ('+lastRw.tanggal+')</div>'
+              +(function(){
+                  // Bulan SPP terakhir yang sudah dibayar (bukan tanggal kwitansi / pengeditan)
+                  var best=null,bestIdx=-1,isPart=false;
+                  [[hist.paid,false],[hist.partial,true]].forEach(function(pr){ pr[0].forEach(function(m){
+                    var mm=String(m).trim().split(/\s+/), bi=BULAN.indexOf(mm[0]), y=parseInt(mm[1]);
+                    if(bi<0||!y) return; var idx=y*12+bi;
+                    if(idx>bestIdx||(idx===bestIdx&&!pr[1])){ bestIdx=idx; best=BULAN[bi]+' '+y; isPart=pr[1]; }
+                  }); });
+                  var txt=best?('<strong style="color:var(--text)">'+best+'</strong>'+(isPart?' (baru sebagian)':'')):lastRw.bayarLabel;
+                  return '<div style="color:var(--text2);margin-top:2px;font-size:11px">Bulan terakhir dibayar: '+txt+'</div>';
+                })()
               +'</div>';
           } else {
             infoHtml='<div style="margin-top:6px;padding:8px 12px;background:var(--gray-light);border:1px solid var(--border);border-radius:7px;font-size:12px;color:var(--text2)">'
@@ -3476,12 +3507,12 @@ function renderItemForms(){
           <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
             <div style="flex:1">
               <label style="font-size:11px;color:var(--text2);display:block;margin-bottom:3px">Nominal Dibayar (Rp)</label>
-              <input type="number" placeholder="350000" value="${it.sppCicilanNominal||''}"
+              <input type="number" placeholder="${(sppCicilanTarget(i)||{}).total||350000}" value="${it.sppCicilanNominal||''}"
                 oninput="itemList[${i}].sppCicilanNominal=parseInt(this.value)||0;hitungCicilanSPP(${i});updateCicilanResultDiv(${i})"
                 style="width:100%;padding:8px 10px;font-size:15px;font-weight:700;color:var(--blue);border:1.5px solid #93c5fd;border-radius:7px;outline:none;box-sizing:border-box">
             </div>
           </div>
-          <div id="cicilan-result-${i}">
+          <div id="cicilan-result-${i}">${(setTimeout(()=>updateCicilanResultDiv(i),0),'')}
             ${it.sppCicilanResult&&it.sppCicilanResult.length
               ? it.sppCicilanResult.map(r=>`<div style="display:flex;justify-content:space-between;padding:4px 10px;background:#fff;border-radius:5px;font-size:12px;border:1px solid #dbeafe;margin-bottom:3px"><span>${r.label}</span><span style="font-weight:700;color:${r.sisa>0?'#dc2626':'var(--green)'}">${fmt(r.bayar)}${r.sisa>0?` <span style="color:#dc2626;font-weight:700">(kurang ${fmt(r.sisa)})</span>`:' ✅'}</span></div>`).join('')
               : '<div style="font-size:11px;color:var(--text2)">Ketik nominal untuk melihat rincian cicilan.</div>'
@@ -3619,6 +3650,8 @@ function onSppTahun(i, val){
 }
 function onSppBulanDari(i, val){
   itemList[i].sppDari = val===''?undefined:parseInt(val);
+  itemList[i].sppDariOtomatis = false;
+  if(itemList[i].sppSampaiAuto){ itemList[i].sppSampai = undefined; itemList[i].sppSampaiAuto = false; }
   if(!itemList[i].sppTahun) itemList[i].sppTahun = new Date().getFullYear();
   updateSppRange(i);
 }
@@ -3703,6 +3736,7 @@ function onSppTahunSampai(i, val){
 
 function onSppBulanSampai(i, val){
   itemList[i].sppSampai = val===''?undefined:parseInt(val);
+  itemList[i].sppSampaiAuto = false;   // dipilih manual -> jadi batas cicilan
   // Validasi: jika tahun sama, bulan sampai tidak boleh < bulan dari
   const thnDari=itemList[i].sppTahun||new Date().getFullYear();
   const thnSampai=itemList[i].sppTahunSampai||thnDari;
@@ -3756,6 +3790,11 @@ function checkItemDuplicateSpp(i){
 }
 
 function updateSppRange(i){
+  _updateSppRangeBase(i);
+  const it = itemList[i];
+  if(it && it.sppCicilan){ hitungCicilanSPP(i); renderItemForms(); }
+}
+function _updateSppRangeBase(i){
   const it = itemList[i];
   const dari = it.sppDari;
   const sampai = it.sppSampai;
@@ -3924,8 +3963,53 @@ function onSppCicilanToggle(i, checked){
   itemList[i].sppCicilan = checked;
   itemList[i].sppCicilanNominal = null;
   itemList[i].sppCicilanResult = null;
+  itemList[i].sppCicilanLebih = 0;
   if(checked) itemList[i].sppKustom = false; // cicilan dan kustom tidak bisa bersamaan
+  // Lupa pilih bulan? isi otomatis "Dari" = bulan SPP berikutnya yang belum dibayar
+  if(checked && itemList[i].sppDari===undefined){
+    const nb = sppBulanBerikutnya(siswaList.length?siswaList[0].nama:null);
+    if(nb){ itemList[i].sppDari=nb.bulan; itemList[i].sppTahun=nb.tahun; itemList[i].sppTahunSampai=nb.tahun;
+      itemList[i].sppSampai=undefined; itemList[i].sppSampaiAuto=false; itemList[i].sppDariOtomatis=true;
+      _updateSppRangeBase(i); return; }
+  }
+  if(!checked){
+    if(itemList[i].sppSampaiAuto){ itemList[i].sppSampai = undefined; itemList[i].sppSampaiAuto = false; }
+    if(itemList[i].sppDari!==undefined){ _updateSppRangeBase(i); return; }
+  }
   renderItemForms();
+}
+
+// Bulan SPP berikutnya yang belum dibayar di TA aktif (sama dengan "Berikutnya" di Status SPP)
+function sppBulanBerikutnya(nama){
+  if(!nama) return null;
+  const hist=getSppHistory(nama), sisamap=getSppSisaPerBulan(nama);
+  const taY=parseInt(getTAAktif().split('/')[0]), list=[];
+  for(let b=6;b<12;b++) list.push([b,taY]);
+  for(let b=0;b<6;b++) list.push([b,taY+1]);
+  const key=x=>BULAN[x[0]]+' '+x[1];
+  let last=-1; list.forEach((x,k)=>{ if(hist.paid.has(key(x))||hist.partial.has(key(x))) last=k; });
+  // bulan sebagian (masih kurang) didahulukan
+  for(let k=0;k<list.length;k++){ if(sisamap[key(list[k])]>0) return {bulan:list[k][0],tahun:list[k][1]}; }
+  const nx=list[last+1]; return nx?{bulan:nx[0],tahun:nx[1]}:null;
+}
+
+// Rentang bulan yang DIPILIH user (Dari–Sampai). null = Sampai belum dipilih (cicilan bebas memanjang)
+function sppCicilanTarget(i){
+  const it=itemList[i]; const siswa=siswaList[0];
+  if(!it||it.sppDari===undefined||!siswa) return null;
+  const thnD=it.sppTahun||new Date().getFullYear();
+  const manual = it.sppSampai!==undefined && !it.sppSampaiAuto;
+  const thnS=manual?(it.sppTahunSampai||thnD):thnD;
+  const n = manual ? Math.max(1,(thnS-thnD)*12+(it.sppSampai-it.sppDari)+1) : 0;
+  const spp=getSPP(), sisamap=getSppSisaPerBulan(siswa.nama), months=[];
+  for(let k=0;k<n;k++){
+    const b=it.sppDari+k, bln=b%12, th=thnD+Math.floor(b/12), key=BULAN[bln]+' '+th;
+    const tgl=th+'-'+String(bln+1).padStart(2,'0')+'-01';
+    const kel=getKelasEfektif(siswa.kelas,tgl)||siswa.kelas;
+    const sb=sisamap[key]||0;
+    months.push({key, nom: sb>0?sb:getSppNominalSiswa(siswa.nama,kel,spp,tgl)});
+  }
+  return manual?{months,total:months.reduce((a,m)=>a+m.nom,0)}:null;
 }
 
 function onSppCicilanNominal(i, val){
@@ -3941,16 +4025,24 @@ function updateCicilanResultDiv(i){
   const totalDiv = document.getElementById('cicilan-total-'+i);
   if(!resultDiv) return;
   const result = it.sppCicilanResult;
+  const tg = sppCicilanTarget(i);
+  const infoTop = it.sppDari===undefined
+    ? '<div style="font-size:12px;color:#b45309;margin-bottom:6px">Pilih bulan <b>Dari</b> (dan <b>Sampai</b> bila perlu) di atas dulu.</div>'
+    : (tg ? '<div style="font-size:12px;color:var(--text2);margin-bottom:6px">Tagihan bulan dipilih ('+tg.months.length+' bulan: '+tg.months[0].key+(tg.months.length>1?' – '+tg.months[tg.months.length-1].key:'')+'): <b style="color:var(--text)">'+fmt(tg.total)+'</b>'
+            +(it.sppCicilanNominal?' · Dibayar '+fmt(Math.min(it.sppCicilanNominal,tg.total))+' · Sisa <b style="color:#dc2626">'+fmt(Math.max(0,tg.total-it.sppCicilanNominal))+'</b>':'')+'</div>'
+         : '<div style="font-size:12px;color:var(--text2);margin-bottom:6px">Mulai '+BULAN[it.sppDari]+' '+(it.sppTahun||new Date().getFullYear())+' — nominal dibagi otomatis ke bulan berikutnya. Pilih <b>Sampai</b> untuk membatasi.</div>');
+  const autoNote = (it.sppDariOtomatis&&it.sppDari!==undefined) ? '<div style="font-size:11.5px;color:#2f7a52;background:#ecf6f0;border-radius:8px;padding:5px 9px;margin-bottom:6px">Bulan <b>Dari</b> diisi otomatis: '+BULAN[it.sppDari]+' '+(it.sppTahun||'')+' (bulan berikutnya yang belum dibayar). Ganti di atas bila perlu.</div>' : '';
+  const lebihHtml = (it.sppCicilanLebih>0) ? '<div style="font-size:12px;color:#dc2626;font-weight:600;margin-top:6px">⚠️ Nominal melebihi tagihan bulan dipilih sebesar '+fmt(it.sppCicilanLebih)+'. Kurangi nominal atau tambah bulan Sampai.</div>' : '';
   if(!result || !result.length){
-    resultDiv.innerHTML = '<div style="font-size:11px;color:var(--text2)">Ketik nominal untuk melihat rincian cicilan.</div>';
+    resultDiv.innerHTML = autoNote+infoTop+'<div style="font-size:11px;color:var(--text2)">Ketik nominal untuk melihat rincian cicilan.</div>';
     if(totalDiv) totalDiv.style.display='none';
     return;
   }
-  resultDiv.innerHTML = result.map(r=>`
+  resultDiv.innerHTML = autoNote + infoTop + result.map(r=>`
     <div style="display:flex;justify-content:space-between;padding:4px 10px;background:#fff;border-radius:5px;font-size:12px;border:1px solid #dbeafe;margin-bottom:3px">
       <span>${r.label}</span>
       <span style="font-weight:700;color:${r.sisa>0?'#dc2626':'var(--green)'}">${fmt(r.bayar)}${r.sisa>0?` <span style="color:#dc2626;font-weight:700">(kurang ${fmt(r.sisa)})</span>`:' ✅'}</span>
-    </div>`).join('');
+    </div>`).join('') + lebihHtml;
   if(totalDiv){
     totalDiv.style.display='flex';
     totalDiv.querySelector('.cicilan-total-val').textContent = fmt(result.reduce((a,r)=>a+r.bayar,0));
@@ -3972,7 +4064,8 @@ function hitungCicilanSPP(i){
   let sisa = it.sppCicilanNominal;
   const result = [];
   let b = it.sppDari;
-  const maxBulan = 24; // max 24 bulan
+  const _tg = sppCicilanTarget(i);
+  const maxBulan = _tg ? _tg.months.length : 24; // dibatasi bulan yang dipilih, atau maks 24 bulan
   let iter = 0;
   while(sisa > 0 && iter < maxBulan){
     const bln = b % 12;
@@ -3998,6 +4091,7 @@ function hitungCicilanSPP(i){
     iter++;
   }
   itemList[i].sppCicilanResult = result;
+  itemList[i].sppCicilanLebih = sisa>0 ? sisa : 0;   // kelebihan di luar bulan yang dipilih
 
   // Update label and qty based on result
   const dariLabel = result[0]?.label||'';
@@ -4011,11 +4105,11 @@ function hitungCicilanSPP(i){
     itemList[i].label = 'SPP ' + dariParts[0] + ' - ' + sampaiParts[0] + ' ' + thn + ' ('+qty+'x)';
   }
   itemList[i].qty = qty;
-  // Update sampai bulan
-  if(result.length > 0){
+  // Update sampai bulan (hanya bila Sampai tidak dipilih manual)
+  if(result.length > 0 && !_tg){
     const lastParts = result[result.length-1].label.split(' ');
     const lastBulan = BULAN.indexOf(lastParts[0]);
-    if(lastBulan >= 0) itemList[i].sppSampai = lastBulan;
+    if(lastBulan >= 0){ itemList[i].sppSampai = lastBulan; itemList[i].sppSampaiAuto = true; }
   }
   // nominal = total bayar
   itemList[i].nominal = nomPerBulan;
@@ -5934,6 +6028,13 @@ function buatKwitansi(){
   }
 
   const tanggal = document.getElementById('inp-tanggal').value;
+  for(const _it of itemList){
+    if(_it.tipe==='SPP'&&_it.sppCicilan){
+      if(_it.sppDari===undefined){ al.textContent='Mode cicilan: pilih bulan SPP dulu.'; al.classList.add('show'); return; }
+      if(!_it.sppCicilanNominal){ al.textContent='Mode cicilan: nominal yang dibayar belum diisi.'; al.classList.add('show'); return; }
+      if(_it.sppCicilanLebih>0){ al.textContent='Nominal cicilan melebihi tagihan bulan yang dipilih (lebih '+fmt(_it.sppCicilanLebih)+'). Kurangi nominal atau tambah bulan "Sampai".'; al.classList.add('show'); return; }
+    }
+  }
   if(!pilihMetodeDulu('kw','inp-metode',buatKwitansi)) return;   // popup Kas / Transfer
   const metode = document.querySelector('input[name="inp-metode"]:checked')?.value || 'Kas';
   const tglFmtStr = tglFmt(tanggal);
