@@ -1866,6 +1866,7 @@ function doConfirmLoadCloud(){ if(typeof confirmLoadCloud==='function') confirmL
 
 <div class="kw-sidebar">
   <div class="kw-sidebar-inner">
+    <div class="sb-head">
     <div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center">
       <span>📋 Daftar Siswa</span>
       <button type="button" class="sb-min-btn" onclick="minimizeSidebar(true)" title="Minimize (sembunyikan ke tombol bawah)">&#8211;</button>
@@ -1890,6 +1891,7 @@ function doConfirmLoadCloud(){ if(typeof confirmLoadCloud==='function') confirmL
     </div>
     <input type="text" id="sidebar-search-siswa" placeholder="Cari nama..." oninput="renderSidebarSiswa()"
       style="width:100%;padding:6px 8px;font-size:12px;border:1px solid var(--border);border-radius:6px;outline:none;margin-bottom:8px">
+    </div>
     <div id="sidebar-siswa-list" style="font-size:13px;color:var(--text2);text-align:center;padding:20px 0">
       Pilih kelas untuk melihat daftar siswa
     </div>
@@ -9997,6 +9999,15 @@ body.ui-dark .navbar.scrolled{background:rgba(15,23,42,.85)!important}
   window.updateKwTotalBar=hitung;
   later();
 })();
+</script>
+<style>
+/* Judul, tombol minimize, pilih kelas & cari tetap terlihat saat daftar siswa di-scroll */
+.kw-sidebar-inner .sb-head{position:sticky;top:-12px;z-index:3;background:var(--surface,#fff);margin:-12px -4px 0 0;padding:12px 4px 2px 0;transition:box-shadow .15s}
+.kw-sidebar-inner .sb-head.sb-shadow{box-shadow:0 8px 10px -8px rgba(0,0,0,.15)}
+</style>
+<script>
+(function(){ var inn=document.querySelector('.kw-sidebar-inner'), hd=inn&&inn.querySelector('.sb-head'); if(!inn||!hd) return;
+  inn.addEventListener('scroll',function(){ hd.classList.toggle('sb-shadow', inn.scrollTop>2); },{passive:true}); })();
 </script>
 </body>
 </html>
