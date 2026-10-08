@@ -1725,9 +1725,10 @@ function doConfirmLoadCloud(){ if(typeof confirmLoadCloud==='function') confirmL
       🏦 <strong>Mode Transfer</strong> — transaksi ini akan dicatat di riwayat tapi <strong>tidak dihitung dalam total kas</strong> di laporan harian & per jenjang.
     </div>
     <div class="alert alert-danger" id="alert-form" style="margin-top:10px"></div>
-    <div class="btn-row" style="margin-top:12px">
+    <div class="btn-row" style="margin-top:12px;align-items:center">
       <button class="btn btn-primary" onclick="buatKwitansi()">&#128196; Buat Kwitansi</button>
       <button class="btn" onclick="resetForm()">&#8635; Reset</button>
+      <div id="kw-total-bar" class="kw-total-bar" style="display:none"></div>
     </div>
   </div>
 
@@ -9929,5 +9930,73 @@ body.ui-dark .navbar.scrolled{background:rgba(15,23,42,.85)!important}
 })();
 </script>
 
+<style>
+.kw-total-bar{margin-left:auto;display:flex;align-items:center;gap:14px;background:var(--surface,#fff);border:1px solid var(--line,#e5e7eb);border-radius:14px;padding:8px 16px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.kw-total-bar .tb-info{font-size:11.5px;color:var(--muted,#6b7280);line-height:1.35;text-align:right}
+.kw-total-bar .tb-info b{color:var(--ink,#111);font-weight:600}
+.kw-total-bar .tb-info .red{color:#dc2626}.kw-total-bar .tb-info .org{color:#c2410c}
+.kw-total-bar .tb-main{display:flex;flex-direction:column;align-items:flex-end;border-left:1px solid var(--line,#e5e7eb);padding-left:14px}
+.kw-total-bar .tb-lbl{font-size:11px;color:var(--muted,#6b7280);text-transform:uppercase;letter-spacing:.05em}
+.kw-total-bar .tb-val{font-size:22px;font-weight:700;color:var(--blue);letter-spacing:-.01em;white-space:nowrap}
+@media(max-width:700px){.kw-total-bar{margin-left:0;width:100%;justify-content:space-between}}
+</style>
+<script>
+// Total pembayaran di samping tombol Buat Kwitansi (dihitung dari item yang tampil di form)
+(function(){
+  var bar=document.getElementById('kw-total-bar'), form=document.getElementById('item-list-form');
+  if(!bar||!form) return;
+  function num(t){ var n=String(t||'').replace(/[^0-9]/g,''); return n?parseInt(n,10):0; }
+  function itemTagihan(i){
+    var it=itemList[i]||{}, nSis=(it.selectedSiswa?it.selectedSiswa.length:Math.max(1,siswaList.length));
+    if(it.tipe==='Pendaftaran'||it.tipe==='Lainnya'||it.tipe==='Koperasi'){
+      var per=it.perSiswaNominal||{}, idx=it.selectedSiswa||siswaList.map(function(_,k){return k;});
+      var sumPer=idx.reduce(function(a,k){return a+(parseInt(per[k])||0);},0);
+      if(sumPer>0) return sumPer*(it.qty||1);
+      return (parseInt(it.customNominal)||0)*(it.qty||1)*nSis;
+    }
+    var blk=form.children[i]; if(!blk) return 0;
+    if(it.sppKustom){ var sk=document.getElementById('item-subtotal-'+i); return sk?num(sk.firstChild?sk.firstChild.textContent:sk.textContent):0; }
+    // total pilihan siswa ("Total (n siswa)") bila ada, kalau tidak pakai Subtotal
+    var spans=blk.querySelectorAll('span'), tot=null;
+    for(var k=0;k<spans.length;k++){ if(/^Total \(\d+ siswa\)$/.test(spans[k].textContent.trim())){ var v=spans[k].nextElementSibling; if(v) tot=num(v.textContent); } }
+    if(tot) return tot;
+    var sub=document.getElementById('item-subtotal-'+i); return sub?num(sub.firstChild?sub.firstChild.textContent:sub.textContent):0;
+  }
+  function hitung(){
+    if(typeof itemList==='undefined'||!Array.isArray(itemList)) return;
+    var n=0,tag=0,byr=0,uang=0;
+    itemList.forEach(function(it,i){
+      if(!it||!it.tipe) return;
+      var t=itemTagihan(i), b=t;
+      if(it.tipe==='SPP'&&it.sppCicilan){
+        var r=it.sppCicilanResult||[];
+        b=r.reduce(function(a,x){return a+(x.bayar||0);},0);
+        var tg=(typeof sppCicilanTarget==='function')?sppCicilanTarget(i):null;
+        t=tg?tg.total:(r.length?r.reduce(function(a,x){return a+(x.bayar||0)+(x.sisa||0);},0):t);
+        uang+=b;
+      } else if((it.kasInput||0)>0){
+        b=Math.min(it.kasInput,t); uang+=it.kasInput;
+      } else uang+=t;
+      if(t>0||b>0) n++;
+      tag+=t; byr+=b;
+    });
+    if(!n){ bar.style.display='none'; return; }
+    var sisa=Math.max(0,tag-byr), kemb=Math.max(0,uang-byr);
+    var f=function(x){return typeof fmt==='function'?fmt(x):'Rp '+x.toLocaleString('id-ID');};
+    bar.innerHTML='<div class="tb-info">'+n+' item · Tagihan <b>'+f(tag)+'</b>'
+      +(sisa?'<br><span class="red">Sisa '+f(sisa)+'</span>':'')
+      +(kemb?'<br><span class="org">Uang diterima '+f(uang)+' · Kembalian <b class="org">'+f(kemb)+'</b></span>':'')
+      +'</div><div class="tb-main"><span class="tb-lbl">Total Bayar</span><span class="tb-val">'+f(byr)+'</span></div>';
+    bar.style.display='flex';
+  }
+  var tmr=null; function later(){ clearTimeout(tmr); tmr=setTimeout(hitung,60); }
+  new MutationObserver(later).observe(form,{childList:true,subtree:true,characterData:true});
+  var page=document.getElementById('page-kwitansi');
+  (page||document).addEventListener('input',later,true);
+  (page||document).addEventListener('change',later,true);
+  window.updateKwTotalBar=hitung;
+  later();
+})();
+</script>
 </body>
 </html>
