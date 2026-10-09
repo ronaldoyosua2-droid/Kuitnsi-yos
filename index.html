@@ -9079,7 +9079,8 @@ function resetDariPreview(){
 <div id="metode-modal" style="display:none;position:fixed;inset:0;z-index:2000;background:rgba(15,23,42,.45);align-items:center;justify-content:center;padding:16px">
   <div class="card" style="margin:0;border-radius:14px;box-shadow:0 20px 50px rgba(0,0,0,.25);width:100%;max-width:400px;padding:22px">
     <div style="font-size:16px;font-weight:700;margin-bottom:4px">Metode Pembayaran</div>
-    <div id="metode-modal-sub" style="font-size:12px;color:var(--text2);margin-bottom:16px">Pilih cara pembayaran untuk kwitansi ini</div>
+    <div id="metode-modal-sub" style="font-size:12px;color:var(--text2);margin-bottom:12px">Periksa dulu, lalu pilih cara pembayaran</div>
+    <div id="metode-summary" class="mt-sum"></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
       <button type="button" class="btn metode-opt" data-m="Kas" onclick="_metodePilih('Kas')" style="flex-direction:column;justify-content:center;gap:6px;padding:18px 10px;border-width:1.5px;font-size:15px;font-weight:700">💵 Kas<span style="font-size:11px;font-weight:400;color:var(--text2)">Tunai · tekan K</span></button>
       <button type="button" class="btn metode-opt" data-m="Transfer" onclick="_metodePilih('Transfer')" style="flex-direction:column;justify-content:center;gap:6px;padding:18px 10px;border-width:1.5px;font-size:15px;font-weight:700">🏦 Transfer<span style="font-size:11px;font-weight:400;color:var(--text2)">Bank · tekan T</span></button>
@@ -9092,6 +9093,19 @@ function resetDariPreview(){
 #metode-modal .metode-opt[data-m="Kas"]:hover{border-color:var(--blue);background:var(--blue-light)}
 #metode-modal .metode-opt[data-m="Transfer"]:hover{border-color:#f59e0b;background:#fef3c7}
 #metode-modal .metode-opt .ui-ico{width:28px;height:28px;margin:0}
+#metode-modal .card{max-width:440px!important}
+.mt-sum{border:1px solid var(--line,#e5e7eb);border-radius:14px;padding:4px 14px;margin-bottom:14px;background:var(--soft,#f9fafb)}
+.mt-sum .r{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:9px 0;font-size:13px}
+.mt-sum .r+.r{border-top:1px solid var(--line,#ececec)}
+.mt-sum .k{color:var(--muted,#6b7280);flex-shrink:0}
+.mt-sum .v{font-weight:600;text-align:right;color:var(--ink,#111)}
+.mt-sum .v small{display:block;font-weight:400;color:var(--muted,#6b7280);font-size:11.5px}
+.mt-sum .tgl{display:flex;align-items:center;gap:8px}
+.mt-sum .tgl input{width:auto!important;padding:6px 10px!important;font-size:14px!important;font-weight:700;border-radius:10px!important}
+.mt-sum .big{font-size:18px;color:var(--blue)}
+.mt-warn{font-size:12px;border-radius:10px;padding:7px 10px;margin:-6px 0 12px}
+.mt-warn.or{background:#fff4dc;color:#a16207;border:1px solid #fde3a7}
+.mt-warn.rd{background:#fdeaea;color:#b33a3a;border:1px solid #f5c2c2}
 </style>
 <script>
 // Popup Kas / Transfer saat klik "Buat Kwitansi".
@@ -9103,6 +9117,7 @@ function pilihMetodeDulu(key, radioName, rerun){
   if(_metodeOk[key]){ _metodeOk[key]=false; return true; }
   _metodeCtx={key:key, radioName:radioName, rerun:rerun};
   var m=document.getElementById('metode-modal');
+  try{ _metodeIsiRingkasan(key); }catch(e){ console.warn(e); }
   m.style.display='flex';
   setTimeout(function(){ var b=m.querySelector('.metode-opt[data-m="Kas"]'); if(b) b.focus(); },50);
   return false;
@@ -9115,11 +9130,57 @@ function _metodePilih(val){
   _metodeOk[c.key]=true;
   try{ c.rerun(); } finally { _metodeOk[c.key]=false; }
 }
+// Ringkasan nama, tanggal kwitansi (bisa diubah di sini) & total — supaya tidak salah tanggal
+var _MT_HARI=['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
+function _mtTglPanjang(v){ if(!v) return '—'; var d=new Date(v+'T00:00:00'); return _MT_HARI[d.getDay()]+', '+d.getDate()+' '+BULAN[d.getMonth()]+' '+d.getFullYear(); }
+function _mtEsc(x){ return String(x==null?'':x).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+function _metodeIsiRingkasan(key){
+  var box=document.getElementById('metode-summary'); if(!box) return;
+  var tglId = key==='sb' ? 'sb-tanggal' : 'inp-tanggal';
+  var tglEl=document.getElementById(tglId), tgl=tglEl?tglEl.value:'';
+  var nama='—', detail='', total='';
+  if(key==='sb'){
+    nama=(document.getElementById('sb-nama')||{}).value||'—';
+    var jj=(document.getElementById('sb-jenjang')||{}).value||'';
+    detail='Siswa baru'+(jj?' · '+jj:'');
+    var dp=parseInt((document.getElementById('sb-dp')||{}).value)||0;
+    total=dp?fmt(dp)+'<small>DP pendaftaran (+ item lain bila dicentang)</small>':'';
+  } else {
+    var nm=(typeof siswaList!=='undefined'?siswaList:[]).map(function(x){return x.nama+(x.kelas&&x.kelas!=='Umum'?' ('+x.kelas+')':'');});
+    nama=nm.length?nm.map(_mtEsc).join('<br>'):'—';
+    var lb=(typeof itemList!=='undefined'?itemList:[]).filter(function(it){return it&&it.tipe;}).map(function(it){return it.label||it.tipe;});
+    detail=lb.length?lb.map(_mtEsc).join(' · '):'';
+    if(typeof updateKwTotalBar==='function') updateKwTotalBar();
+    var tv=document.querySelector('#kw-total-bar .tb-val'); total=tv?tv.textContent:'';
+  }
+  box.innerHTML=
+    '<div class="r"><span class="k">'+(key==='sb'?'Nama':'Siswa')+'</span><span class="v">'+(key==='sb'?_mtEsc(nama):nama)+(detail?'<small>'+detail+'</small>':'')+'</span></div>'+
+    '<div class="r"><span class="k">Tanggal kwitansi</span><span class="v tgl"><input type="date" id="mt-tgl" value="'+_mtEsc(tgl)+'"></span></div>'+
+    '<div class="r" style="padding-top:2px"><span class="k"></span><span class="v" id="mt-tgl-txt" style="font-weight:600">'+_mtTglPanjang(tgl)+'</span></div>'+
+    (total?'<div class="r"><span class="k">Total bayar</span><span class="v big">'+total+'</span></div>':'');
+  var w=document.getElementById('mt-warn'); if(w) w.remove();
+  var inp=document.getElementById('mt-tgl');
+  function cek(){
+    var v=inp.value, t=today(), old=document.getElementById('mt-warn'); if(old) old.remove();
+    document.getElementById('mt-tgl-txt').textContent=_mtTglPanjang(v);
+    if(!v||v===t) return;
+    var div=document.createElement('div'); div.id='mt-warn';
+    div.className='mt-warn '+(v>t?'rd':'or');
+    div.innerHTML=(v>t?'⚠️ Tanggal kwitansi <b>di masa depan</b>. ':'⚠️ Tanggal kwitansi <b>bukan hari ini</b>. ')+'Hari ini: '+_mtTglPanjang(t)+'. Ubah di atas bila salah.';
+    box.parentNode.insertBefore(div,box.nextSibling);
+  }
+  inp.addEventListener('change',function(){
+    if(tglEl&&inp.value){ tglEl.value=inp.value; tglEl.dispatchEvent(new Event('input',{bubbles:true})); tglEl.dispatchEvent(new Event('change',{bubbles:true})); }
+    cek();
+  });
+  cek();
+}
 function _metodeTutup(){ _metodeCtx=null; document.getElementById('metode-modal').style.display='none'; }
 document.addEventListener('keydown',function(e){
   var m=document.getElementById('metode-modal');
   if(!m||m.style.display!=='flex') return;
   var k=(e.key||'').toLowerCase();
+  if(document.activeElement&&document.activeElement.id==='mt-tgl'&&k!=='escape') return;   // sedang mengubah tanggal
   if(k==='k'){ e.preventDefault(); _metodePilih('Kas'); }
   else if(k==='t'){ e.preventDefault(); _metodePilih('Transfer'); }
   else if(k==='escape'){ e.preventDefault(); _metodeTutup(); }
