@@ -10070,5 +10070,585 @@ body.ui-dark .navbar.scrolled{background:rgba(15,23,42,.85)!important}
 (function(){ var inn=document.querySelector('.kw-sidebar-inner'), hd=inn&&inn.querySelector('.sb-head'); if(!inn||!hd) return;
   inn.addEventListener('scroll',function(){ hd.classList.toggle('sb-shadow', inn.scrollTop>2); },{passive:true}); })();
 </script>
+<!-- ===================== BUKTI TRANSFER (AI) — early test ===================== -->
+<style id="bt-css">
+#page-buktiTf{padding-top:4px}.nav-btns .nav-btn[onclick*="'buktiTf'"]{order:2}
+#page-buktiTf .bt-wrap{max-width:1180px;margin:0 auto}
+.bt-setup{background:var(--surface,#fff);border:1px solid var(--line,#e5e7eb);border-radius:16px;padding:16px 18px;margin-bottom:14px}
+.bt-setup h3{font-size:15px;margin:0 0 6px}
+.bt-setup p{font-size:12.5px;color:var(--muted,#6b7280);margin:0 0 10px;line-height:1.5}
+.bt-setup .bt-krow{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.bt-setup input{flex:1;min-width:220px;padding:9px 12px;border:1px solid var(--line,#e5e7eb);border-radius:10px;font-size:13px;background:var(--surface,#fff);color:var(--ink,#111)}
+.bt-setup textarea{width:100%;min-height:54px;padding:8px 12px;border:1px solid var(--line,#e5e7eb);border-radius:10px;font-size:13px;background:var(--surface,#fff);color:var(--ink,#111);box-sizing:border-box}
+.bt-drop{border:2px dashed #a9cbb8;background:rgba(90,154,120,.07);border-radius:16px;padding:20px 22px;display:flex;align-items:center;gap:18px;margin-bottom:14px;transition:.15s}
+.bt-drop.over{background:rgba(90,154,120,.18);border-color:#5a9a78}
+.bt-drop .bt-ic{width:50px;height:50px;border-radius:14px;background:#5a9a78;display:grid;place-items:center;flex:none}
+.bt-drop b{font-size:15px}.bt-drop p{margin:3px 0 0;color:var(--muted,#6b7280);font-size:12.5px;line-height:1.5}
+.bt-drop kbd{font-family:inherit;background:var(--surface,#fff);border:1px solid #cfd8d2;border-bottom-width:2px;border-radius:6px;padding:0 6px;font-size:11.5px;font-weight:600}
+.bt-tabs{display:flex;gap:6px;margin:0 0 12px;flex-wrap:wrap;align-items:center}
+.bt-tab{padding:7px 13px;border-radius:20px;font-size:12.5px;color:var(--muted,#6b7280);cursor:pointer;border:1px solid transparent;user-select:none}
+.bt-tab.on{background:var(--ink,#1f2a24);color:var(--surface,#fff);font-weight:600}
+.bt-tab i{font-style:normal;margin-left:5px;font-size:11px;padding:0 7px;border-radius:9px;background:var(--soft,#eef1ef);color:var(--ink,#333);font-weight:700}
+.bt-tab.on i{background:#5a9a78;color:#fff}
+.bt-note{font-size:11.5px;color:var(--muted,#6b7280);margin-left:auto}
+.bt-card{background:var(--surface,#fff);border:1px solid var(--line,#e5e7eb);border-radius:16px;padding:16px 18px;margin-bottom:12px;display:grid;grid-template-columns:230px minmax(0,1fr);gap:18px}
+.bt-rwrap{overflow-x:auto}
+body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-right:0!important}
+.bt-rows select{min-width:96px}.bt-rows input.bt-bayar{min-width:100px}
+.bt-card.st-ok{border-left:4px solid #5a9a78}.bt-card.st-warn{border-left:4px solid #e8833a}.bt-card.st-bad{border-left:4px solid #dc2626}.bt-card.st-done{border-left:4px solid #9ca3af;opacity:.8}
+.bt-thumb{width:100%;max-height:300px;object-fit:contain;object-position:top;border-radius:10px;border:1px solid var(--line,#e5e7eb);background:var(--soft,#f6f7f6);cursor:zoom-in;display:block}
+.bt-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px;color:var(--muted,#6b7280);margin-bottom:10px}
+.bt-st{font-size:11px;font-weight:700;border-radius:9px;padding:2px 9px;white-space:nowrap}
+.bt-st.ok{background:#dff1e6;color:#2f7a55}.bt-st.warn{background:#fde9d7;color:#b4581a}.bt-st.bad{background:#fde2e2;color:#b91c1c}.bt-st.done{background:#e5e7eb;color:#4b5563}.bt-st.read{background:#e6e9f5;color:#4b55a0}
+.bt-fields{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px 14px;margin-bottom:10px}
+.bt-f label{display:block;font-size:10.5px;color:var(--muted,#8a948e);margin-bottom:2px;text-transform:uppercase;letter-spacing:.03em}
+.bt-f .v{font-weight:600;font-size:13.5px;word-break:break-word}
+.bt-f input{width:100%;box-sizing:border-box;padding:5px 8px;border:1px solid var(--line,#e5e7eb);border-radius:8px;font-size:13.5px;font-weight:700;background:var(--surface,#fff);color:var(--ink,#111)}
+.bt-f .miss{color:#c2410c;font-weight:500;font-style:italic}
+.bt-chat{background:var(--soft,#f6f7f6);border-radius:10px;padding:7px 11px;font-size:12.5px;margin-bottom:10px;line-height:1.5}
+.bt-reasons{margin:0 0 10px;padding:0;list-style:none;font-size:12.5px}
+.bt-reasons li{padding:3px 0}
+.bt-reasons li.w{color:#b4581a}.bt-reasons li.b{color:#b91c1c;font-weight:600}.bt-reasons li.g{color:#2f7a55}
+.bt-rows{width:100%;border-collapse:separate;border-spacing:0 6px}
+.bt-rows th{font-size:10.5px;color:var(--muted,#8a948e);font-weight:600;text-align:left;padding:0 5px;text-transform:uppercase;letter-spacing:.03em}
+.bt-rows td{padding:0 5px;vertical-align:middle}
+.bt-rows input,.bt-rows select{width:100%;box-sizing:border-box;padding:7px 8px;border:1px solid var(--line,#e5e7eb);border-radius:8px;font-size:13px;background:var(--surface,#fff);color:var(--ink,#111)}
+.bt-rows tr.cic input.bt-bayar{border-color:#e8833a}
+.bt-rows .bt-sub{font-size:11px;color:var(--muted,#6b7280);margin-top:2px;white-space:nowrap}
+.bt-rows .bt-sub.w{color:#b4581a}
+.bt-tg{display:inline-flex;background:var(--soft,#eef1ef);border-radius:16px;padding:2px}
+.bt-tg span{padding:4px 10px;border-radius:14px;font-size:11.5px;font-weight:600;color:var(--muted,#5c6862);cursor:pointer}
+.bt-tg span.on{background:var(--surface,#fff);color:var(--ink,#111);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.bt-tg span.on.c{background:#e8833a;color:#fff}
+.bt-tot{display:flex;justify-content:space-between;align-items:center;border-radius:10px;padding:9px 12px;margin:6px 0 10px;font-size:13px;gap:10px}
+.bt-tot.good{background:#e8f5ec;color:#22603f}.bt-tot.bad{background:#fff1e6;color:#9a4512}
+.bt-acts{display:flex;gap:8px;flex-wrap:wrap}
+.bt-b{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line,#dfe4e0);background:var(--surface,#fff);border-radius:18px;padding:7px 13px;font-size:12.5px;font-weight:500;color:var(--ink,#1f2a24);cursor:pointer;white-space:nowrap}
+.bt-b:hover{background:var(--hover,#f3f4f6)}
+.bt-b.pri{background:#5a9a78;border-color:#5a9a78;color:#fff;font-weight:600}
+.bt-b.org{background:#fff6ee;border-color:#f3c9a5;color:#b4581a;font-weight:600}
+.bt-b.red{color:#b91c1c;border-color:#f7d4d4}
+.bt-b[disabled]{opacity:.45;cursor:not-allowed}
+.bt-b.sm{padding:5px 10px;font-size:12px}
+.bt-done{font-size:12px;font-weight:700;color:#2f7a55;white-space:nowrap}
+.bt-spin{width:16px;height:16px;border:2px solid #c7d2fe;border-top-color:#4b55a0;border-radius:50%;animation:btspin .8s linear infinite;display:inline-block;vertical-align:middle}
+@keyframes btspin{to{transform:rotate(360deg)}}
+.bt-empty{text-align:center;color:var(--muted,#6b7280);font-size:13px;padding:30px 0}
+#bt-zoom{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:100000;display:none;align-items:center;justify-content:center;cursor:zoom-out}
+#bt-zoom img{max-width:94vw;max-height:94vh;border-radius:8px;background:#fff}
+#bt-banner{display:none;position:relative;z-index:5;background:#fff6ee;border:1px solid #f3c9a5;color:#7a3a10;border-radius:12px;padding:10px 14px;margin:0 0 10px;font-size:13px;align-items:center;gap:10px;flex-wrap:wrap;box-shadow:0 4px 14px rgba(0,0,0,.06)}
+#bt-banner b{color:#5a2a08}
+#bt-banner .bt-bwarn{color:#b91c1c;font-weight:700}
+.metode-opt.bt-hl{outline:3px solid #e8833a;outline-offset:2px}
+@media(max-width:800px){.bt-card{grid-template-columns:1fr}.bt-fields{grid-template-columns:repeat(2,minmax(0,1fr))}.bt-rows thead{display:none}.bt-rows tr{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px}.bt-rows td:first-child{grid-column:1/-1}.bt-drop{flex-direction:column;text-align:center}}
+</style>
+
+<div id="bt-zoom" onclick="this.style.display='none'"><img alt=""></div>
+
+<script>
+// ===================== BUKTI TRANSFER (AI) — early test =====================
+(function(){
+  var KEY_LS='kwbt_key', MODEL_LS='kwbt_model', REK_LS='kwbt_rek', ALIAS_LS='ya_bt_alias';
+  var MODELS=['gemini-flash-latest','gemini-2.5-flash','gemini-2.0-flash'];
+  var Q=[];            // antrian kartu (hanya di memori — hilang bila halaman di-refresh)
+  var TAB='all', seq=0;
+  window._btPending=null;
+
+  function $(id){return document.getElementById(id);}
+  function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+  function ls(k){try{return localStorage.getItem(k)||'';}catch(e){return '';}}
+  function lsw(k,v){try{ if(v) localStorage.setItem(k,v); else localStorage.removeItem(k);}catch(e){}}
+  function rp(n){return 'Rp '+(Number(n)||0).toLocaleString('id-ID');}
+  function norm(s){return String(s||'').toLowerCase().replace(/\(.*?\)/g,function(m){return ' '+m.slice(1,-1)+' ';}).replace(/[^a-z\s]/g,' ').replace(/\s+/g,' ').trim();}
+  function toks(s){return norm(s).split(' ').filter(function(t){return t.length>1;});}
+  function getAlias(){try{return JSON.parse(localStorage.getItem(ALIAS_LS))||{};}catch(e){return {};}}
+  function setAlias(q,nama){ if(!q||!nama) return; var a=getAlias(); a[norm(q)]=nama; try{localStorage.setItem(ALIAS_LS,JSON.stringify(a));}catch(e){} }
+  function rekSekolah(){ return ls(REK_LS).split(/[\n,;]+/).map(function(x){return x.replace(/\D/g,'');}).filter(function(x){return x.length>=5;}); }
+
+  // ---------- Bulan (TA lalu + TA aktif + TA depan) ----------
+  function monthList(){
+    var y=parseInt(getTAAktif().split('/')[0]), out=[];
+    for(var t=y-1;t<=y+1;t++){ for(var b=6;b<12;b++) out.push({b:b,th:t}); for(var b2=0;b2<6;b2++) out.push({b:b2,th:t+1}); }
+    return out;
+  }
+  function mKey(m){return BULAN[m.b]+' '+m.th;}
+  function mIdx(m){return m.th*12+m.b;}
+  function fromIdx(i){return {b:i%12,th:Math.floor(i/12)};}
+  function parseBulan(s, tglTf){
+    s=String(s||'').toLowerCase();
+    for(var i=0;i<12;i++){
+      var nm=BULAN[i].toLowerCase();
+      if(s.indexOf(nm)>=0||s.indexOf(nm.slice(0,3))>=0){
+        var th=(s.match(/20\d\d/)||[])[0];
+        if(!th){ var d=tglTf?new Date(tglTf+'T00:00:00'):new Date(); th=d.getFullYear(); if(i>=6&&d.getMonth()<3) th--; if(i<3&&d.getMonth()>=9) th++; }
+        return {b:i,th:parseInt(th)};
+      }
+    }
+    return null;
+  }
+
+  // ---------- Pencocokan siswa ----------
+  function cariSiswa(namaAi, kelasAi){
+    var all=getSiswa()||[], qt=toks(namaAi); if(!qt.length) return [];
+    var alias=getAlias()[norm(namaAi)], qsq=qt.join('');
+    var res=all.map(function(s){
+      var st=toks(s.nama), common=qt.filter(function(t){return st.indexOf(t)>=0;}).length;
+      var sc=common/qt.length*0.8+(st.length?common/st.length*0.2:0);
+      if(st.join('')===qsq||norm(s.nama).replace(/ /g,'').indexOf(qsq)>=0) sc=Math.max(sc,0.97);
+      if(kelasAi){ var kn=String(kelasAi).match(/\d+/); if(kn&&String(s.kelas||'').indexOf(kn[0]+' ')===0) sc+=0.05; }
+      if(alias&&alias===s.nama) sc=1.2;
+      return {s:s,sc:sc};
+    }).filter(function(x){return x.sc>=0.5;}).sort(function(a,b){return b.sc-a.sc;});
+    return res.slice(0,6);
+  }
+  function siswaByNama(n){ return (getSiswa()||[]).find(function(s){return s.nama===n;}); }
+
+  // tarif / sisa per bulan untuk siswa
+  function tagihanBulan(nama, kelas, m){
+    var sis=getSppSisaPerBulan(nama)||{}, k=mKey(m);
+    if(sis[k]>0) return {nom:sis[k], sisa:true};
+    var hist=getSppHistory(nama);
+    if(hist.paid&&hist.paid.has(k)) return {nom:0, lunas:true};
+    var tgl=m.th+'-'+String(m.b+1).padStart(2,'0')+'-01';
+    var kel=getKelasEfektif(kelas,tgl)||kelas;
+    return {nom:getSppNominalSiswa(nama,kel,getSPP(),tgl)||0};
+  }
+  function hitungRow(row){
+    row.tagihan=0; row.info=[]; row.lunasSudah=[];
+    if(!row.nama||row.dari==null) return;
+    var s=siswaByNama(row.nama); if(!s) return;
+    row.kelas=s.kelas;
+    var a=row.dari, z=row.sampai!=null&&row.sampai>=row.dari?row.sampai:row.dari;
+    for(var i=a;i<=z;i++){
+      var t=tagihanBulan(row.nama,s.kelas,fromIdx(i));
+      if(t.lunas) row.lunasSudah.push(mKey(fromIdx(i)));
+      row.tagihan+=t.nom;
+      if(t.sisa) row.info.push(mKey(fromIdx(i))+': sisa '+rp(t.nom));
+    }
+  }
+  // bagi nominal transfer ke baris (urut: lunas dulu, sisa -> cicil)
+  function alokasi(card){
+    var sisa=card.nominal||0;
+    card.rows.forEach(function(r){ hitungRow(r); });
+    card.rows.forEach(function(r){
+      if(!r.tagihan){ r.bayar=0; r.mode='lunas'; return; }
+      var b=Math.min(r.tagihan, Math.max(0,sisa)); r.bayar=b; sisa-=b;
+      r.mode = b<r.tagihan ? 'cicil' : 'lunas';
+    });
+    card.lebih = sisa>0 ? sisa : 0;
+  }
+
+  // ---------- Evaluasi status kartu ----------
+  function evalCard(c){
+    var R=[], lvl='ok';
+    function w(t){R.push({c:'w',t:t}); if(lvl==='ok') lvl='warn';}
+    function b(t){R.push({c:'b',t:t}); lvl='bad';}
+    if(c.state==='reading') return {lvl:'read',R:[],can:false};
+    if(c.state==='error') return {lvl:'bad',R:[{c:'b',t:c.err}],can:false};
+    var d=c.ai||{};
+    if(d.bukti_valid===false) b('Gambar ini sepertinya bukan bukti transfer.');
+    if(d.status_transfer&&!/berhasil|sukses|success|selesai/i.test(d.status_transfer)) b('Status transfer: "'+d.status_transfer+'" (bukan BERHASIL).');
+    if(!c.nominal) b('Nominal tidak terbaca — isi manual.');
+    if(!c.tanggal) w('Tanggal transfer tidak terbaca — isi manual.');
+    var rek=rekSekolah(), rt=String(d.rekening_tujuan||'').replace(/\D/g,'');
+    if(rek.length&&rt&&rek.indexOf(rt)<0) b('Rekening tujuan '+rt+' BUKAN rekening sekolah.');
+    if(c.dup&&!c.dupOk) b('Kemungkinan DOBEL: '+c.dup);
+    if(!c.rows.length) w('Nama siswa tidak ada di chat — pilih siswa manual atau Tanya Wali Kelas.');
+    var total=0, allNama=true;
+    c.rows.forEach(function(r,i){
+      var lbl='Siswa '+(i+1);
+      if(!r.nama){ allNama=false; w(lbl+(r.aiNama?' ("'+r.aiNama+'")':'')+': tidak ditemukan di data siswa — pilih manual.'); return; }
+      if(r.ambigu&&!r.dikonfirmasi) w(lbl+': ada '+r.ambigu+' data mirip untuk "'+r.aiNama+'" — pastikan siswanya benar.');
+      if(r.bulanTebak&&!r.dikonfirmasi) w(lbl+': bulan tidak disebut — ditebak bulan berikutnya yang belum dibayar.');
+      if(r.lunasSudah&&r.lunasSudah.length) b(lbl+': '+r.lunasSudah.join(', ')+' sudah LUNAS sebelumnya.');
+      if(r.mode==='cicil'&&r.tagihan>0&&r.bayar>=r.tagihan) w(lbl+': mode Cicil — ketik nominal yang dibayar.');
+      else if(r.mode==='cicil'&&r.tagihan>0) w(lbl+': dicicil, kurang '+rp(r.tagihan-r.bayar)+' (masuk tunggakan).');
+      total+=Number(r.bayar)||0;
+    });
+    if(c.rows.length&&allNama&&c.nominal){
+      if(total!==c.nominal) b('Total dibagi '+rp(total)+' ≠ nominal transfer '+rp(c.nominal)+'.');
+      var tag=c.rows.reduce(function(a,r){return a+(r.tagihan||0);},0);
+      if(c.nominal>tag&&total===c.nominal){}
+      if(c.nominal>tag) w('Transfer lebih '+rp(c.nominal-tag)+' dari tagihan — tambah bulan / siswa, atau cek lagi.');
+    }
+    var can=lvl!=='bad'&&allNama&&c.rows.length>0&&total===c.nominal&&c.nominal>0;
+    if(lvl==='ok') R.push({c:'g',t:'Semua cocok: nama, bulan, dan nominal pas dengan tagihan.'});
+    return {lvl:lvl,R:R,can:can};
+  }
+
+  // ---------- AI (Gemini) ----------
+  var PROMPT=[
+    'Kamu membaca screenshot bukti transfer pembayaran sekolah (Sekolah Yos Anugerah, Batam). Screenshot bisa berupa foto struk m-banking saja,',
+    'atau potongan chat WhatsApp berisi foto bukti + caption + pesan lanjutan (nama siswa, kelas, bulan SPP) + nama orang yang mengirim/meneruskan.',
+    'Ambil data APA ADANYA. Jangan menebak. Jika tidak terlihat, isi string kosong "" atau 0.',
+    'Balas HANYA JSON dengan bentuk:',
+    '{"bukti_valid":true,"status_transfer":"","bank":"","tanggal":"YYYY-MM-DD","jam":"HH:MM","nominal":0,',
+    '"rekening_tujuan":"","nama_tujuan":"","nama_pengirim":"","berita":"","teks_chat":[""],"penerus":"",',
+    '"siswa":[{"nama":"","kelas":"","bulan":["Oktober 2026"],"jenis":"SPP"}],"catatan":""}',
+    'Aturan: nominal = angka rupiah bulat tanpa titik/koma (Rp 525.000,00 -> 525000). Format tanggal di struk Indonesia biasanya DD/MM/YYYY.',
+    'nama_tujuan/rekening_tujuan = penerima ("Ke ..."). nama_pengirim = pemilik rekening asal (sering tidak ada di struk BCA m-Transfer).',
+    'teks_chat = semua teks pesan/caption WhatsApp yang terlihat (bukan isi struk). penerus = nama pengirim pesan di grup bila terlihat (atau "You").',
+    'siswa = setiap nama anak/siswa yang disebut di caption, pesan, atau berita transfer (JANGAN masukkan nama orang tua/pengirim rekening).',
+    'bulan = bulan SPP yang disebut (tulis "Bulan Tahun"; jika tahun tidak disebut, kosongkan tahun). jenis = SPP / Pendaftaran / Lainnya.',
+    'Jika satu pesan menyebut beberapa siswa untuk bulan yang sama, ulangi bulan itu di tiap siswa.'
+  ].join('\n');
+
+  async function gemCall(model, key, b64, mime){
+    var res=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+model+':generateContent',{
+      method:'POST', headers:{'Content-Type':'application/json','x-goog-api-key':key},
+      body:JSON.stringify({contents:[{parts:[{text:PROMPT},{inline_data:{mime_type:mime,data:b64}}]}],
+        generationConfig:{temperature:0,responseMimeType:'application/json'}})
+    });
+    var j=null; try{ j=await res.json(); }catch(e){}
+    if(!res.ok){ var e=new Error((j&&j.error&&j.error.message)||('HTTP '+res.status)); e.status=res.status; throw e; }
+    var txt=(((j||{}).candidates||[])[0]||{}).content; txt=txt&&txt.parts?txt.parts.map(function(p){return p.text||'';}).join(''):'';
+    txt=txt.replace(/^```(json)?/i,'').replace(/```\s*$/,'').trim();
+    return JSON.parse(txt);
+  }
+  async function bacaAI(b64, mime){
+    var key=ls(KEY_LS); if(!key) throw new Error('API key Gemini belum diisi (lihat kotak pengaturan di atas).');
+    var saved=ls(MODEL_LS), list=saved?[saved].concat(MODELS.filter(function(m){return m!==saved;})):MODELS.slice(), last;
+    for(var i=0;i<list.length;i++){
+      try{ var r=await gemCall(list[i],key,b64,mime); lsw(MODEL_LS,list[i]); return r; }
+      catch(e){ last=e; if(e.status===404||/not found|not supported/i.test(e.message)) continue; break; }
+    }
+    if(last&&(last.status===400&&/api key/i.test(last.message)||last.status===401||last.status===403)) throw new Error('API key ditolak Google. Cek lagi key-nya. ('+last.message+')');
+    if(last&&last.status===429) throw new Error('Kuota AI habis / terlalu cepat. Tunggu 1 menit lalu klik Baca ulang.');
+    throw new Error('AI gagal membaca: '+(last?last.message:'tidak diketahui'));
+  }
+  window.btTesKey=async function(){
+    var el=$('bt-key-info'); el.textContent='Mengetes...';
+    try{
+      var key=ls(KEY_LS); if(!key) throw new Error('Isi key dulu.');
+      var r=await fetch('https://generativelanguage.googleapis.com/v1beta/models?pageSize=50',{headers:{'x-goog-api-key':key}});
+      var j=await r.json(); if(!r.ok) throw new Error((j.error&&j.error.message)||r.status);
+      el.innerHTML='<span style="color:#2f7a55;font-weight:600">✓ Key berfungsi.</span>';
+    }catch(e){ el.innerHTML='<span style="color:#b91c1c;font-weight:600">✗ '+esc(e.message)+'</span>'; }
+  };
+
+  // ---------- Gambar ----------
+  function prepImage(file){
+    return new Promise(function(res,rej){
+      var fr=new FileReader();
+      fr.onerror=function(){rej(new Error('Gagal membaca file'));};
+      fr.onload=function(){
+        var img=new Image();
+        img.onerror=function(){rej(new Error('File bukan gambar'));};
+        img.onload=function(){
+          var max=1800, w=img.width, h=img.height, k=Math.min(1,max/Math.max(w,h));
+          var cv=document.createElement('canvas'); cv.width=Math.round(w*k); cv.height=Math.round(h*k);
+          var cx=cv.getContext('2d'); cx.fillStyle='#fff'; cx.fillRect(0,0,cv.width,cv.height); cx.drawImage(img,0,0,cv.width,cv.height);
+          var url=cv.toDataURL('image/jpeg',0.88);
+          res({url:url,b64:url.split(',')[1],mime:'image/jpeg'});
+        };
+        img.src=fr.result;
+      };
+      fr.readAsDataURL(file);
+    });
+  }
+  function addFiles(files){
+    [].slice.call(files||[]).filter(function(f){return /^image\//.test(f.type);}).forEach(function(f){
+      var c={id:'bt'+(++seq),state:'reading',rows:[],ditambah:new Date()};
+      Q.unshift(c); render();
+      prepImage(f).then(function(im){ c.img=im.url; c._b64=im.b64; c._mime=im.mime; render(); return proses(c); })
+        .catch(function(e){ c.state='error'; c.err=e.message; render(); });
+    });
+  }
+  async function proses(c){
+    c.state='reading'; c.err=''; render();
+    try{
+      var d=await bacaAI(c._b64,c._mime);
+      c.ai=d; c.state='ok';
+      c.nominal=parseInt(String(d.nominal||'').replace(/[^\d]/g,''))||0;
+      c.tanggal=/^\d{4}-\d{2}-\d{2}$/.test(d.tanggal||'')?d.tanggal:'';
+      bangunRows(c); cekDobel(c);
+    }catch(e){ c.state='error'; c.err=e.message; }
+    render();
+  }
+  function bangunRows(c){
+    var d=c.ai||{}; c.rows=[];
+    (d.siswa||[]).filter(function(s){return s&&s.nama;}).forEach(function(s){
+      var cand=cariSiswa(s.nama,s.kelas), top=cand[0];
+      var row={aiNama:s.nama, aiKelas:s.kelas||'', cand:cand.map(function(x){return x.s.nama;}), nama:'', dari:null, sampai:null};
+      if(top&&top.sc>=0.75){
+        row.nama=top.s.nama;
+        var close=cand.filter(function(x){return x.sc>=top.sc-0.12&&top.sc<1.2;});
+        if(close.length>1) row.ambigu=close.length;
+      }
+      var bl=(s.bulan||[]).map(function(x){return parseBulan(x,c.tanggal);}).filter(Boolean).map(mIdx).sort(function(a,b){return a-b;});
+      if(bl.length){ row.dari=bl[0]; row.sampai=bl[bl.length-1]; }
+      else if(row.nama){ var nb=sppBulanBerikutnya(row.nama); if(nb){ row.dari=mIdx({b:nb.bulan,th:nb.tahun}); row.sampai=row.dari; row.bulanTebak=true; } }
+      c.rows.push(row);
+    });
+    // bulan lebih: jika transfer pas kelipatan tarif 1 siswa, panjangkan bulan
+    if(c.rows.length===1&&c.rows[0].nama&&c.rows[0].bulanTebak){
+      var r=c.rows[0]; hitungRow(r);
+      if(r.tagihan>0&&c.nominal>r.tagihan){ var n=0, tot=0, i=r.dari; while(n<12){ var t=tagihanBulan(r.nama,siswaByNama(r.nama).kelas,fromIdx(i)).nom; if(tot+t>c.nominal) break; tot+=t; i++; n++; if(tot===c.nominal) break; } if(tot===c.nominal&&n>1) r.sampai=r.dari+n-1; }
+    }
+    alokasi(c);
+  }
+  function sig(d){ return [String(d.nominal||''),d.tanggal||'',d.jam||'',String(d.rekening_tujuan||'').replace(/\D/g,'')].join('|'); }
+  function cekDobel(c){
+    c.dup='';
+    if(!c.nominal||!c.tanggal) return;
+    var s=sig({nominal:c.nominal,tanggal:c.tanggal,jam:(c.ai||{}).jam,rekening_tujuan:(c.ai||{}).rekening_tujuan});
+    var o=Q.find(function(x){return x!==c&&x.state==='ok'&&sig({nominal:x.nominal,tanggal:x.tanggal,jam:(x.ai||{}).jam,rekening_tujuan:(x.ai||{}).rekening_tujuan})===s;});
+    if(o){ c.dup='bukti yang sama sudah ada di antrian ini.'; return; }
+    var r=(getRiwayat()||[]).find(function(r){return r.buktiTf&&r.buktiTf.sig===s;});
+    if(r) c.dup='sudah pernah dibuat kuitansi '+r.no+' ('+r.nama+').';
+  }
+
+  // ---------- Render ----------
+  function cardStatus(c){
+    if(c.rows.length&&c.rows.every(function(r){return r.doneNo;})) return 'done';
+    return evalCard(c).lvl;
+  }
+  function counts(){ var n={all:0,ok:0,warn:0,done:0}; Q.forEach(function(c){ var s=cardStatus(c); n.all++; if(s==='ok') n.ok++; else if(s==='done') n.done++; else n.warn++; }); return n; }
+  function render(){
+    var wrap=$('bt-list'); if(!wrap) return;
+    var n=counts();
+    $('bt-tabs').innerHTML=[['all','Semua',n.all],['ok','Siap dibuat',n.ok],['warn','Perlu dicek',n.warn],['done','Selesai',n.done]].map(function(t){
+      return '<span class="bt-tab'+(TAB===t[0]?' on':'')+'" onclick="btTab(\''+t[0]+'\')">'+t[1]+'<i>'+t[2]+'</i></span>';
+    }).join('')+'<span class="bt-note">Antrian tersimpan sementara — hilang bila halaman di-refresh.</span>';
+    var list=Q.filter(function(c){ var s=cardStatus(c); return TAB==='all'||(TAB==='ok'&&s==='ok')||(TAB==='done'&&s==='done')||(TAB==='warn'&&s!=='ok'&&s!=='done'); });
+    if(!list.length){ wrap.innerHTML='<div class="bt-empty">'+(Q.length?'Tidak ada di tab ini.':'Belum ada bukti. Tempel screenshot (Ctrl+V) atau seret gambar ke kotak di atas.')+'</div>'; return; }
+    wrap.innerHTML=list.map(cardHtml).join('');
+    var dl=$('bt-dl');
+    if(dl&&!dl.dataset.n){ dl.innerHTML=(getSiswa()||[]).map(function(s){return '<option value="'+esc(s.nama)+' — '+esc(s.kelas)+'">';}).join(''); dl.dataset.n='1'; }
+    var nb=document.querySelector('.nav-btn[onclick*="buktiTf"] .bt-badge'); if(nb){ nb.textContent=n.warn+n.ok; nb.style.display=(n.warn+n.ok)?'':'none'; }
+  }
+  function monthOpts(sel){ return monthList().map(function(m){ var i=mIdx(m); return '<option value="'+i+'"'+(i===sel?' selected':'')+'>'+BULAN[m.b].slice(0,3)+' '+m.th+'</option>'; }).join(''); }
+  function cardHtml(c){
+    var E=evalCard(c), st=cardStatus(c), d=c.ai||{};
+    var stLbl={ok:'Siap dibuat',warn:'Perlu dicek',bad:'Perlu dicek',done:'Selesai',read:'Membaca...'}[st]||st;
+    var stCls={ok:'ok',warn:'warn',bad:'bad',done:'done',read:'read'}[st];
+    var h='<div class="bt-card st-'+(st==='read'?'warn':st)+'" id="'+c.id+'">';
+    h+='<div>'+(c.img?'<img class="bt-thumb" src="'+c.img+'" onclick="btZoom(\''+c.id+'\')" title="Klik untuk memperbesar">':'<div class="bt-thumb" style="height:160px"></div>')+'</div><div>';
+    h+='<div class="bt-meta"><span class="bt-st '+stCls+'">● '+stLbl+'</span>';
+    if(d.penerus) h+='Dikirim oleh <b>'+esc(d.penerus)+'</b> · ';
+    h+='ditempel '+c.ditambah.toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'})+'</div>';
+    if(c.state==='reading'){ return h+'<div style="font-size:13px;color:#4b55a0"><span class="bt-spin"></span> AI sedang membaca bukti...</div></div></div>'; }
+    if(c.state==='error'){ return h+'<ul class="bt-reasons"><li class="b">✗ '+esc(c.err)+'</li></ul><div class="bt-acts"><span class="bt-b pri" onclick="btUlang(\''+c.id+'\')">Baca ulang</span><span class="bt-b red" onclick="btHapus(\''+c.id+'\')">Hapus</span></div></div></div>'; }
+    function f(l,v){ return '<div class="bt-f"><label>'+l+'</label><div class="v">'+(v?esc(v):'<span class="miss">tidak ada</span>')+'</div></div>'; }
+    h+='<div class="bt-fields">';
+    h+='<div class="bt-f"><label>Nominal</label><input type="number" value="'+(c.nominal||'')+'" onchange="btSet(\''+c.id+'\',\'nominal\',this.value)"></div>';
+    h+='<div class="bt-f"><label>Tanggal transfer</label><input type="date" value="'+(c.tanggal||'')+'" onchange="btSet(\''+c.id+'\',\'tanggal\',this.value)" style="font-weight:600"></div>';
+    h+=f('Bank · jam',[d.bank,d.jam].filter(Boolean).join(' · '));
+    var rt=String(d.rekening_tujuan||'').replace(/\D/g,''), rk=rekSekolah();
+    h+=f('Ke rekening',[d.nama_tujuan,rt].filter(Boolean).join(' · ')+(rk.length&&rt?(rk.indexOf(rt)>=0?' ✓':' ✗'):''));
+    h+=f('Pengirim',d.nama_pengirim)+f('Berita transfer',d.berita)+f('Status',d.status_transfer);
+    h+='</div>';
+    var chat=(d.teks_chat||[]).filter(Boolean);
+    h+='<div class="bt-chat">💬 '+(chat.length?chat.map(function(t){return '“'+esc(t)+'”';}).join(' · '):'<i style="color:#b4581a">tanpa caption / keterangan</i>')+'</div>';
+    if(st==='done') E.R=[{c:'g',t:'Semua kuitansi dari bukti ini sudah dibuat.'}];
+    h+='<ul class="bt-reasons">'+E.R.map(function(r){return '<li class="'+r.c+'">'+(r.c==='g'?'✓ ':r.c==='b'?'✗ ':'⚠ ')+esc(r.t)+(r.c==='b'&&/DOBEL/.test(r.t)?' <span class="bt-b sm" onclick="btDupOk(\''+c.id+'\')">Bukan dobel</span>':'')+'</li>';}).join('')+'</ul>';
+    // baris siswa
+    h+='<div class="bt-rwrap"><table class="bt-rows"><thead><tr><th style="width:34%">Siswa</th><th>Dari</th><th>Sampai</th><th>Tagihan</th><th>Status</th><th>Dibayar</th><th></th></tr></thead><tbody>';
+    c.rows.forEach(function(r,i){
+      var s=r.nama?siswaByNama(r.nama):null, done=!!r.doneNo;
+      h+='<tr class="'+(r.mode==='cicil'?'cic':'')+'"><td><input list="bt-dl" value="'+(s?esc(s.nama)+' — '+esc(s.kelas):'')+'" placeholder="'+esc(r.aiNama?'Cari: '+r.aiNama:'Ketik nama siswa...')+'" onchange="btSiswa(\''+c.id+'\','+i+',this.value)"'+(done?' disabled':'')+'>';
+      h+='<div class="bt-sub">'+(r.aiNama?'dari chat: “'+esc(r.aiNama)+(r.aiKelas?' · '+esc(r.aiKelas):'')+'”':'ditambah manual')+(r.cand&&r.cand.length>1&&!done?' · <a href="javascript:void 0" onclick="btCand(\''+c.id+'\','+i+')">'+(r.cand.length)+' kandidat</a>':'')+'</div></td>';
+      h+='<td><select onchange="btBulan(\''+c.id+'\','+i+',\'dari\',this.value)"'+(done?' disabled':'')+'><option value="">—</option>'+monthOpts(r.dari)+'</select></td>';
+      h+='<td><select onchange="btBulan(\''+c.id+'\','+i+',\'sampai\',this.value)"'+(done?' disabled':'')+'><option value="">—</option>'+monthOpts(r.sampai)+'</select></td>';
+      var nb=r.dari!=null?((r.sampai!=null&&r.sampai>=r.dari?r.sampai:r.dari)-r.dari+1):0;
+      h+='<td><b>'+rp(r.tagihan)+'</b><div class="bt-sub'+(r.info&&r.info.length?' w':'')+'">'+(s?esc(s.kelas)+' · '+nb+' bln':'')+(r.info&&r.info.length?' · ada sisa lama':'')+'</div></td>';
+      h+='<td><span class="bt-tg"><span class="'+(r.mode!=='cicil'?'on':'')+'" onclick="btMode(\''+c.id+'\','+i+',\'lunas\')">Lunas</span><span class="'+(r.mode==='cicil'?'on c':'')+'" onclick="btMode(\''+c.id+'\','+i+',\'cicil\')">Cicil</span></span></td>';
+      h+='<td><input class="bt-bayar" type="number" value="'+(r.bayar||0)+'" onchange="btBayar(\''+c.id+'\','+i+',this.value)"'+(done?' disabled':'')+'><div class="bt-sub'+(r.mode==='cicil'?' w':'')+'">'+(r.mode==='cicil'&&r.tagihan?'sisa '+rp(r.tagihan-r.bayar):(r.tagihan?'lunas':''))+'</div></td>';
+      h+='<td style="white-space:nowrap">'+(done?'<span class="bt-done">✓ '+esc(r.doneNo)+'</span>':'<span class="bt-b pri sm" '+(E.can?'onclick="btIsi(\''+c.id+'\','+i+')"':'disabled title="Selesaikan tanda ✗ dulu"')+'>Isi ke Kuitansi</span> <span class="bt-b sm red" title="Hapus baris" onclick="btHapusRow(\''+c.id+'\','+i+')">✕</span>')+'</td></tr>';
+    });
+    h+='</tbody></table></div>';
+    var tot=c.rows.reduce(function(a,r){return a+(Number(r.bayar)||0);},0);
+    if(c.rows.length) h+='<div class="bt-tot '+(tot===c.nominal?'good':'bad')+'"><span>'+(tot===c.nominal?'✓':'⚠')+' Total dibagi <b>'+rp(tot)+'</b> dari transfer <b>'+rp(c.nominal)+'</b></span><b>'+(tot===c.nominal?c.rows.length+' kuitansi':'selisih '+rp(c.nominal-tot))+'</b></div>';
+    h+='<div class="bt-acts"><span class="bt-b" onclick="btTambahRow(\''+c.id+'\')">+ Siswa</span>';
+    if(c.rows.length>1) h+='<span class="bt-b" onclick="btAuto(\''+c.id+'\',\'urut\')">Siswa 1 lunas dulu</span><span class="bt-b" onclick="btAuto(\''+c.id+'\',\'balik\')">Siswa terakhir lunas dulu</span>';
+    else if(c.rows.length) h+='<span class="bt-b" onclick="btAuto(\''+c.id+'\',\'urut\')">Hitung ulang</span>';
+    h+='<span class="bt-b org" onclick="btTanya(\''+c.id+'\')">Tanya Wali Kelas</span><span class="bt-b" onclick="btUlang(\''+c.id+'\')">Baca ulang</span><span class="bt-b red" onclick="btHapus(\''+c.id+'\')">Hapus</span></div>';
+    return h+'</div></div>';
+  }
+
+  // ---------- Aksi ----------
+  function C(id){return Q.find(function(c){return c.id===id;});}
+  window.btTab=function(t){TAB=t;render();};
+  window.btZoom=function(id){ var c=C(id); if(!c||!c.img) return; var z=$('bt-zoom'); z.querySelector('img').src=c.img; z.style.display='flex'; };
+  window.btUlang=function(id){ var c=C(id); if(c&&c._b64) proses(c); };
+  window.btHapus=function(id){ var c=C(id); if(!c) return; if(c.rows.some(function(r){return !r.doneNo;})&&c.state==='ok'&&!confirm('Hapus bukti ini dari antrian?')) return; Q=Q.filter(function(x){return x!==c;}); render(); };
+  window.btDupOk=function(id){ var c=C(id); if(c){c.dupOk=true; render();} };
+  window.btSet=function(id,k,v){ var c=C(id); if(!c) return; if(k==='nominal') c.nominal=parseInt(v)||0; else c[k]=v; alokasi(c); cekDobel(c); render(); };
+  window.btSiswa=function(id,i,v){
+    var c=C(id), r=c&&c.rows[i]; if(!r) return;
+    var nm=String(v).split(' — ')[0].trim(), s=siswaByNama(nm);
+    if(!s){ var m=cariSiswa(nm)[0]; s=m?m.s:null; }
+    r.nama=s?s.nama:''; r.dikonfirmasi=!!s; r.ambigu=0;
+    if(s&&r.aiNama) setAlias(r.aiNama,s.nama);
+    if(s&&r.dari==null){ var nb=sppBulanBerikutnya(s.nama); if(nb){ r.dari=mIdx({b:nb.bulan,th:nb.tahun}); r.sampai=r.dari; r.bulanTebak=true; } }
+    alokasi(c); render();
+  };
+  window.btCand=function(id,i){
+    var c=C(id), r=c&&c.rows[i]; if(!r) return;
+    var lst=r.cand.map(function(n,k){var s=siswaByNama(n); return (k+1)+'. '+n+' — '+(s?s.kelas:'');}).join('\n');
+    var p=prompt('Kandidat untuk "'+r.aiNama+'":\n'+lst+'\n\nKetik nomor pilihan:','1'); var k=parseInt(p);
+    if(k>=1&&k<=r.cand.length){ var s=siswaByNama(r.cand[k-1]); window.btSiswa(id,i,s.nama+' — '+s.kelas); }
+  };
+  window.btBulan=function(id,i,k,v){ var c=C(id), r=c&&c.rows[i]; if(!r) return; r[k]=v===''?null:parseInt(v); if(k==='dari'&&(r.sampai==null||r.sampai<r.dari)) r.sampai=r.dari; r.bulanTebak=false; alokasi(c); render(); };
+  window.btMode=function(id,i,m){ var c=C(id), r=c&&c.rows[i]; if(!r||r.doneNo) return; hitungRow(r); r.mode=m; if(m==='lunas') r.bayar=r.tagihan; else if(r.bayar>=r.tagihan) r.bayar=0; render(); setTimeout(function(){ var el=document.querySelectorAll('#'+id+' .bt-bayar')[i]; if(el&&m==='cicil'){el.focus();el.select();} },30); };
+  window.btBayar=function(id,i,v){ var c=C(id), r=c&&c.rows[i]; if(!r) return; hitungRow(r); r.bayar=Math.max(0,parseInt(v)||0); if(r.tagihan&&r.bayar>r.tagihan) r.bayar=r.tagihan; r.mode=r.bayar<r.tagihan?'cicil':'lunas'; render(); };
+  window.btAuto=function(id,how){ var c=C(id); if(!c) return; if(how==='balik'){ c.rows.reverse(); alokasi(c); c.rows.reverse(); } else alokasi(c); render(); };
+  window.btTambahRow=function(id){ var c=C(id); if(!c) return; c.rows.push({aiNama:'',cand:[],nama:'',dari:null,sampai:null}); render(); };
+  window.btHapusRow=function(id,i){ var c=C(id); if(!c) return; c.rows.splice(i,1); alokasi(c); render(); };
+  window.btTanya=function(id){
+    var c=C(id); if(!c) return; var d=c.ai||{};
+    var t='Halo, mohon konfirmasi bukti transfer '+rp(c.nominal)+(c.tanggal?' tgl '+tglFmt(c.tanggal):'')+(d.bank?' ('+d.bank+')':'')+(d.nama_pengirim?' a.n. '+d.nama_pengirim:'')+
+      (c.rows.length?' untuk '+c.rows.map(function(r){return r.aiNama||r.nama;}).join(' & '):'')+'. Untuk siswa siapa, kelas berapa, dan SPP bulan apa? Terima kasih.';
+    window.open('https://wa.me/?text='+encodeURIComponent(t),'_blank');
+  };
+
+  // ---------- Isi ke form Kuitansi ----------
+  window.btIsi=function(id,i){
+    var c=C(id), r=c&&c.rows[i]; if(!r||!r.nama) return;
+    var s=siswaByNama(r.nama); if(!s) return;
+    showPage('kwitansi');
+    resetForm();
+    var tg=$('inp-tanggal'); if(tg&&c.tanggal){ tg.value=c.tanggal; tg.dispatchEvent(new Event('input',{bubbles:true})); tg.dispatchEvent(new Event('change',{bubbles:true})); }
+    siswaList=[{nama:s.nama,kelas:s.kelas}]; renderSiswaForms();
+    itemList=[]; tambahItemForm(); onItemTipeChange(0,'SPP');
+    var a=fromIdx(r.dari), z=fromIdx(r.sampai!=null&&r.sampai>=r.dari?r.sampai:r.dari);
+    itemList[0].sppTahun=a.th; itemList[0].sppTahunSampai=z.th;
+    onSppBulanDari(0,String(a.b));
+    if(mIdx(z)!==mIdx(a)) onSppBulanSampai(0,String(z.b));
+    if(r.mode==='cicil'){
+      onSppCicilanToggle(0,true);
+      itemList[0].sppCicilanNominal=Number(r.bayar)||0; hitungCicilanSPP(0); renderItemForms();
+    }
+    if(typeof updateKwTotalBar==='function') updateKwTotalBar();
+    setTimeout(function(){ document.querySelectorAll('.sf-dd').forEach(function(x){x.classList.remove('open');}); if(document.activeElement&&document.activeElement.blur) document.activeElement.blur(); },80);
+    var d=c.ai||{};
+    window._btPending={id:id,row:i,nama:s.nama,bayar:Number(r.bayar)||0,prev:window._lastNewRecs,
+      meta:{sig:sig({nominal:c.nominal,tanggal:c.tanggal,jam:d.jam,rekening_tujuan:d.rekening_tujuan}),bank:d.bank||'',tglTf:c.tanggal||'',jam:d.jam||'',nominalTf:c.nominal,
+        rekTujuan:String(d.rekening_tujuan||'').replace(/\D/g,''),namaTujuan:d.nama_tujuan||'',pengirim:d.nama_pengirim||'',penerus:d.penerus||'',ket:(d.teks_chat||[]).join(' | ').slice(0,300)}};
+    setTimeout(banner,60);
+    window.scrollTo(0,0);
+  };
+  function formTotal(){ var tv=document.querySelector('#kw-total-bar .tb-val'); return tv?parseInt(tv.textContent.replace(/\D/g,''))||0:null; }
+  function banner(){
+    var b=$('bt-banner'), p=window._btPending; if(!b) return;
+    if(!p){ b.style.display='none'; return; }
+    var c=C(p.id), ft=formTotal(), warn=(ft!=null&&ft!==p.bayar)?' <span class="bt-bwarn">⚠ Total di form '+rp(ft)+' ≠ '+rp(p.bayar)+' — cek lagi!</span>':'';
+    b.innerHTML='<span style="flex:1 1 320px;line-height:1.5">📷 Diisi dari <b>Bukti Transfer</b>: <b>'+esc(p.nama)+'</b> · '+rp(p.bayar)+(p.meta.bank?' · '+esc(p.meta.bank):'')+(p.meta.tglTf?' · '+tglFmt(p.meta.tglTf):'')+
+      '. Cek form, lalu klik <b>Buat Kwitansi</b> dan pilih <b>Transfer</b>.'+warn+'</span>'+
+      '<span class="bt-b sm" onclick="btBatal()">Batal</span><span class="bt-b sm" onclick="btKembali()">← Kembali ke Bukti Transfer</span>';
+    b.style.display='flex';
+  }
+  window.btBatal=function(){ window._btPending=null; banner(); resetForm(); };
+  window.btKembali=function(){ showPage('buktiTf'); };
+
+  // setelah kuitansi tersimpan → tandai baris selesai + simpan info bukti di record
+  var _bk=window.buatKwitansi;
+  if(typeof _bk==='function'){
+    window.buatKwitansi=function(){
+      var p=window._btPending, before=window._lastNewRecs;
+      var ret=_bk.apply(this,arguments);
+      try{
+        if(p&&window._lastNewRecs&&window._lastNewRecs!==before){
+          var recs=window._lastNewRecs, rec=recs.find(function(r){return r.nama===p.nama;})||recs[0];
+          var rw=getRiwayat(), ids=recs.map(function(r){return r.id;});
+          rw.forEach(function(r){ if(ids.indexOf(r.id)>=0) r.buktiTf=p.meta; });
+          setRiwayat(rw);
+          var c=C(p.id); if(c&&c.rows[p.row]){ c.rows[p.row].doneNo=rec?rec.no:'tersimpan'; if(c.rows[p.row].aiNama) setAlias(c.rows[p.row].aiNama,p.nama); }
+          window._btPending=null; banner(); render();
+          var sisa=c?c.rows.filter(function(r){return !r.doneNo;}).length:0;
+          if(sisa&&$('bt-banner')){ var b=$('bt-banner'); b.innerHTML='<span style="flex:1 1 320px">✓ Kuitansi '+esc(rec?rec.no:'')+' tersimpan. Masih ada <b>'+sisa+' siswa</b> lagi di bukti ini.</span><span class="bt-b sm pri" style="margin-left:auto" onclick="btKembali()">Lanjut siswa berikutnya →</span>'; b.style.display='flex'; }
+        }
+      }catch(e){ console.warn('bukti tf',e); }
+      return ret;
+    };
+  }
+  // Popup metode: sorot "Transfer" bila dari Bukti Transfer
+  var _pm=window.pilihMetodeDulu;
+  if(typeof _pm==='function'){
+    window.pilihMetodeDulu=function(key){
+      var r=_pm.apply(this,arguments);
+      if(!r&&key==='kw'&&window._btPending){
+        setTimeout(function(){ var m=$('metode-modal'); if(!m) return; m.querySelectorAll('.metode-opt').forEach(function(x){x.classList.remove('bt-hl');}); var t=m.querySelector('.metode-opt[data-m="Transfer"]'); if(t){ t.classList.add('bt-hl'); t.focus(); } },80);
+      }
+      return r;
+    };
+  }
+  // banner ikut update saat form berubah
+  document.addEventListener('input',function(e){ if(window._btPending&&e.target.closest&&e.target.closest('#page-kwitansi')) setTimeout(banner,30); },true);
+  document.addEventListener('change',function(e){ if(window._btPending&&e.target.closest&&e.target.closest('#page-kwitansi')) setTimeout(banner,30); },true);
+
+  // ---------- Pengaturan ----------
+  window.btSimpanKey=function(){ var v=($('bt-key').value||'').trim(); if(v.indexOf('•')>=0) return; lsw(KEY_LS,v); lsw(MODEL_LS,''); setupUi(); if(v) btTesKey(); };
+  window.btHapusKey=function(){ if(!confirm('Hapus API key dari browser ini?')) return; lsw(KEY_LS,''); setupUi(); };
+  window.btSimpanRek=function(){ lsw(REK_LS,($('bt-rek').value||'').trim()); var i=$('bt-rek-info'); if(i) i.textContent='✓ Tersimpan'; Q.forEach(function(c){}); render(); };
+  window.btToggleSet=function(){ var s=$('bt-set'); s.style.display=s.style.display==='none'?'block':'none'; };
+  function setupUi(){
+    var has=!!ls(KEY_LS), k=$('bt-key'); if(!k) return;
+    k.value=has?'••••••••••••'+ls(KEY_LS).slice(-4):'';
+    $('bt-key-hint').style.display=has?'none':'block';
+    $('bt-set').style.display=has?'none':'block';
+    $('bt-rek').value=ls(REK_LS);
+  }
+
+  // ---------- Pasang halaman ----------
+  function init(){
+    var nav=document.querySelector('.nav-btns'), kwBtn=nav&&nav.querySelector('.nav-btn[onclick*="\'kwitansi\'"]');
+    if(nav&&!nav.querySelector('.nav-btn[onclick*="buktiTf"]')){
+      var b=document.createElement('button'); b.className='nav-btn'; b.setAttribute('onclick',"showPage('buktiTf')");
+      b.innerHTML='📷 <span class="nb-t" data-s="Bukti">Bukti Transfer</span><span class="bt-badge" style="display:none;margin-left:auto;background:#e8833a;color:#fff;font-size:10.5px;font-weight:700;border-radius:9px;padding:0 6px;line-height:17px">0</span>';
+      if(kwBtn&&kwBtn.nextSibling) nav.insertBefore(b,kwBtn.nextSibling); else nav.appendChild(b);
+    }
+    var ref=$('page-tagihan')||document.querySelector('.page');
+    if(!$('page-buktiTf')&&ref){
+      var pg=document.createElement('div'); pg.className='page'; pg.id='page-buktiTf';
+      pg.innerHTML='<div class="bt-wrap">'+
+        '<div class="bt-setup"><div style="display:flex;align-items:center;gap:10px"><h3 style="margin:0">Bukti Transfer <span style="font-size:11px;font-weight:700;background:#e6e9f5;color:#4b55a0;border-radius:8px;padding:2px 8px;vertical-align:middle">EARLY TEST</span></h3>'+
+        '<span class="bt-b sm" style="margin-left:auto" onclick="btToggleSet()">⚙ Pengaturan AI</span></div>'+
+        '<div id="bt-set" style="display:none;margin-top:10px">'+
+          '<div id="bt-key-hint"><p><b>Langkah awal (sekali saja):</b> buka <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> dengan akun Google sekolah → <b>Create API key</b> → salin, lalu tempel di bawah. Key hanya tersimpan di browser ini (tidak ikut ke GitHub / cloud).</p></div>'+
+          '<div class="bt-krow"><input id="bt-key" type="password" placeholder="Tempel API key Gemini di sini (AIza...)" autocomplete="off" onfocus="if(this.value.indexOf(\'•\')>=0)this.value=\'\'">'+
+          '<span class="bt-b pri" onclick="btSimpanKey()">Simpan key</span><span class="bt-b" onclick="btTesKey()">Tes</span><span class="bt-b red" onclick="btHapusKey()">Hapus</span></div>'+
+          '<div id="bt-key-info" style="font-size:12px;margin:6px 0 10px"></div>'+
+          '<p style="margin-bottom:6px"><b>Nomor rekening sekolah</b> (opsional, pisahkan dengan koma). Bila diisi, bukti yang ditransfer ke rekening lain diberi tanda merah.</p>'+
+          '<div class="bt-krow"><textarea id="bt-rek" placeholder="contoh: 8210508288"></textarea></div>'+
+          '<div class="bt-krow" style="margin-top:6px"><span class="bt-b" onclick="btSimpanRek()">Simpan rekening</span><span id="bt-rek-info" style="font-size:12px;color:#2f7a55"></span></div>'+
+        '</div></div>'+
+        '<div class="bt-drop" id="bt-drop"><div class="bt-ic"><svg width="24" height="24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v4h16v-4"/></svg></div>'+
+          '<div style="flex:1"><b>Tempel screenshot bukti TF di sini</b><p>Di WA Web tekan <kbd>Win</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd>, kotakkan gelembung chat (foto + caption + nama siswa), lalu di halaman ini tekan <kbd>Ctrl</kbd>+<kbd>V</kbd>. Bisa juga seret banyak gambar sekaligus.</p></div>'+
+          '<label class="bt-b" style="cursor:pointer">Pilih file<input type="file" accept="image/*" multiple style="display:none" onchange="btFiles(this.files);this.value=\'\'"></label></div>'+
+        '<div class="bt-tabs" id="bt-tabs"></div><div id="bt-list"></div><datalist id="bt-dl"></datalist></div>';
+      ref.parentNode.insertBefore(pg,ref);
+      var dz=$('bt-drop');
+      ['dragenter','dragover'].forEach(function(ev){ pg.addEventListener(ev,function(e){ e.preventDefault(); dz.classList.add('over'); }); });
+      ['dragleave','drop'].forEach(function(ev){ pg.addEventListener(ev,function(e){ e.preventDefault(); if(ev==='drop'||!pg.contains(e.relatedTarget)) dz.classList.remove('over'); }); });
+      pg.addEventListener('drop',function(e){ addFiles(e.dataTransfer&&e.dataTransfer.files); });
+    }
+    if(!$('bt-banner')){ var kw=document.querySelector('#page-kwitansi .kw-main')||$('page-kwitansi'); if(kw){ var bn=document.createElement('div'); bn.id='bt-banner'; kw.insertBefore(bn,kw.firstChild); } }
+    setupUi(); render();
+  }
+  window.btFiles=addFiles;
+  document.addEventListener('paste',function(e){
+    var pg=$('page-buktiTf'); if(!pg||!pg.classList.contains('active')) return;
+    if(e.target&&/^(INPUT|TEXTAREA)$/.test(e.target.tagName)&&e.target.type!=='file') return;
+    var items=(e.clipboardData&&e.clipboardData.items)||[], files=[];
+    for(var i=0;i<items.length;i++){ if(items[i].kind==='file'&&/^image\//.test(items[i].type)){ var f=items[i].getAsFile(); if(f) files.push(f); } }
+    if(files.length){ e.preventDefault(); addFiles(files); }
+  });
+  var _sp=window.showPage;
+  window.showPage=function(p){
+    var r=_sp.apply(this,arguments);
+    document.body.classList.toggle('pg-bt',p==='buktiTf');
+    if(p==='buktiTf'){ var h=document.querySelector('.navbar h1'); if(h) h.innerHTML='<span class="pt-muted">Bukti</span> Transfer'; Q.forEach(function(c){ if(c.state==='ok'){ alokasiKeep(c); } }); render(); }
+    if(p==='kwitansi') setTimeout(banner,120); else if($('bt-banner')&&p!=='preview') $('bt-banner').style.display='none';
+    return r;
+  };
+  // hitung ulang tagihan (data riwayat bisa berubah) tanpa mengubah pembagian manual
+  function alokasiKeep(c){ c.rows.forEach(function(r){ if(!r.doneNo) hitungRow(r); }); cekDobelKeep(c); }
+  function cekDobelKeep(c){ if(!c.rows.some(function(r){return r.doneNo;})) cekDobel(c); }
+  window._btDebug={Q:function(){return Q;},cariSiswa:cariSiswa,addFake:function(ai,img){ var c={id:'bt'+(++seq),state:'ok',rows:[],ditambah:new Date(),ai:ai,img:img||''}; c.nominal=ai.nominal; c.tanggal=ai.tanggal; bangunRows(c); cekDobel(c); Q.unshift(c); render(); return c; }};
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',function(){setTimeout(init,50);}); else setTimeout(init,50);
+})();
+</script>
+
 </body>
 </html>
