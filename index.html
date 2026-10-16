@@ -10093,6 +10093,7 @@ body.ui-dark .navbar.scrolled{background:rgba(15,23,42,.85)!important}
 .bt-note{font-size:11.5px;color:var(--muted,#6b7280);margin-left:auto}
 .bt-card{background:var(--surface,#fff);border:1px solid var(--line,#e5e7eb);border-radius:16px;padding:16px 18px;margin-bottom:12px;display:grid;grid-template-columns:210px minmax(0,1fr);gap:18px}
 .bt-rwrap{overflow-x:auto}
+.bt-logt{width:100%;border-collapse:collapse;font-size:12.5px}.bt-logt th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted,#8a948e);padding:8px 8px;border-bottom:1px solid var(--line,#e5e7eb)}.bt-logt td{padding:8px;border-bottom:1px solid var(--line,#f0f0f0);vertical-align:top}
 .bt-rlist{display:flex;flex-direction:column;gap:8px;margin-bottom:4px}
 .bt-r{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:flex-start;border:1px solid var(--line,#e5e7eb);border-radius:12px;padding:10px 12px;background:var(--surface,#fff)}
 .bt-r.cic{border-color:#f3c9a5;background:rgba(232,131,58,.05)}.bt-r.done{opacity:.75}
@@ -10384,7 +10385,9 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
       c.nominal=parseInt(String(d.nominal||'').replace(/[^\d]/g,''))||0;
       c.tanggal=/^\d{4}-\d{2}-\d{2}$/.test(d.tanggal||'')?d.tanggal:'';
       bangunRows(c); cekDobel(c);
-    }catch(e){ c.state='error'; c.err=e.message; }
+      btLog('Dibaca AI',c,{ket:(c.rows.length?c.rows.length+' siswa terbaca':'tanpa nama siswa')+(ls(MODEL_LS)?' · '+ls(MODEL_LS):'')});
+      if(c.dup) btLog('Terdeteksi dobel',c,{ket:c.dup});
+    }catch(e){ c.state='error'; c.err=e.message; btLog('Gagal dibaca',c,{ket:e.message.slice(0,200)}); }
     render();
   }
   function bangunRows(c){
@@ -10420,6 +10423,55 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
     if(r) c.dup='sudah pernah dibuat kuitansi '+r.no+' ('+r.nama+').';
   }
 
+  // ---------- LOG BUKTI TRANSFER (terpisah dari Log Aktivitas) ----------
+  var BTLOG_LS='ya_bt_log', LOGQ='', LOGD='';
+  function getBtLog(){ try{ return JSON.parse(localStorage.getItem(BTLOG_LS))||[]; }catch(e){ return []; } }
+  function btLog(aksi, c, extra){
+    try{
+      var d=(c&&c.ai)||{}, L=getBtLog();
+      L.unshift(Object.assign({t:new Date().toISOString(), aksi:aksi,
+        nominal:c?c.nominal||0:0, tglTf:c?c.tanggal||'':'', bank:d.bank||'', jam:d.jam||'',
+        rek:String(d.rekening_tujuan||'').replace(/\D/g,''), penerus:d.penerus||'',
+        siswa:c&&c.rows?c.rows.map(function(r){return r.nama||r.aiNama||'?';}).join(', '):''}, extra||{}));
+      if(L.length>3000) L.length=3000;
+      localStorage.setItem(BTLOG_LS, JSON.stringify(L));
+    }catch(e){ console.warn('btLog',e); }
+  }
+  var AKSI_WARNA={'Dibaca AI':'#4b55a0','Gagal dibaca':'#b91c1c','Kuitansi dibuat':'#2f7a55','Siswa diubah':'#b4581a','Data dikoreksi':'#b4581a',
+    'Terdeteksi dobel':'#b91c1c','Ditandai bukan dobel':'#b4581a','Tanya wali kelas':'#b4581a','Dihapus dari antrian':'#6b7280'};
+  function logHtml(){
+    var L=getBtLog(), q=LOGQ.toLowerCase();
+    var F=L.filter(function(l){ if(LOGD&&String(l.t).slice(0,10)!==LOGD&&l.tglTf!==LOGD) return false; if(!q) return true;
+      return [l.aksi,l.siswa,l.no,l.bank,l.ket,String(l.nominal)].join(' ').toLowerCase().indexOf(q)>=0; });
+    var nKw=F.filter(function(l){return l.aksi==='Kuitansi dibuat';}), tot=nKw.reduce(function(a,l){return a+(l.bayar||0);},0);
+    var h='<div class="bt-setup" style="padding:12px 14px"><div class="bt-krow">'+
+      '<input type="text" placeholder="Cari nama siswa, no kuitansi, bank, nominal..." value="'+esc(LOGQ)+'" oninput="btLogCari(this.value)" id="bt-log-q">'+
+      '<input type="date" value="'+esc(LOGD)+'" onchange="btLogTgl(this.value)" style="flex:0 0 160px;min-width:0" title="Tanggal (waktu log atau tanggal transfer)">'+
+      (LOGD?'<span class="bt-b sm" onclick="btLogTgl(\'\')">Semua tanggal</span>':'')+
+      '<span class="bt-b sm" onclick="btLogExcel()">⬇ Download Excel</span></div>'+
+      '<div style="font-size:12px;color:var(--muted,#6b7280);margin-top:8px">'+F.length+' catatan · <b style="color:#2f7a55">'+nKw.length+' kuitansi dibuat</b> dari bukti transfer · total '+rp(tot)+'</div></div>';
+    if(!F.length) return h+'<div class="bt-empty">Belum ada catatan.</div>';
+    h+='<div class="bt-card" style="display:block;padding:6px 10px"><table class="bt-logt"><thead><tr><th>Waktu</th><th>Aksi</th><th>Bukti transfer</th><th>Siswa</th><th>Keterangan</th></tr></thead><tbody>';
+    F.slice(0,500).forEach(function(l){
+      var dt=new Date(l.t), w=dt.toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric'})+' · '+dt.toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'});
+      var bukti=[l.nominal?rp(l.nominal):'',l.bank,[l.tglTf?tglFmt(l.tglTf):'',l.jam].filter(Boolean).join(' ')].filter(Boolean).join(' · ');
+      var ket=l.aksi==='Kuitansi dibuat'?'<b>'+esc(l.no||'')+'</b> · '+esc(l.siswaKw||'')+' · '+rp(l.bayar||0)+(l.mode==='cicil'?' (cicil)':''):esc(l.ket||'');
+      h+='<tr><td style="white-space:nowrap;color:var(--muted,#6b7280)">'+w+'</td><td><span class="bt-st" style="background:transparent;border:1px solid '+(AKSI_WARNA[l.aksi]||'#999')+';color:'+(AKSI_WARNA[l.aksi]||'#666')+'">'+esc(l.aksi)+'</span></td>'+
+        '<td style="white-space:nowrap">'+esc(bukti)+'</td><td>'+esc(l.siswa||'')+'</td><td>'+ket+'</td></tr>';
+    });
+    h+='</tbody></table>'+(F.length>500?'<div class="bt-empty">Menampilkan 500 terbaru — gunakan pencarian / tanggal.</div>':'')+'</div>';
+    return h;
+  }
+  window.btLogCari=function(v){ LOGQ=v; render(); var el=$('bt-log-q'); if(el){ el.focus(); el.setSelectionRange(v.length,v.length); } };
+  window.btLogTgl=function(v){ LOGD=v; render(); };
+  window.btLogExcel=function(){
+    if(typeof XLSX==='undefined'){ alert('Library Excel belum termuat. Coba lagi sebentar.'); return; }
+    var rows=getBtLog().map(function(l){ return {Waktu:new Date(l.t).toLocaleString('id-ID'),Aksi:l.aksi,Nominal:l.nominal||0,'Tgl Transfer':l.tglTf||'',Jam:l.jam||'',Bank:l.bank||'',
+      'Rek Tujuan':l.rek||'','Dikirim oleh':l.penerus||'',Siswa:l.siswa||'','No Kuitansi':l.no||'','Siswa Kuitansi':l.siswaKw||'',Dibayar:l.bayar||'',Mode:l.mode||'',Keterangan:l.ket||''}; });
+    var ws=XLSX.utils.json_to_sheet(rows), wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Log Bukti Transfer');
+    var d=new Date(); XLSX.writeFile(wb,'Log Bukti Transfer_'+String(d.getDate()).padStart(2,'0')+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+d.getFullYear()+'.xlsx');
+  };
+
   // ---------- Render ----------
   function cardStatus(c){
     if(c.rows.length&&c.rows.every(function(r){return r.doneNo;})) return 'done';
@@ -10429,9 +10481,10 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
   function render(){
     var wrap=$('bt-list'); if(!wrap) return;
     var n=counts();
-    $('bt-tabs').innerHTML=[['all','Semua',n.all],['ok','Siap dibuat',n.ok],['warn','Perlu dicek',n.warn],['done','Selesai',n.done]].map(function(t){
+    $('bt-tabs').innerHTML=[['all','Semua',n.all],['ok','Siap dibuat',n.ok],['warn','Perlu dicek',n.warn],['done','Selesai',n.done],['log','📋 Log',getBtLog().length]].map(function(t){
       return '<span class="bt-tab'+(TAB===t[0]?' on':'')+'" onclick="btTab(\''+t[0]+'\')">'+t[1]+'<i>'+t[2]+'</i></span>';
     }).join('')+'<span class="bt-note">Antrian tersimpan sementara — hilang bila halaman di-refresh.</span>';
+    if(TAB==='log'){ wrap.innerHTML=logHtml(); return; }
     var list=Q.filter(function(c){ var s=cardStatus(c); return TAB==='all'||(TAB==='ok'&&s==='ok')||(TAB==='done'&&s==='done')||(TAB==='warn'&&s!=='ok'&&s!=='done'); });
     if(!list.length){ wrap.innerHTML='<div class="bt-empty">'+(Q.length?'Tidak ada di tab ini.':'Belum ada bukti. Tempel screenshot (Ctrl+V) atau seret gambar ke kotak di atas.')+'</div>'; return; }
     wrap.innerHTML=list.map(cardHtml).join('');
@@ -10495,14 +10548,15 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
   window.btTab=function(t){TAB=t;render();};
   window.btZoom=function(id){ var c=C(id); if(!c||!c.img) return; var z=$('bt-zoom'); z.querySelector('img').src=c.img; z.style.display='flex'; };
   window.btUlang=function(id){ var c=C(id); if(c&&c._b64) proses(c); };
-  window.btHapus=function(id){ var c=C(id); if(!c) return; if(c.rows.some(function(r){return !r.doneNo;})&&c.state==='ok'&&!confirm('Hapus bukti ini dari antrian?')) return; Q=Q.filter(function(x){return x!==c;}); render(); };
-  window.btDupOk=function(id){ var c=C(id); if(c){c.dupOk=true; render();} };
-  window.btSet=function(id,k,v){ var c=C(id); if(!c) return; if(k==='nominal') c.nominal=parseInt(v)||0; else c[k]=v; alokasi(c); cekDobel(c); render(); };
+  window.btHapus=function(id){ var c=C(id); if(!c) return; if(c.rows.some(function(r){return !r.doneNo;})&&c.state==='ok'&&!confirm('Hapus bukti ini dari antrian?')) return; if(c.state==='ok'){ var dn=c.rows.filter(function(r){return r.doneNo;}).length; btLog('Dihapus dari antrian',c,{ket:dn===c.rows.length&&dn?'sudah selesai':(dn?dn+' dari '+c.rows.length+' sudah dibuat':'belum dibuat kuitansi')}); } Q=Q.filter(function(x){return x!==c;}); render(); };
+  window.btDupOk=function(id){ var c=C(id); if(c){c.dupOk=true; btLog('Ditandai bukan dobel',c,{ket:c.dup||''}); render();} };
+  window.btSet=function(id,k,v){ var c=C(id); if(!c) return; var old=c[k]; if(k==='nominal') c.nominal=parseInt(v)||0; else c[k]=v; btLog('Data dikoreksi',c,{ket:(k==='nominal'?'Nominal '+rp(old)+' → '+rp(c.nominal):'Tanggal '+(old||'-')+' → '+(c[k]||'-'))}); alokasi(c); cekDobel(c); render(); };
   window.btSiswa=function(id,i,v){
     var c=C(id), r=c&&c.rows[i]; if(!r) return;
     var nm=String(v).split(' — ')[0].trim(), s=siswaByNama(nm);
     if(!s){ var m=cariSiswa(nm)[0]; s=m?m.s:null; }
-    r.nama=s?s.nama:''; r.dikonfirmasi=!!s; r.ambigu=0;
+    var lama=r.nama; r.nama=s?s.nama:''; r.dikonfirmasi=!!s; r.ambigu=0;
+    if(lama!==r.nama) btLog('Siswa diubah',c,{ket:'Siswa '+(i+1)+(r.aiNama?' (chat: '+r.aiNama+')':'')+': '+(lama||'-')+' → '+(r.nama||'-')});
     if(s&&r.aiNama) setAlias(r.aiNama,s.nama);
     if(s&&r.dari==null){ var nb=sppBulanBerikutnya(s.nama); if(nb){ r.dari=mIdx({b:nb.bulan,th:nb.tahun}); r.sampai=r.dari; r.bulanTebak=true; } }
     alokasi(c); render();
@@ -10523,6 +10577,7 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
     var c=C(id); if(!c) return; var d=c.ai||{};
     var t='Halo, mohon konfirmasi bukti transfer '+rp(c.nominal)+(c.tanggal?' tgl '+tglFmt(c.tanggal):'')+(d.bank?' ('+d.bank+')':'')+(d.nama_pengirim?' a.n. '+d.nama_pengirim:'')+
       (c.rows.length?' untuk '+c.rows.map(function(r){return r.aiNama||r.nama;}).join(' & '):'')+'. Untuk siswa siapa, kelas berapa, dan SPP bulan apa? Terima kasih.';
+    btLog('Tanya wali kelas',c,{ket:t.slice(0,200)});
     window.open('https://wa.me/?text='+encodeURIComponent(t),'_blank');
   };
 
@@ -10577,7 +10632,7 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
           var rw=getRiwayat(), ids=recs.map(function(r){return r.id;});
           rw.forEach(function(r){ if(ids.indexOf(r.id)>=0) r.buktiTf=p.meta; });
           setRiwayat(rw);
-          var c=C(p.id); if(c&&c.rows[p.row]){ c.rows[p.row].doneNo=rec?rec.no:'tersimpan'; if(c.rows[p.row].aiNama) setAlias(c.rows[p.row].aiNama,p.nama); }
+          var c=C(p.id); if(c&&c.rows[p.row]){ var rr=c.rows[p.row]; rr.doneNo=rec?rec.no:'tersimpan'; btLog('Kuitansi dibuat',c,{no:rr.doneNo,siswaKw:p.nama,bayar:rec?rec.nominalBayar:p.bayar,mode:rr.mode,ket:''}); if(c.rows[p.row].aiNama) setAlias(c.rows[p.row].aiNama,p.nama); }
           window._btPending=null; banner(); render();
           var sisa=c?c.rows.filter(function(r){return !r.doneNo;}).length:0;
           if(sisa&&$('bt-banner')){ var b=$('bt-banner'); b.innerHTML='<span style="flex:1 1 320px">✓ Kuitansi '+esc(rec?rec.no:'')+' tersimpan. Masih ada <b>'+sisa+' siswa</b> lagi di bukti ini.</span><span class="bt-b sm pri" style="margin-left:auto" onclick="btKembali()">Lanjut siswa berikutnya →</span>'; b.style.display='flex'; }
