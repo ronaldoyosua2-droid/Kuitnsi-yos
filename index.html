@@ -10093,6 +10093,12 @@ body.ui-dark .navbar.scrolled{background:rgba(15,23,42,.85)!important}
 .bt-note{font-size:11.5px;color:var(--muted,#6b7280);margin-left:auto}
 .bt-card{background:var(--surface,#fff);border:1px solid var(--line,#e5e7eb);border-radius:16px;padding:16px 18px;margin-bottom:12px;display:grid;grid-template-columns:210px minmax(0,1fr);gap:18px}
 .bt-rwrap{overflow-x:auto}
+.bt-more{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}.bt-more img{width:62px;height:62px;object-fit:cover;object-position:top;border-radius:8px;border:1px solid var(--line,#e5e7eb);cursor:zoom-in}
+.bt-attach-btn{margin-top:8px;width:100%;justify-content:center;box-sizing:border-box}
+.bt-attach.on{margin-top:8px;padding:10px;border:2px dashed #e8833a;border-radius:10px;background:#fff6ee;color:#7a3a10;font-size:12px;text-align:center;line-height:1.6;animation:btpulse 1.4s ease-in-out infinite}
+@keyframes btpulse{50%{border-color:#f3c9a5}}
+.bt-xd{margin:-2px 0 10px;font-size:12.5px}.bt-xd summary{cursor:pointer;color:var(--muted,#6b7280);font-weight:600;padding:2px 0}.bt-xd .bt-krow{margin-top:6px;flex-direction:column;align-items:stretch}.bt-xd .bt-krow .bt-b{align-self:flex-start}
+.bt-xd textarea{flex:1;min-width:220px;min-height:52px;padding:8px 10px;border:1px solid var(--line,#e5e7eb);border-radius:10px;font-size:13px;font-family:inherit;background:var(--surface,#fff);color:var(--ink,#111)}
 .bt-logt{width:100%;border-collapse:collapse;font-size:12.5px}.bt-logt th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted,#8a948e);padding:8px 8px;border-bottom:1px solid var(--line,#e5e7eb)}.bt-logt td{padding:8px;border-bottom:1px solid var(--line,#f0f0f0);vertical-align:top}
 .bt-rlist{display:flex;flex-direction:column;gap:8px;margin-bottom:4px}
 .bt-r{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:flex-start;border:1px solid var(--line,#e5e7eb);border-radius:12px;padding:10px 12px;background:var(--surface,#fff)}
@@ -10207,7 +10213,10 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
       var st=toks(s.nama), common=qt.filter(function(t){return st.indexOf(t)>=0;}).length;
       var sc=common/qt.length*0.8+(st.length?common/st.length*0.2:0);
       if(st.join('')===qsq||norm(s.nama).replace(/ /g,'').indexOf(qsq)>=0) sc=Math.max(sc,0.97);
-      if(kelasAi){ var kn=String(kelasAi).match(/\d+/); if(kn&&String(s.kelas||'').indexOf(kn[0]+' ')===0) sc+=0.05; }
+      if(kelasAi){ var kn=String(kelasAi).match(/\d+/), kp=/\+|plus/i.test(kelasAi), sk=String(s.kelas||'');
+        if(kn){ if(sk.indexOf(kn[0]+' ')===0) sc+=0.1; else if(/^\d/.test(sk)) sc-=0.2; }
+        else if(/tk/i.test(kelasAi)) sc+=(sk==='TK'?0.1:-0.2);
+        if(kp&&/plus/i.test(sk)) sc+=0.05; }
       if(alias&&alias===s.nama) sc=1.2;
       return {s:s,sc:sc};
     }).filter(function(x){return x.sc>=0.5;}).sort(function(a,b){return b.sc-a.sc;});
@@ -10302,13 +10311,17 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
     'teks_chat = semua teks pesan/caption WhatsApp yang terlihat (bukan isi struk). penerus = nama pengirim pesan di grup bila terlihat (atau "You").',
     'siswa = setiap nama anak/siswa yang disebut di caption, pesan, atau berita transfer (JANGAN masukkan nama orang tua/pengirim rekening).',
     'bulan = bulan SPP yang disebut (tulis "Bulan Tahun"; jika tahun tidak disebut, kosongkan tahun). jenis = SPP / Pendaftaran / Lainnya.',
-    'Jika satu pesan menyebut beberapa siswa untuk bulan yang sama, ulangi bulan itu di tiap siswa.'
+    'Jika satu pesan menyebut beberapa siswa untuk bulan yang sama, ulangi bulan itu di tiap siswa.',
+    'Bisa ada LEBIH DARI SATU gambar: semuanya potongan dari 1 bukti yang sama (lanjutan chat di bawah/atas). Gabungkan isinya, jangan dihitung sebagai transfer terpisah.'
   ].join('\n');
 
-  async function gemCall(model, key, b64, mime){
+  async function gemCall(model, key, imgs, extra){
+    var parts=[{text:PROMPT}];
+    if(extra) parts.push({text:'KETERANGAN TAMBAHAN (ketikan/salinan chat dari admin, bagian dari bukti ini — pakai untuk siswa/kelas/bulan):\n'+extra});
+    imgs.forEach(function(im){ parts.push({inline_data:{mime_type:im.mime,data:im.b64}}); });
     var res=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+model+':generateContent',{
       method:'POST', headers:{'Content-Type':'application/json','x-goog-api-key':key},
-      body:JSON.stringify({contents:[{parts:[{text:PROMPT},{inline_data:{mime_type:mime,data:b64}}]}],
+      body:JSON.stringify({contents:[{parts:parts}],
         generationConfig:{temperature:0,responseMimeType:'application/json'}})
     });
     var j=null; try{ j=await res.json(); }catch(e){}
@@ -10317,7 +10330,7 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
     txt=txt.replace(/^```(json)?/i,'').replace(/```\s*$/,'').trim();
     return JSON.parse(txt);
   }
-  async function bacaAI(b64, mime, onStatus){
+  async function bacaAI(imgs, extra, onStatus){
     var key=ls(KEY_LS); if(!key) throw new Error('API key Gemini belum diisi (lihat kotak pengaturan di atas).');
     var saved=ls(MODEL_LS), list=saved?[saved].concat(MODELS.filter(function(m){return m!==saved;})):MODELS.slice(), last, mati={};
     function sibuk(e){ return e.status===503||e.status===500||e.status===502||e.status===504||/high demand|overload|unavailable|try again later|internal/i.test(e.message||''); }
@@ -10325,7 +10338,7 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
       if(putaran>0){ if(onStatus) onStatus('AI sedang sibuk — mencoba lagi ('+putaran+'/2)...'); await new Promise(function(r){setTimeout(r,4000*putaran);}); }
       for(var i=0;i<list.length;i++){
         if(mati[list[i]]) continue;
-        try{ var r=await gemCall(list[i],key,b64,mime); lsw(MODEL_LS,list[i]); return r; }
+        try{ var r=await gemCall(list[i],key,imgs,extra); lsw(MODEL_LS,list[i]); return r; }
         catch(e){ last=e;
           if(e.status===404||/not found|not supported/i.test(e.message)){ mati[list[i]]=1; continue; }
           if(sibuk(e)){ if(onStatus) onStatus('Model '+list[i]+' sibuk, mencoba model lain...'); continue; }
@@ -10368,18 +10381,27 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
       fr.readAsDataURL(file);
     });
   }
+  var ATTACH=null;
   function addFiles(files){
-    [].slice.call(files||[]).filter(function(f){return /^image\//.test(f.type);}).forEach(function(f){
+    var list=[].slice.call(files||[]).filter(function(f){return /^image\//.test(f.type);});
+    var tgt=ATTACH&&C(ATTACH);
+    if(tgt&&list.length){
+      ATTACH=null; tgt.state='reading'; render();
+      Promise.all(list.map(prepImage)).then(function(ims){ tgt.imgs=(tgt.imgs||[]).concat(ims); btLog('Screenshot lanjutan ditambah',tgt,{ket:ims.length+' gambar · total '+tgt.imgs.length}); return proses(tgt); })
+        .catch(function(e){ tgt.state='error'; tgt.err=e.message; render(); });
+      return;
+    }
+    list.forEach(function(f){
       var c={id:'bt'+(++seq),state:'reading',rows:[],ditambah:new Date()};
       Q.unshift(c); render();
-      prepImage(f).then(function(im){ c.img=im.url; c._b64=im.b64; c._mime=im.mime; render(); return proses(c); })
+      prepImage(f).then(function(im){ c.img=im.url; c.imgs=[im]; render(); return proses(c); })
         .catch(function(e){ c.state='error'; c.err=e.message; render(); });
     });
   }
   async function proses(c){
     c.state='reading'; c.err=''; render();
     try{
-      var d=await bacaAI(c._b64,c._mime,function(t){ c.statusTxt=t; render(); });
+      var d=await bacaAI(c.imgs||[],c.extra||'',function(t){ c.statusTxt=t; render(); });
       c.statusTxt='';
       c.ai=d; c.state='ok';
       c.nominal=parseInt(String(d.nominal||'').replace(/[^\d]/g,''))||0;
@@ -10498,7 +10520,10 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
     var stLbl={ok:'Siap dibuat',warn:'Perlu dicek',bad:'Perlu dicek',done:'Selesai',read:'Membaca...'}[st]||st;
     var stCls={ok:'ok',warn:'warn',bad:'bad',done:'done',read:'read'}[st];
     var h='<div class="bt-card st-'+(st==='read'?'warn':st)+'" id="'+c.id+'">';
-    h+='<div>'+(c.img?'<img class="bt-thumb" src="'+c.img+'" onclick="btZoom(\''+c.id+'\')" title="Klik untuk memperbesar">':'<div class="bt-thumb" style="height:160px"></div>')+'</div><div>';
+    h+='<div>'+(c.img?'<img class="bt-thumb" src="'+c.img+'" onclick="btZoom(\''+c.id+'\',0)" title="Klik untuk memperbesar">':'<div class="bt-thumb" style="height:160px"></div>');
+    if(c.imgs&&c.imgs.length>1) h+='<div class="bt-more">'+c.imgs.slice(1).map(function(im,k){ return '<img src="'+im.url+'" onclick="btZoom(\''+c.id+'\','+(k+1)+')" title="Screenshot lanjutan '+(k+1)+'">'; }).join('')+'</div>';
+    if(c.img&&c.state!=='reading') h+=(ATTACH===c.id?'<div class="bt-attach on">📋 Sekarang tekan <b>Ctrl+V</b> untuk menempel screenshot lanjutan ke bukti ini<br><span class="bt-b sm" onclick="btLanjut(\''+c.id+'\')">Batal</span></div>':'<span class="bt-b sm bt-attach-btn" onclick="btLanjut(\''+c.id+'\')" title="Tambahkan potongan chat di bawah/atas bukti ini">＋ Screenshot lanjutan</span>');
+    h+='</div><div>';
     h+='<div class="bt-meta"><span class="bt-st '+stCls+'">● '+stLbl+'</span>';
     if(d.penerus) h+='Dikirim oleh <b>'+esc(d.penerus)+'</b> · ';
     h+='ditempel '+c.ditambah.toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'})+'</div>';
@@ -10515,6 +10540,7 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
     h+='</div>';
     var chat=(d.teks_chat||[]).filter(Boolean);
     h+='<div class="bt-chat">💬 '+(chat.length?chat.map(function(t){return '“'+esc(t)+'”';}).join(' · '):'<i style="color:#b4581a">tanpa caption / keterangan</i>')+'</div>';
+    if(st!=='done') h+='<details class="bt-xd"'+(c.extra||c.xOpen?' open':'')+' ontoggle="btXOpen(\''+c.id+'\',this.open)"><summary>✎ Keterangan tambahan'+(c.extra?' (terpakai)':'')+'</summary><div class="bt-krow"><textarea class="bt-extra" placeholder="Salin (Ctrl+C) pesan WA yang terpotong lalu tempel di sini, atau ketik sendiri. Contoh: Marco 5 SD spp Oktober" oninput="btExtra(\''+c.id+'\',this.value)">'+esc(c.extra||'')+'</textarea><span class="bt-b pri sm" onclick="btExtraBaca(\''+c.id+'\')">Baca ulang dengan keterangan ini</span></div></details>';
     if(st==='done') E.R=[{c:'g',t:'Semua kuitansi dari bukti ini sudah dibuat.'}];
     h+='<ul class="bt-reasons">'+E.R.map(function(r){return '<li class="'+r.c+'">'+(r.c==='g'?'✓ ':r.c==='b'?'✗ ':'⚠ ')+esc(r.t)+(r.c==='b'&&/DOBEL/.test(r.t)?' <span class="bt-b sm" onclick="btDupOk(\''+c.id+'\')">Bukan dobel</span>':'')+'</li>';}).join('')+'</ul>';
     // baris siswa
@@ -10546,8 +10572,12 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
   // ---------- Aksi ----------
   function C(id){return Q.find(function(c){return c.id===id;});}
   window.btTab=function(t){TAB=t;render();};
-  window.btZoom=function(id){ var c=C(id); if(!c||!c.img) return; var z=$('bt-zoom'); z.querySelector('img').src=c.img; z.style.display='flex'; };
-  window.btUlang=function(id){ var c=C(id); if(c&&c._b64) proses(c); };
+  window.btZoom=function(id,k){ var c=C(id); if(!c||!c.img) return; var im=(c.imgs&&c.imgs[k||0])?c.imgs[k||0].url:c.img; var z=$('bt-zoom'); z.querySelector('img').src=im; z.style.display='flex'; };
+  window.btUlang=function(id){ var c=C(id); if(c&&c.imgs&&c.imgs.length) proses(c); };
+  window.btLanjut=function(id){ ATTACH=(ATTACH===id?null:id); render(); };
+  window.btXOpen=function(id,o){ var c=C(id); if(c) c.xOpen=o; };
+  window.btExtra=function(id,v){ var c=C(id); if(c) c.extra=String(v||'').trim(); };
+  window.btExtraBaca=function(id){ var c=C(id); if(!c) return; var t=document.querySelector('#'+id+' .bt-extra'); if(t) c.extra=t.value.trim(); btLog('Keterangan tambahan',c,{ket:(c.extra||'').slice(0,200)}); proses(c); };
   window.btHapus=function(id){ var c=C(id); if(!c) return; if(c.rows.some(function(r){return !r.doneNo;})&&c.state==='ok'&&!confirm('Hapus bukti ini dari antrian?')) return; if(c.state==='ok'){ var dn=c.rows.filter(function(r){return r.doneNo;}).length; btLog('Dihapus dari antrian',c,{ket:dn===c.rows.length&&dn?'sudah selesai':(dn?dn+' dari '+c.rows.length+' sudah dibuat':'belum dibuat kuitansi')}); } Q=Q.filter(function(x){return x!==c;}); render(); };
   window.btDupOk=function(id){ var c=C(id); if(c){c.dupOk=true; btLog('Ditandai bukan dobel',c,{ket:c.dup||''}); render();} };
   window.btSet=function(id,k,v){ var c=C(id); if(!c) return; var old=c[k]; if(k==='nominal') c.nominal=parseInt(v)||0; else c[k]=v; btLog('Data dikoreksi',c,{ket:(k==='nominal'?'Nominal '+rp(old)+' → '+rp(c.nominal):'Tanggal '+(old||'-')+' → '+(c[k]||'-'))}); alokasi(c); cekDobel(c); render(); };
@@ -10708,7 +10738,6 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
   window.btFiles=addFiles;
   document.addEventListener('paste',function(e){
     var pg=$('page-buktiTf'); if(!pg||!pg.classList.contains('active')) return;
-    if(e.target&&/^(INPUT|TEXTAREA)$/.test(e.target.tagName)&&e.target.type!=='file') return;
     var items=(e.clipboardData&&e.clipboardData.items)||[], files=[];
     for(var i=0;i<items.length;i++){ if(items[i].kind==='file'&&/^image\//.test(items[i].type)){ var f=items[i].getAsFile(); if(f) files.push(f); } }
     if(files.length){ e.preventDefault(); addFiles(files); }
