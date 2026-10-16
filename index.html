@@ -10149,7 +10149,7 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
 // ===================== BUKTI TRANSFER (AI) — early test =====================
 (function(){
   var KEY_LS='kwbt_key', MODEL_LS='kwbt_model', REK_LS='kwbt_rek', ALIAS_LS='ya_bt_alias';
-  var MODELS=['gemini-flash-latest','gemini-2.5-flash','gemini-2.0-flash'];
+  var MODELS=['gemini-flash-latest','gemini-2.5-flash','gemini-2.5-flash-lite','gemini-2.0-flash','gemini-flash-lite-latest'];
   var Q=[];            // antrian kartu (hanya di memori — hilang bila halaman di-refresh)
   var TAB='all', seq=0;
   window._btPending=null;
@@ -10306,13 +10306,23 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
     txt=txt.replace(/^```(json)?/i,'').replace(/```\s*$/,'').trim();
     return JSON.parse(txt);
   }
-  async function bacaAI(b64, mime){
+  async function bacaAI(b64, mime, onStatus){
     var key=ls(KEY_LS); if(!key) throw new Error('API key Gemini belum diisi (lihat kotak pengaturan di atas).');
-    var saved=ls(MODEL_LS), list=saved?[saved].concat(MODELS.filter(function(m){return m!==saved;})):MODELS.slice(), last;
-    for(var i=0;i<list.length;i++){
-      try{ var r=await gemCall(list[i],key,b64,mime); lsw(MODEL_LS,list[i]); return r; }
-      catch(e){ last=e; if(e.status===404||/not found|not supported/i.test(e.message)) continue; break; }
+    var saved=ls(MODEL_LS), list=saved?[saved].concat(MODELS.filter(function(m){return m!==saved;})):MODELS.slice(), last, mati={};
+    function sibuk(e){ return e.status===503||e.status===500||e.status===502||e.status===504||/high demand|overload|unavailable|try again later|internal/i.test(e.message||''); }
+    for(var putaran=0;putaran<3;putaran++){
+      if(putaran>0){ if(onStatus) onStatus('AI sedang sibuk — mencoba lagi ('+putaran+'/2)...'); await new Promise(function(r){setTimeout(r,4000*putaran);}); }
+      for(var i=0;i<list.length;i++){
+        if(mati[list[i]]) continue;
+        try{ var r=await gemCall(list[i],key,b64,mime); lsw(MODEL_LS,list[i]); return r; }
+        catch(e){ last=e;
+          if(e.status===404||/not found|not supported/i.test(e.message)){ mati[list[i]]=1; continue; }
+          if(sibuk(e)){ if(onStatus) onStatus('Model '+list[i]+' sibuk, mencoba model lain...'); continue; }
+          if(e.status===429&&!/quota|exceeded/i.test(e.message)) continue;
+          putaran=9; break; }
+      }
     }
+    if(last&&sibuk(last)) throw new Error('Server AI Google sedang sibuk (bukan kesalahan aplikasi / key). Tunggu 1–2 menit lalu klik Baca ulang.');
     if(last&&(last.status===400&&/api key/i.test(last.message)||last.status===401||last.status===403)) throw new Error('API key ditolak Google. Cek lagi key-nya. ('+last.message+')');
     if(last&&last.status===429) throw new Error('Kuota AI habis / terlalu cepat. Tunggu 1 menit lalu klik Baca ulang.');
     throw new Error('AI gagal membaca: '+(last?last.message:'tidak diketahui'));
@@ -10358,7 +10368,8 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
   async function proses(c){
     c.state='reading'; c.err=''; render();
     try{
-      var d=await bacaAI(c._b64,c._mime);
+      var d=await bacaAI(c._b64,c._mime,function(t){ c.statusTxt=t; render(); });
+      c.statusTxt='';
       c.ai=d; c.state='ok';
       c.nominal=parseInt(String(d.nominal||'').replace(/[^\d]/g,''))||0;
       c.tanggal=/^\d{4}-\d{2}-\d{2}$/.test(d.tanggal||'')?d.tanggal:'';
@@ -10428,7 +10439,7 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
     h+='<div class="bt-meta"><span class="bt-st '+stCls+'">● '+stLbl+'</span>';
     if(d.penerus) h+='Dikirim oleh <b>'+esc(d.penerus)+'</b> · ';
     h+='ditempel '+c.ditambah.toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'})+'</div>';
-    if(c.state==='reading'){ return h+'<div style="font-size:13px;color:#4b55a0"><span class="bt-spin"></span> AI sedang membaca bukti...</div></div></div>'; }
+    if(c.state==='reading'){ return h+'<div style="font-size:13px;color:#4b55a0"><span class="bt-spin"></span> '+esc(c.statusTxt||'AI sedang membaca bukti...')+'</div></div></div>'; }
     if(c.state==='error'){ return h+'<ul class="bt-reasons"><li class="b">✗ '+esc(c.err)+'</li></ul><div class="bt-acts"><span class="bt-b pri" onclick="btUlang(\''+c.id+'\')">Baca ulang</span><span class="bt-b red" onclick="btHapus(\''+c.id+'\')">Hapus</span></div></div></div>'; }
     function f(l,v){ return '<div class="bt-f"><label>'+l+'</label><div class="v">'+(v?esc(v):'<span class="miss">tidak ada</span>')+'</div></div>'; }
     h+='<div class="bt-fields">';
