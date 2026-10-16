@@ -319,11 +319,12 @@ function getTunggakanSiswa(nama, kelas){
       if(sudahBayar && !adaSisa) return; // lunas, skip
 
       // Hitung tarif bulan ini
-      const tglBulan = (taY + Math.floor(idx/12))+'-'+String((idx%12===0?6:idx%12)%12+1).padStart(2,'0')+'-01';
+      // idx 0 = Juli taY ... idx 5 = Desember taY, idx 6 = Januari taY+1 ... idx 11 = Juni taY+1
+      const tglBulan = (taY + (idx>=6?1:0))+'-'+String(((6+idx)%12)+1).padStart(2,'0')+'-01';
       // Ambil kelas efektif
       const siswaObj = getSiswa().find(s=>s.nama===nama);
       const kelasEf = siswaObj ? (getKelasEfektif(siswaObj.kelas, tglBulan)||siswaObj.kelas) : kelas;
-      const tarif = getSppNominal(kelasEf, spp) || 0;
+      const tarif = (siswaObj ? getSppNominalSiswa(siswaObj.nama, kelasEf, spp, tglBulan) : getSppNominal(kelasEf, spp)) || 0;
       if(!tarif) return;
 
       if(adaSisa){
@@ -10761,9 +10762,9 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
 <!-- ===================== VERSI APLIKASI ===================== -->
 <script>
 // Ubah setiap kali ada update: x.y.z  (z = perbaikan kecil, y = fitur baru, x = perubahan besar)
-window.APP_VERSION='3.1.1';
+window.APP_VERSION='3.1.2';
 window.APP_BUILD='2026-10-16';
-window.APP_NOTES='Catatan mini tidak lagi menghalangi tombol (klik tembus saat pudar) + tombol Tandai dibaca. Bukti Transfer (AI) early test.';
+window.APP_NOTES='Perbaikan tarif SPP di Tagihan (Agustus–Juni sempat pakai tarif kelas tahun lalu). Catatan mini tidak lagi menghalangi tombol (klik tembus saat pudar) + tombol Tandai dibaca. Bukti Transfer (AI) early test.';
 (function(){
   function tgl(s){ var d=new Date(s+'T00:00:00'); return d.toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'}); }
   function pasang(){
