@@ -10761,9 +10761,9 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
 <!-- ===================== VERSI APLIKASI ===================== -->
 <script>
 // Ubah setiap kali ada update: x.y.z  (z = perbaikan kecil, y = fitur baru, x = perubahan besar)
-window.APP_VERSION='3.1.0';
+window.APP_VERSION='3.1.1';
 window.APP_BUILD='2026-10-16';
-window.APP_NOTES='Bukti Transfer (AI) early test: tempel screenshot WA, AI baca, isi ke kuitansi, log sendiri, screenshot lanjutan.';
+window.APP_NOTES='Catatan mini tidak lagi menghalangi tombol (klik tembus saat pudar) + tombol Tandai dibaca. Bukti Transfer (AI) early test.';
 (function(){
   function tgl(s){ var d=new Date(s+'T00:00:00'); return d.toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'}); }
   function pasang(){
@@ -10783,6 +10783,42 @@ window.APP_NOTES='Bukti Transfer (AI) early test: tempel screenshot WA, AI baca,
 })();
 </script>
 <style>.app-ver-sb{order:100;font-size:10.5px;color:var(--muted,#9ca3af);text-align:center;padding:6px 0 0;cursor:help;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}body.sn-collapsed .app-ver-sb{font-size:9px}@media(max-width:700px){.app-ver-sb{display:none}}</style>
+
+<!-- ===================== CATATAN MINI: tidak menghalangi klik + Tandai dibaca ===================== -->
+<script>
+(function(){
+  var READ_LS='np_mini_read';
+  function hash(){ try{ return JSON.stringify((window.npNotes||[]).slice(0,2).map(function(n){return [n.title||'',n.body||''];})); }catch(e){ return ''; } }
+  function mini(){ return document.getElementById('note-mini'); }
+  function pudar(m){ if(!m) return; m.style.opacity='0.15'; m.style.pointerEvents='none'; }   // pudar = klik tembus ke tombol di belakangnya
+  function tampil(m){ if(!m) return; m.style.opacity='1'; m.style.pointerEvents='auto'; clearTimeout(m._fadeT); m._fadeT=setTimeout(function(){pudar(m);},5000); }
+  var _orig=window.npRenderMini;
+  if(typeof _orig!=='function') return;
+  window.npRenderMini=function(){
+    var r=_orig.apply(this,arguments), m=mini(); if(!m) return r;
+    var h=hash(), read=''; try{ read=localStorage.getItem(READ_LS)||''; }catch(e){}
+    if(!h||h==='[]'){ return r; }
+    if(read===h){ m.style.display='none'; return r; }       // sudah ditandai dibaca → sembunyi sampai catatan berubah
+    var b=document.createElement('button'); b.type='button'; b.className='np-mini-read'; b.textContent='✓ Tandai dibaca';
+    b.title='Sembunyikan pratinjau ini sampai ada catatan baru/berubah';
+    b.onclick=function(e){ e.stopPropagation(); try{ localStorage.setItem(READ_LS,hash()); }catch(_){} m.style.display='none'; };
+    m.appendChild(b);
+    clearTimeout(m._fadeT); tampil(m);
+    return r;
+  };
+  function pasang(){
+    var m=mini(); if(!m) return;
+    m.onmouseleave=function(){ clearTimeout(m._fadeT); m._fadeT=setTimeout(function(){pudar(m);},800); };
+    m.onmouseenter=function(){ m.style.opacity='1'; clearTimeout(m._fadeT); };
+    var fab=document.getElementById('note-fab');
+    if(fab) fab.addEventListener('mouseenter',function(){ if(m.style.display!=='none'&&m.childNodes.length) tampil(m); });
+    if((window.npNotes||[]).length&&!window.npPopupOpen) window.npRenderMini();
+  }
+  // catatan awal ditampilkan aplikasi pada 500 ms → pasang sesudahnya
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',function(){setTimeout(pasang,800);}); else setTimeout(pasang,800);
+})();
+</script>
+<style>.np-mini-read{align-self:flex-end;border:1px solid rgba(0,0,0,.12);background:var(--surface,#fff);color:var(--ink,#333);border-radius:12px;padding:3px 10px;font-size:10.5px;font-weight:600;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.08)}.np-mini-read:hover{background:var(--hover,#f3f4f6)}</style>
 
 </body>
 </html>
