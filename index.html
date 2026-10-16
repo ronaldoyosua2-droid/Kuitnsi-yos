@@ -10091,8 +10091,18 @@ body.ui-dark .navbar.scrolled{background:rgba(15,23,42,.85)!important}
 .bt-tab i{font-style:normal;margin-left:5px;font-size:11px;padding:0 7px;border-radius:9px;background:var(--soft,#eef1ef);color:var(--ink,#333);font-weight:700}
 .bt-tab.on i{background:#5a9a78;color:#fff}
 .bt-note{font-size:11.5px;color:var(--muted,#6b7280);margin-left:auto}
-.bt-card{background:var(--surface,#fff);border:1px solid var(--line,#e5e7eb);border-radius:16px;padding:16px 18px;margin-bottom:12px;display:grid;grid-template-columns:230px minmax(0,1fr);gap:18px}
+.bt-card{background:var(--surface,#fff);border:1px solid var(--line,#e5e7eb);border-radius:16px;padding:16px 18px;margin-bottom:12px;display:grid;grid-template-columns:210px minmax(0,1fr);gap:18px}
 .bt-rwrap{overflow-x:auto}
+.bt-rlist{display:flex;flex-direction:column;gap:8px;margin-bottom:4px}
+.bt-r{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:flex-start;border:1px solid var(--line,#e5e7eb);border-radius:12px;padding:10px 12px;background:var(--surface,#fff)}
+.bt-r.cic{border-color:#f3c9a5;background:rgba(232,131,58,.05)}.bt-r.done{opacity:.75}
+.bt-c label{display:block;font-size:10.5px;color:var(--muted,#8a948e);font-weight:600;text-transform:uppercase;letter-spacing:.03em;margin-bottom:3px}
+.bt-c input,.bt-c select{width:100%;box-sizing:border-box;padding:7px 8px;border:1px solid var(--line,#e5e7eb);border-radius:8px;font-size:13px;background:var(--surface,#fff);color:var(--ink,#111)}
+.bt-c-s{flex:1 1 220px;min-width:190px}.bt-c-m{flex:0 0 104px}.bt-c-t{flex:0 0 112px}.bt-c-t b{display:block;font-size:14px;padding-top:6px}
+.bt-c-b{flex:0 0 116px}.bt-r.cic input.bt-bayar{border-color:#e8833a}
+.bt-c-a{display:flex;gap:6px;align-items:center;align-self:center;margin-left:auto;padding-top:14px}
+.bt-c .bt-sub{font-size:11px;color:var(--muted,#6b7280);margin-top:3px}.bt-c .bt-sub.w{color:#b4581a}
+@media(max-width:800px){.bt-c-s{flex-basis:100%}.bt-c-a{margin-left:0;padding-top:0;width:100%}}
 body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-right:0!important}
 .bt-rows select{min-width:96px}.bt-rows input.bt-bayar{min-width:100px}
 .bt-card.st-ok{border-left:4px solid #5a9a78}.bt-card.st-warn{border-left:4px solid #e8833a}.bt-card.st-bad{border-left:4px solid #dc2626}.bt-card.st-done{border-left:4px solid #9ca3af;opacity:.8}
@@ -10259,7 +10269,7 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
     c.rows.forEach(function(r,i){
       var lbl='Siswa '+(i+1);
       if(!r.nama){ allNama=false; w(lbl+(r.aiNama?' ("'+r.aiNama+'")':'')+': tidak ditemukan di data siswa — pilih manual.'); return; }
-      if(r.ambigu&&!r.dikonfirmasi) w(lbl+': ada '+r.ambigu+' data mirip untuk "'+r.aiNama+'" — pastikan siswanya benar.');
+      if(r.ambigu&&!r.dikonfirmasi) w(lbl+': ada '+r.ambigu+' data siswa mirip untuk "'+r.aiNama+'" — pastikan yang dipilih benar (lihat "kandidat").');
       if(r.bulanTebak&&!r.dikonfirmasi) w(lbl+': bulan tidak disebut — ditebak bulan berikutnya yang belum dibayar.');
       if(r.lunasSudah&&r.lunasSudah.length) b(lbl+': '+r.lunasSudah.join(', ')+' sudah LUNAS sebelumnya.');
       if(r.mode==='cicil'&&r.tagihan>0&&r.bayar>=r.tagihan) w(lbl+': mode Cicil — ketik nominal yang dibayar.');
@@ -10455,20 +10465,22 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
     if(st==='done') E.R=[{c:'g',t:'Semua kuitansi dari bukti ini sudah dibuat.'}];
     h+='<ul class="bt-reasons">'+E.R.map(function(r){return '<li class="'+r.c+'">'+(r.c==='g'?'✓ ':r.c==='b'?'✗ ':'⚠ ')+esc(r.t)+(r.c==='b'&&/DOBEL/.test(r.t)?' <span class="bt-b sm" onclick="btDupOk(\''+c.id+'\')">Bukan dobel</span>':'')+'</li>';}).join('')+'</ul>';
     // baris siswa
-    h+='<div class="bt-rwrap"><table class="bt-rows"><thead><tr><th style="width:34%">Siswa</th><th>Dari</th><th>Sampai</th><th>Tagihan</th><th>Status</th><th>Dibayar</th><th></th></tr></thead><tbody>';
+    h+='<div class="bt-rlist">';
     c.rows.forEach(function(r,i){
-      var s=r.nama?siswaByNama(r.nama):null, done=!!r.doneNo;
-      h+='<tr class="'+(r.mode==='cicil'?'cic':'')+'"><td><input list="bt-dl" value="'+(s?esc(s.nama)+' — '+esc(s.kelas):'')+'" placeholder="'+esc(r.aiNama?'Cari: '+r.aiNama:'Ketik nama siswa...')+'" onchange="btSiswa(\''+c.id+'\','+i+',this.value)"'+(done?' disabled':'')+'>';
-      h+='<div class="bt-sub">'+(r.aiNama?'dari chat: “'+esc(r.aiNama)+(r.aiKelas?' · '+esc(r.aiKelas):'')+'”':'ditambah manual')+(r.cand&&r.cand.length>1&&!done?' · <a href="javascript:void 0" onclick="btCand(\''+c.id+'\','+i+')">'+(r.cand.length)+' kandidat</a>':'')+'</div></td>';
-      h+='<td><select onchange="btBulan(\''+c.id+'\','+i+',\'dari\',this.value)"'+(done?' disabled':'')+'><option value="">—</option>'+monthOpts(r.dari)+'</select></td>';
-      h+='<td><select onchange="btBulan(\''+c.id+'\','+i+',\'sampai\',this.value)"'+(done?' disabled':'')+'><option value="">—</option>'+monthOpts(r.sampai)+'</select></td>';
+      var s=r.nama?siswaByNama(r.nama):null, done=!!r.doneNo, dis=done?' disabled':'';
       var nb=r.dari!=null?((r.sampai!=null&&r.sampai>=r.dari?r.sampai:r.dari)-r.dari+1):0;
-      h+='<td><b>'+rp(r.tagihan)+'</b><div class="bt-sub'+(r.info&&r.info.length?' w':'')+'">'+(s?esc(s.kelas)+' · '+nb+' bln':'')+(r.info&&r.info.length?' · ada sisa lama':'')+'</div></td>';
-      h+='<td><span class="bt-tg"><span class="'+(r.mode!=='cicil'?'on':'')+'" onclick="btMode(\''+c.id+'\','+i+',\'lunas\')">Lunas</span><span class="'+(r.mode==='cicil'?'on c':'')+'" onclick="btMode(\''+c.id+'\','+i+',\'cicil\')">Cicil</span></span></td>';
-      h+='<td><input class="bt-bayar" type="number" value="'+(r.bayar||0)+'" onchange="btBayar(\''+c.id+'\','+i+',this.value)"'+(done?' disabled':'')+'><div class="bt-sub'+(r.mode==='cicil'?' w':'')+'">'+(r.mode==='cicil'&&r.tagihan?'sisa '+rp(r.tagihan-r.bayar):(r.tagihan?'lunas':''))+'</div></td>';
-      h+='<td style="white-space:nowrap">'+(done?'<span class="bt-done">✓ '+esc(r.doneNo)+'</span>':'<span class="bt-b pri sm" '+(E.can?'onclick="btIsi(\''+c.id+'\','+i+')"':'disabled title="Selesaikan tanda ✗ dulu"')+'>Isi ke Kuitansi</span> <span class="bt-b sm red" title="Hapus baris" onclick="btHapusRow(\''+c.id+'\','+i+')">✕</span>')+'</td></tr>';
+      h+='<div class="bt-r'+(r.mode==='cicil'?' cic':'')+(done?' done':'')+'">';
+      h+='<div class="bt-c bt-c-s"><label>Siswa '+(i+1)+'</label><input list="bt-dl" value="'+(s?esc(s.nama)+' — '+esc(s.kelas):'')+'" placeholder="'+esc(r.aiNama?'Cari: '+r.aiNama:'Ketik nama siswa...')+'" onchange="btSiswa(\''+c.id+'\','+i+',this.value)"'+dis+'>';
+      h+='<div class="bt-sub">'+(r.aiNama?'dari chat: “'+esc(r.aiNama)+(r.aiKelas?' · '+esc(r.aiKelas):'')+'”':'ditambah manual')+(r.cand&&r.cand.length>1&&!done?' · <a href="javascript:void 0" onclick="btCand(\''+c.id+'\','+i+')">'+(r.cand.length)+' kandidat</a>':'')+'</div></div>';
+      h+='<div class="bt-c bt-c-m"><label>Dari</label><select onchange="btBulan(\''+c.id+'\','+i+',\'dari\',this.value)"'+dis+'><option value="">—</option>'+monthOpts(r.dari)+'</select></div>';
+      h+='<div class="bt-c bt-c-m"><label>Sampai</label><select onchange="btBulan(\''+c.id+'\','+i+',\'sampai\',this.value)"'+dis+'><option value="">—</option>'+monthOpts(r.sampai)+'</select></div>';
+      h+='<div class="bt-c bt-c-t"><label>Tagihan</label><b>'+rp(r.tagihan)+'</b><div class="bt-sub'+(r.info&&r.info.length?' w':'')+'">'+(s?esc(s.kelas)+' · '+nb+' bln':'')+(r.info&&r.info.length?' · ada sisa lama':'')+'</div></div>';
+      h+='<div class="bt-c"><label>Status</label><span class="bt-tg"><span class="'+(r.mode!=='cicil'?'on':'')+'" onclick="btMode(\''+c.id+'\','+i+',\'lunas\')">Lunas</span><span class="'+(r.mode==='cicil'?'on c':'')+'" onclick="btMode(\''+c.id+'\','+i+',\'cicil\')">Cicil</span></span></div>';
+      h+='<div class="bt-c bt-c-b"><label>Dibayar</label><input class="bt-bayar" type="number" value="'+(r.bayar||0)+'" onchange="btBayar(\''+c.id+'\','+i+',this.value)"'+dis+'><div class="bt-sub'+(r.mode==='cicil'?' w':'')+'">'+(r.mode==='cicil'&&r.tagihan?'sisa '+rp(r.tagihan-r.bayar):(r.tagihan?'lunas':''))+'</div></div>';
+      h+='<div class="bt-c bt-c-a">'+(done?'<span class="bt-done">✓ '+esc(r.doneNo)+'</span>':'<span class="bt-b pri" '+(E.can?'onclick="btIsi(\''+c.id+'\','+i+')"':'disabled title="Selesaikan tanda ✗ dulu"')+'>Isi ke Kuitansi</span><span class="bt-b sm red" title="Hapus baris" onclick="btHapusRow(\''+c.id+'\','+i+')">✕</span>')+'</div>';
+      h+='</div>';
     });
-    h+='</tbody></table></div>';
+    h+='</div>';
     var tot=c.rows.reduce(function(a,r){return a+(Number(r.bayar)||0);},0);
     if(c.rows.length) h+='<div class="bt-tot '+(tot===c.nominal?'good':'bad')+'"><span>'+(tot===c.nominal?'✓':'⚠')+' Total dibagi <b>'+rp(tot)+'</b> dari transfer <b>'+rp(c.nominal)+'</b></span><b>'+(tot===c.nominal?c.rows.length+' kuitansi':'selisih '+rp(c.nominal-tot))+'</b></div>';
     h+='<div class="bt-acts"><span class="bt-b" onclick="btTambahRow(\''+c.id+'\')">+ Siswa</span>';
