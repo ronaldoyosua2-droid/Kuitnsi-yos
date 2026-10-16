@@ -10163,6 +10163,7 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
   function toks(s){return norm(s).split(' ').filter(function(t){return t.length>1;});}
   function getAlias(){try{return JSON.parse(localStorage.getItem(ALIAS_LS))||{};}catch(e){return {};}}
   function setAlias(q,nama){ if(!q||!nama) return; var a=getAlias(); a[norm(q)]=nama; try{localStorage.setItem(ALIAS_LS,JSON.stringify(a));}catch(e){} }
+  function rekCocok(rt){ rt=String(rt||'').replace(/\D/g,''); if(rt.length<4) return null; var L=rekSekolah(); if(!L.length) return null; return L.some(function(x){ return x===rt||x.slice(-rt.length)===rt||rt.slice(-x.length)===x; }); }
   function rekSekolah(){ return ls(REK_LS).split(/[\n,;]+/).map(function(x){return x.replace(/\D/g,'');}).filter(function(x){return x.length>=5;}); }
 
   // ---------- Bulan (TA lalu + TA aktif + TA depan) ----------
@@ -10251,7 +10252,7 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
     if(!c.nominal) b('Nominal tidak terbaca — isi manual.');
     if(!c.tanggal) w('Tanggal transfer tidak terbaca — isi manual.');
     var rek=rekSekolah(), rt=String(d.rekening_tujuan||'').replace(/\D/g,'');
-    if(rek.length&&rt&&rek.indexOf(rt)<0) b('Rekening tujuan '+rt+' BUKAN rekening sekolah.');
+    if(rekCocok(rt)===false) b('Rekening tujuan '+rt+' BUKAN rekening sekolah.');
     if(c.dup&&!c.dupOk) b('Kemungkinan DOBEL: '+c.dup);
     if(!c.rows.length) w('Nama siswa tidak ada di chat — pilih siswa manual atau Tanya Wali Kelas.');
     var total=0, allNama=true;
@@ -10435,7 +10436,7 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
     h+='<div class="bt-f"><label>Tanggal transfer</label><input type="date" value="'+(c.tanggal||'')+'" onchange="btSet(\''+c.id+'\',\'tanggal\',this.value)" style="font-weight:600"></div>';
     h+=f('Bank · jam',[d.bank,d.jam].filter(Boolean).join(' · '));
     var rt=String(d.rekening_tujuan||'').replace(/\D/g,''), rk=rekSekolah();
-    h+=f('Ke rekening',[d.nama_tujuan,rt].filter(Boolean).join(' · ')+(rk.length&&rt?(rk.indexOf(rt)>=0?' ✓':' ✗'):''));
+    h+=f('Ke rekening',[d.nama_tujuan,rt].filter(Boolean).join(' · ')+(rekCocok(rt)===true?' ✓':rekCocok(rt)===false?' ✗':''));
     h+=f('Pengirim',d.nama_pengirim)+f('Berita transfer',d.berita)+f('Status',d.status_transfer);
     h+='</div>';
     var chat=(d.teks_chat||[]).filter(Boolean);
