@@ -10181,8 +10181,19 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
   function toks(s){return norm(s).split(' ').filter(function(t){return t.length>1;});}
   function getAlias(){try{return JSON.parse(localStorage.getItem(ALIAS_LS))||{};}catch(e){return {};}}
   function setAlias(q,nama){ if(!q||!nama) return; var a=getAlias(); a[norm(q)]=nama; try{localStorage.setItem(ALIAS_LS,JSON.stringify(a));}catch(e){} }
-  function rekCocok(rt){ rt=String(rt||'').replace(/\D/g,''); if(rt.length<4) return null; var L=rekSekolah(); if(!L.length) return null; return L.some(function(x){ return x===rt||x.slice(-rt.length)===rt||rt.slice(-x.length)===x; }); }
-  function rekSekolah(){ return ls(REK_LS).split(/[\n,;]+/).map(function(x){return x.replace(/\D/g,'');}).filter(function(x){return x.length>=5;}); }
+  // true = cocok, 'mirip' = beda 1-2 angka (kemungkinan salah baca foto), false = tidak cocok, null = tidak dicek
+  function rekCocok(rt){ rt=String(rt||'').replace(/\D/g,''); if(rt.length<4) return null; var L=rekSekolah(); if(!L.length) return null;
+    if(L.some(function(x){ return x===rt||x.slice(-rt.length)===rt||rt.slice(-x.length)===x; })) return true;
+    if(rt.length>=8&&L.some(function(x){ return Math.abs(x.length-rt.length)<=1&&lev(x,rt)<=2; })) return 'mirip';
+    return false; }
+  function rekMirip(rt){ rt=String(rt||'').replace(/\D/g,''); var L=rekSekolah(), best=null, bd=9; L.forEach(function(x){ var d=lev(x,rt); if(d<bd){bd=d;best=x;} }); return best; }
+  function rekSekolah(){ var out=[];
+    ls(REK_LS).split(/[\n,;\/|]+|\s+(?:dan|&)\s+/i).forEach(function(part){
+      var dg=part.replace(/\D/g,'');
+      // beberapa nomor dipisah spasi saja (mis. "8210508288 1090014535561") → pecah per kelompok angka panjang
+      if(dg.length>20){ part.split(/\s+/).forEach(function(t){ var d=t.replace(/\D/g,''); if(d.length>=5) out.push(d); }); }
+      else if(dg.length>=5) out.push(dg);
+    }); return out; }
 
   // ---------- Bulan (TA lalu + TA aktif + TA depan) ----------
   function monthList(){
@@ -10193,13 +10204,18 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
   function mKey(m){return BULAN[m.b]+' '+m.th;}
   function mIdx(m){return m.th*12+m.b;}
   function fromIdx(i){return {b:i%12,th:Math.floor(i/12)};}
-  function parseBulan(s, tglTf){
+  // usulan tahun bila AI salah baca tahun: tanggal yang sama di tahun ini / tahun lalu yang jatuh ≤60 hari lalu
+  function saranTahun(t){ var now=new Date(today()+'T00:00:00'), y=now.getFullYear();
+    for(var k=0;k<2;k++){ var s=(y-k)+t.slice(4), d=new Date(s+'T00:00:00'), hr=(d-now)/864e5; if(hr<=1&&hr>=-60) return s; } return ''; }
+  function parseBulan(s, chatTxt){
     s=String(s||'').toLowerCase();
     for(var i=0;i<12;i++){
       var nm=BULAN[i].toLowerCase();
       if(s.indexOf(nm)>=0||s.indexOf(nm.slice(0,3))>=0){
+        // Tahun hanya dipakai bila BENAR-BENAR tertulis di chat/keterangan; selain itu ikut Tahun Ajaran aktif
         var th=(s.match(/20\d\d/)||[])[0];
-        if(!th){ var d=tglTf?new Date(tglTf+'T00:00:00'):new Date(); th=d.getFullYear(); if(i>=6&&d.getMonth()<3) th--; if(i<3&&d.getMonth()>=9) th++; }
+        if(th&&chatTxt&&String(chatTxt).indexOf(th)<0) th=null;
+        if(!th){ var taY=parseInt(getTAAktif().split('/')[0]); th=(i>=6)?taY:taY+1; }
         return {b:i,th:parseInt(th)};
       }
     }
@@ -10207,14 +10223,18 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
   }
 
   // ---------- Pencocokan siswa ----------
+  // jarak edit (salah ketik nama: Clirinda ~ Clorinda)
+  function lev(a,b){ if(Math.abs(a.length-b.length)>2) return 9; var m=[],i,j; for(i=0;i<=a.length;i++){m[i]=[i];} for(j=0;j<=b.length;j++) m[0][j]=j;
+    for(i=1;i<=a.length;i++) for(j=1;j<=b.length;j++) m[i][j]=Math.min(m[i-1][j]+1,m[i][j-1]+1,m[i-1][j-1]+(a[i-1]===b[j-1]?0:1)); return m[a.length][b.length]; }
   function cariSiswa(namaAi, kelasAi){
     var all=getSiswa()||[], qt=toks(namaAi); if(!qt.length) return [];
     var alias=getAlias()[norm(namaAi)], qsq=qt.join('');
     var res=all.map(function(s){
-      var st=toks(s.nama), common=qt.filter(function(t){return st.indexOf(t)>=0;}).length;
+      var st=toks(s.nama), common=qt.reduce(function(acc,t){ if(st.indexOf(t)>=0) return acc+1; var best=0; st.forEach(function(u){ if(t.length>=4&&u.length>=4){ var dd=lev(t,u); if(dd<=1||(dd<=2&&Math.min(t.length,u.length)>=7)) best=Math.max(best,0.85); } }); return acc+best; },0);
       var sc=common/qt.length*0.8+(st.length?common/st.length*0.2:0);
       if(st.join('')===qsq||norm(s.nama).replace(/ /g,'').indexOf(qsq)>=0) sc=Math.max(sc,0.97);
-      if(kelasAi){ var kn=String(kelasAi).match(/\d+/), kp=/\+|plus/i.test(kelasAi), sk=String(s.kelas||'');
+      if(kelasAi){ var ROM={I:1,II:2,III:3,IV:4,V:5,VI:6,VII:7,VIII:8,IX:9,X:10,XI:11,XII:12}, rm=String(kelasAi).trim().match(/^(?:kls\.?|kelas)?\s*(XII|XI|IX|X|VIII|VII|VI|IV|V|III|II|I)(?![a-z])/i);
+        var kn=rm?[String(ROM[rm[1].toUpperCase()])]:String(kelasAi).match(/\d+/), kp=/\+|plus/i.test(kelasAi), sk=String(s.kelas||'');
         if(kn){ if(sk.indexOf(kn[0]+' ')===0) sc+=0.1; else if(/^\d/.test(sk)) sc-=0.2; }
         else if(/tk/i.test(kelasAi)) sc+=(sk==='TK'?0.1:-0.2);
         if(kp&&/plus/i.test(sk)) sc+=0.05; }
@@ -10272,15 +10292,21 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
     if(d.status_transfer&&!/berhasil|sukses|success|selesai/i.test(d.status_transfer)) b('Status transfer: "'+d.status_transfer+'" (bukan BERHASIL).');
     if(!c.nominal) b('Nominal tidak terbaca — isi manual.');
     if(!c.tanggal) w('Tanggal transfer tidak terbaca — isi manual.');
+    else { var hr=Math.round((new Date(c.tanggal+'T00:00:00')-new Date(today()+'T00:00:00'))/864e5);
+      if(hr>1) b('Tanggal transfer '+tglFmt(c.tanggal)+' ada di masa depan — cek tanggal di foto.');
+      else if(hr<-60){ w('Tanggal transfer '+tglFmt(c.tanggal)+' sudah '+Math.round(-hr/30)+' bulan lalu — cek tahunnya di foto (AI bisa salah baca angka tahun).'); c._thSaran=saranTahun(c.tanggal); } }
     var rek=rekSekolah(), rt=String(d.rekening_tujuan||'').replace(/\D/g,'');
-    if(rekCocok(rt)===false) b('Rekening tujuan '+rt+' BUKAN rekening sekolah.');
+    var rc=rekCocok(rt);
+    if(rc===false&&!c.rekOk) b('Rekening tujuan '+rt+' BUKAN rekening sekolah.');
+    else if(rc==='mirip'&&!c.rekOk) w('Rekening tujuan '+rt+' mirip rekening sekolah '+rekMirip(rt)+' (beda 1–2 angka) — kemungkinan salah baca foto. Cek di foto.');
+    else if((rc===false||rc==='mirip')&&c.rekOk) R.push({c:'g',t:'Rekening tujuan sudah dicek manual & dinyatakan benar.'});
     if(c.dup&&!c.dupOk) b('Kemungkinan DOBEL: '+c.dup);
     if(!c.rows.length) w('Nama siswa tidak ada di chat — pilih siswa manual atau Tanya Wali Kelas.');
     var total=0, allNama=true;
     c.rows.forEach(function(r,i){
       var lbl='Siswa '+(i+1);
       if(!r.nama){ allNama=false; w(lbl+(r.aiNama?' ("'+r.aiNama+'")':'')+': tidak ditemukan di data siswa — pilih manual.'); return; }
-      if(r.ambigu&&!r.dikonfirmasi) w(lbl+': ada '+r.ambigu+' data siswa mirip untuk "'+r.aiNama+'" — pastikan yang dipilih benar (lihat "kandidat").');
+      if(r.ambigu&&!r.dikonfirmasi) w(lbl+': ada '+r.ambigu+' data siswa mirip untuk "'+r.aiNama+'"'+(r.pilihNominal?' — dipilih yang tarifnya pas dengan nominal; tetap cek (lihat "kandidat").':' — pastikan yang dipilih benar (lihat "kandidat").'));
       if(r.bulanTebak&&!r.dikonfirmasi) w(lbl+': bulan tidak disebut — ditebak bulan berikutnya yang belum dibayar.');
       if(r.lunasSudah&&r.lunasSudah.length) b(lbl+': '+r.lunasSudah.join(', ')+' sudah LUNAS sebelumnya.');
       if(r.mode==='cicil'&&r.tagihan>0&&r.bayar>=r.tagihan) w(lbl+': mode Cicil — ketik nominal yang dibayar.');
@@ -10305,11 +10331,11 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
     'Ambil data APA ADANYA. Jangan menebak. Jika tidak terlihat, isi string kosong "" atau 0.',
     'Balas HANYA JSON dengan bentuk:',
     '{"bukti_valid":true,"status_transfer":"","bank":"","tanggal":"YYYY-MM-DD","jam":"HH:MM","nominal":0,',
-    '"rekening_tujuan":"","nama_tujuan":"","nama_pengirim":"","berita":"","teks_chat":[""],"penerus":"",',
+    '"rekening_tujuan":"","nama_tujuan":"","nama_pengirim":"","berita":"","teks_chat":[""],"penerus":"","penerus_nomor":"",',
     '"siswa":[{"nama":"","kelas":"","bulan":["Oktober 2026"],"jenis":"SPP"}],"catatan":""}',
     'Aturan: nominal = angka rupiah bulat tanpa titik/koma (Rp 525.000,00 -> 525000). Format tanggal di struk Indonesia biasanya DD/MM/YYYY.',
     'nama_tujuan/rekening_tujuan = penerima ("Ke ..."). nama_pengirim = pemilik rekening asal (sering tidak ada di struk BCA m-Transfer).',
-    'teks_chat = semua teks pesan/caption WhatsApp yang terlihat (bukan isi struk). penerus = nama pengirim pesan di grup bila terlihat (atau "You").',
+    'teks_chat = semua teks pesan/caption WhatsApp yang terlihat (bukan isi struk). penerus = nama pengirim pesan di grup WA (label kecil di atas gelembung, mis. "~ Tloo"), atau "You" bila pesan dari pemilik akun. penerus_nomor = nomor HP yang tampil di samping nama pengirim itu (mis. "+62 813-6335-153"), kosongkan bila tidak terlihat.',
     'siswa = setiap nama anak/siswa yang disebut di caption, pesan, atau berita transfer (JANGAN masukkan nama orang tua/pengirim rekening).',
     'bulan = bulan SPP yang disebut (tulis "Bulan Tahun"; jika tahun tidak disebut, kosongkan tahun). jenis = SPP / Pendaftaran / Lainnya.',
     'Jika satu pesan menyebut beberapa siswa untuk bulan yang sama, ulangi bulan itu di tiap siswa.',
@@ -10317,7 +10343,7 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
   ].join('\n');
 
   async function gemCall(model, key, imgs, extra){
-    var parts=[{text:PROMPT}];
+    var parts=[{text:PROMPT+'\nHari ini: '+today()+' (bukti biasanya baru beberapa hari/minggu lalu; bila angka tahun buram, jangan menebak tahun yang jauh).'}];
     if(extra) parts.push({text:'KETERANGAN TAMBAHAN (ketikan/salinan chat dari admin, bagian dari bukti ini — pakai untuk siswa/kelas/bulan):\n'+extra});
     imgs.forEach(function(im){ parts.push({inline_data:{mime_type:im.mime,data:im.b64}}); });
     var res=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+model+':generateContent',{
@@ -10416,16 +10442,24 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
   function bangunRows(c){
     var d=c.ai||{}; c.rows=[];
     (d.siswa||[]).filter(function(s){return s&&s.nama;}).forEach(function(s){
-      var cand=cariSiswa(s.nama,s.kelas), top=cand[0];
+      var P=infoPengirim(c), kHint=s.kelas||(P.kelas&&!/semua|admin/i.test(P.kelas)?P.kelas:'');
+      var cand=cariSiswa(s.nama,kHint), top=cand[0];
       var row={aiNama:s.nama, aiKelas:s.kelas||'', cand:cand.map(function(x){return x.s.nama;}), nama:'', dari:null, sampai:null};
       if(top&&top.sc>=0.75){
         row.nama=top.s.nama;
         var close=cand.filter(function(x){return x.sc>=top.sc-0.12&&top.sc<1.2;});
         if(close.length>1) row.ambigu=close.length;
       }
-      var bl=(s.bulan||[]).map(function(x){return parseBulan(x,c.tanggal);}).filter(Boolean).map(mIdx).sort(function(a,b){return a-b;});
+      var chatTxt=((d.teks_chat||[]).join(' ')+' '+(d.berita||'')+' '+(c.extra||''));
+      var bl=(s.bulan||[]).map(function(x){return parseBulan(x,chatTxt);}).filter(Boolean).map(mIdx).sort(function(a,b){return a-b;});
       if(bl.length){ row.dari=bl[0]; row.sampai=bl[bl.length-1]; }
       else if(row.nama){ var nb=sppBulanBerikutnya(row.nama); if(nb){ row.dari=mIdx({b:nb.bulan,th:nb.tahun}); row.sampai=row.dari; row.bulanTebak=true; } }
+      // Nama mirip > 1 & hanya 1 siswa di bukti: pilih kandidat yang tarifnya cocok dengan nominal transfer
+      if(row.ambigu&&(d.siswa||[]).length===1&&c.nominal&&row.dari!=null){
+        var cocok=cand.filter(function(x){ if(x.sc<top.sc-0.12) return false; var n=0,tot=0,i=row.dari; while(n<12&&tot<c.nominal){ var t=tagihanBulan(x.s.nama,x.s.kelas,fromIdx(i)).nom; if(!t) break; tot+=t; i++; n++; } return tot===c.nominal; });
+        if(cocok.length===1&&cocok[0].s.nama!==row.nama){ row.nama=cocok[0].s.nama; row.pilihNominal=true; }
+        else if(cocok.length===1) row.pilihNominal=true;
+      }
       c.rows.push(row);
     });
     // bulan lebih: jika transfer pas kelipatan tarif 1 siswa, panjangkan bulan
@@ -10454,13 +10488,13 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
       var d=(c&&c.ai)||{}, L=getBtLog();
       L.unshift(Object.assign({t:new Date().toISOString(), aksi:aksi,
         nominal:c?c.nominal||0:0, tglTf:c?c.tanggal||'':'', bank:d.bank||'', jam:d.jam||'',
-        rek:String(d.rekening_tujuan||'').replace(/\D/g,''), penerus:d.penerus||'',
+        rek:String(d.rekening_tujuan||'').replace(/\D/g,''), penerus:(c&&c.ai?infoPengirim(c).nama:'')||d.penerus||'', penerusNo:(c&&c.ai?infoPengirim(c).no:''),
         siswa:c&&c.rows?c.rows.map(function(r){return r.nama||r.aiNama||'?';}).join(', '):''}, extra||{}));
       if(L.length>3000) L.length=3000;
       localStorage.setItem(BTLOG_LS, JSON.stringify(L));
     }catch(e){ console.warn('btLog',e); }
   }
-  var AKSI_WARNA={'Dibaca AI':'#4b55a0','Gagal dibaca':'#b91c1c','Kuitansi dibuat':'#2f7a55','Siswa diubah':'#b4581a','Data dikoreksi':'#b4581a',
+  var AKSI_WARNA={'Rekening dicek manual':'#b4581a','Rekening sekolah ditambah':'#2f7a55','Pengirim didaftarkan':'#2f7a55','Dibaca AI':'#4b55a0','Gagal dibaca':'#b91c1c','Kuitansi dibuat':'#2f7a55','Siswa diubah':'#b4581a','Data dikoreksi':'#b4581a',
     'Terdeteksi dobel':'#b91c1c','Ditandai bukan dobel':'#b4581a','Tanya wali kelas':'#b4581a','Dihapus dari antrian':'#6b7280'};
   function logHtml(){
     var L=getBtLog(), q=LOGQ.toLowerCase();
@@ -10490,7 +10524,7 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
   window.btLogExcel=function(){
     if(typeof XLSX==='undefined'){ alert('Library Excel belum termuat. Coba lagi sebentar.'); return; }
     var rows=getBtLog().map(function(l){ return {Waktu:new Date(l.t).toLocaleString('id-ID'),Aksi:l.aksi,Nominal:l.nominal||0,'Tgl Transfer':l.tglTf||'',Jam:l.jam||'',Bank:l.bank||'',
-      'Rek Tujuan':l.rek||'','Dikirim oleh':l.penerus||'',Siswa:l.siswa||'','No Kuitansi':l.no||'','Siswa Kuitansi':l.siswaKw||'',Dibayar:l.bayar||'',Mode:l.mode||'',Keterangan:l.ket||''}; });
+      'Rek Tujuan':l.rek||'','Dikirim oleh':l.penerus||'','No WA pengirim':l.penerusNo?nomorFmt(l.penerusNo):'',Siswa:l.siswa||'','No Kuitansi':l.no||'','Siswa Kuitansi':l.siswaKw||'',Dibayar:l.bayar||'',Mode:l.mode||'',Keterangan:l.ket||''}; });
     var ws=XLSX.utils.json_to_sheet(rows), wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Log Bukti Transfer');
     var d=new Date(); XLSX.writeFile(wb,'Log Bukti Transfer_'+String(d.getDate()).padStart(2,'0')+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+d.getFullYear()+'.xlsx');
   };
@@ -10526,7 +10560,8 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
     if(c.img&&c.state!=='reading') h+=(ATTACH===c.id?'<div class="bt-attach on">📋 Sekarang tekan <b>Ctrl+V</b> untuk menempel screenshot lanjutan ke bukti ini<br><span class="bt-b sm" onclick="btLanjut(\''+c.id+'\')">Batal</span></div>':'<span class="bt-b sm bt-attach-btn" onclick="btLanjut(\''+c.id+'\')" title="Tambahkan potongan chat di bawah/atas bukti ini">＋ Screenshot lanjutan</span>');
     h+='</div><div>';
     h+='<div class="bt-meta"><span class="bt-st '+stCls+'">● '+stLbl+'</span>';
-    if(d.penerus) h+='Dikirim oleh <b>'+esc(d.penerus)+'</b> · ';
+    if(d.penerus||d.penerus_nomor){ var P=infoPengirim(c);
+      h+='Dikirim oleh <b>'+esc(P.self?'Anda sendiri':(P.nama||'?'))+'</b>'+(P.no?' · '+esc(nomorFmt(P.no)):'')+(P.terdaftar?(P.kelas?' · <span class="bt-st ok">wali '+esc(P.kelas)+'</span>':' · <span class="bt-st ok">terdaftar</span>'):(!P.self&&c.state==='ok'?' · <span class="bt-b sm" onclick="btSimpanWali(\''+c.id+'\')" title="Simpan sebagai wali kelas / pengirim">+ Daftarkan</span>':''))+' · '; }
     h+='ditempel '+c.ditambah.toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'})+'</div>';
     if(c.state==='reading'){ return h+'<div style="font-size:13px;color:#4b55a0"><span class="bt-spin"></span> '+esc(c.statusTxt||'AI sedang membaca bukti...')+'</div></div></div>'; }
     if(c.state==='error'){ return h+'<ul class="bt-reasons"><li class="b">✗ '+esc(c.err)+'</li></ul><div class="bt-acts"><span class="bt-b pri" onclick="btUlang(\''+c.id+'\')">Baca ulang</span><span class="bt-b red" onclick="btHapus(\''+c.id+'\')">Hapus</span></div></div></div>'; }
@@ -10536,14 +10571,14 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
     h+='<div class="bt-f"><label>Tanggal transfer</label><input type="date" value="'+(c.tanggal||'')+'" onchange="btSet(\''+c.id+'\',\'tanggal\',this.value)" style="font-weight:600"></div>';
     h+=f('Bank · jam',[d.bank,d.jam].filter(Boolean).join(' · '));
     var rt=String(d.rekening_tujuan||'').replace(/\D/g,''), rk=rekSekolah();
-    h+=f('Ke rekening',[d.nama_tujuan,rt].filter(Boolean).join(' · ')+(rekCocok(rt)===true?' ✓':rekCocok(rt)===false?' ✗':''));
+    h+=f('Ke rekening',[d.nama_tujuan,rt].filter(Boolean).join(' · ')+(rekCocok(rt)===true||c.rekOk?' ✓':rekCocok(rt)==='mirip'?' ≈':rekCocok(rt)===false?' ✗':''));
     h+=f('Pengirim',d.nama_pengirim)+f('Berita transfer',d.berita)+f('Status',d.status_transfer);
     h+='</div>';
     var chat=(d.teks_chat||[]).filter(Boolean);
     h+='<div class="bt-chat">💬 '+(chat.length?chat.map(function(t){return '“'+esc(t)+'”';}).join(' · '):'<i style="color:#b4581a">tanpa caption / keterangan</i>')+'</div>';
     if(st!=='done') h+='<details class="bt-xd"'+(c.extra||c.xOpen?' open':'')+' ontoggle="btXOpen(\''+c.id+'\',this.open)"><summary>✎ Keterangan tambahan'+(c.extra?' (terpakai)':'')+'</summary><div class="bt-krow"><textarea class="bt-extra" placeholder="Salin (Ctrl+C) pesan WA yang terpotong lalu tempel di sini, atau ketik sendiri. Contoh: Marco 5 SD spp Oktober" oninput="btExtra(\''+c.id+'\',this.value)">'+esc(c.extra||'')+'</textarea><span class="bt-b pri sm" onclick="btExtraBaca(\''+c.id+'\')">Baca ulang dengan keterangan ini</span></div></details>';
     if(st==='done') E.R=[{c:'g',t:'Semua kuitansi dari bukti ini sudah dibuat.'}];
-    h+='<ul class="bt-reasons">'+E.R.map(function(r){return '<li class="'+r.c+'">'+(r.c==='g'?'✓ ':r.c==='b'?'✗ ':'⚠ ')+esc(r.t)+(r.c==='b'&&/DOBEL/.test(r.t)?' <span class="bt-b sm" onclick="btDupOk(\''+c.id+'\')">Bukan dobel</span>':'')+'</li>';}).join('')+'</ul>';
+    h+='<ul class="bt-reasons">'+E.R.map(function(r){return '<li class="'+r.c+'">'+(r.c==='g'?'✓ ':r.c==='b'?'✗ ':'⚠ ')+esc(r.t)+(r.c==='b'&&/DOBEL/.test(r.t)?' <span class="bt-b sm" onclick="btDupOk(\''+c.id+'\')">Bukan dobel</span>':'')+(/^Rekening tujuan .*(BUKAN|mirip)/.test(r.t)?' <span class="bt-b sm pri" onclick="btRekOk(\''+c.id+'\')" title="Saya sudah cek di foto: rekening tujuan benar rekening sekolah">✓ Rekening benar</span> <span class="bt-b sm" onclick="btRekTambah(\''+c.id+'\')">+ Jadikan rekening sekolah</span>':'')+(/cek tahunnya/.test(r.t)&&c._thSaran?' <span class="bt-b sm pri" onclick="btSet(\''+c.id+'\',\'tanggal\',\''+c._thSaran+'\')">Ganti ke '+esc(tglFmt(c._thSaran))+'</span>':'')+'</li>';}).join('')+'</ul>';
     // baris siswa
     h+='<div class="bt-rlist">';
     c.rows.forEach(function(r,i){
@@ -10580,6 +10615,13 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
   window.btExtra=function(id,v){ var c=C(id); if(c) c.extra=String(v||'').trim(); };
   window.btExtraBaca=function(id){ var c=C(id); if(!c) return; var t=document.querySelector('#'+id+' .bt-extra'); if(t) c.extra=t.value.trim(); btLog('Keterangan tambahan',c,{ket:(c.extra||'').slice(0,200)}); proses(c); };
   window.btHapus=function(id){ var c=C(id); if(!c) return; if(c.rows.some(function(r){return !r.doneNo;})&&c.state==='ok'&&!confirm('Hapus bukti ini dari antrian?')) return; if(c.state==='ok'){ var dn=c.rows.filter(function(r){return r.doneNo;}).length; btLog('Dihapus dari antrian',c,{ket:dn===c.rows.length&&dn?'sudah selesai':(dn?dn+' dari '+c.rows.length+' sudah dibuat':'belum dibuat kuitansi')}); } Q=Q.filter(function(x){return x!==c;}); render(); };
+  window.btRekOk=function(id){ var c=C(id); if(!c) return; var rt=String((c.ai||{}).rekening_tujuan||'').replace(/\D/g,'');
+    if(!confirm('Pastikan di FOTO rekening tujuannya benar rekening sekolah.\n\nTerbaca: '+rt+((c.ai||{}).nama_tujuan?' a.n. '+c.ai.nama_tujuan:'')+'\n\nLanjut tandai benar?')) return;
+    c.rekOk=true; btLog('Rekening dicek manual',c,{ket:'Rekening '+rt+' dinyatakan benar oleh admin'}); render(); };
+  window.btRekTambah=function(id){ var c=C(id); if(!c) return; var rt=String((c.ai||{}).rekening_tujuan||'').replace(/\D/g,'');
+    var v=prompt('Tambahkan ke daftar rekening sekolah. Betulkan angkanya bila AI salah baca:',rt); if(v===null) return; v=v.replace(/\D/g,''); if(v.length<5) return;
+    var cur=ls(REK_LS).trim(); lsw(REK_LS,(cur?cur+', ':'')+v); var t=$('bt-rek'); if(t) t.value=ls(REK_LS);
+    if(v!==rt) c.rekOk=true; btLog('Rekening sekolah ditambah',c,{ket:v}); render(); };
   window.btDupOk=function(id){ var c=C(id); if(c){c.dupOk=true; btLog('Ditandai bukan dobel',c,{ket:c.dup||''}); render();} };
   window.btSet=function(id,k,v){ var c=C(id); if(!c) return; var old=c[k]; if(k==='nominal') c.nominal=parseInt(v)||0; else c[k]=v; btLog('Data dikoreksi',c,{ket:(k==='nominal'?'Nominal '+rp(old)+' → '+rp(c.nominal):'Tanggal '+(old||'-')+' → '+(c[k]||'-'))}); alokasi(c); cekDobel(c); render(); };
   window.btSiswa=function(id,i,v){
@@ -10609,8 +10651,38 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
     var t='Halo, mohon konfirmasi bukti transfer '+rp(c.nominal)+(c.tanggal?' tgl '+tglFmt(c.tanggal):'')+(d.bank?' ('+d.bank+')':'')+(d.nama_pengirim?' a.n. '+d.nama_pengirim:'')+
       (c.rows.length?' untuk '+c.rows.map(function(r){return r.aiNama||r.nama;}).join(' & '):'')+'. Untuk siswa siapa, kelas berapa, dan SPP bulan apa? Terima kasih.';
     btLog('Tanya wali kelas',c,{ket:t.slice(0,200)});
-    window.open('https://wa.me/?text='+encodeURIComponent(t),'_blank');
+    var P=infoPengirim(c);
+    window.open('https://wa.me/'+(P.no&&!P.self?P.no:'')+'?text='+encodeURIComponent(t),'_blank');
   };
+
+  // ---------- Pengirim / Wali kelas (yang mem-forward di grup WA) ----------
+  var WALI_LS='kwbt_wali';
+  function nomorNorm(s){ var d=String(s||'').replace(/\D/g,''); if(!d) return ''; if(d.indexOf('0')===0) d='62'+d.slice(1); else if(d.indexOf('8')===0) d='62'+d; return d; }
+  function nomorFmt(d){ d=nomorNorm(d); if(!d) return ''; return '+'+d.slice(0,2)+' '+d.slice(2,5)+'-'+d.slice(5,9)+'-'+d.slice(9); }
+  function getWali(){ return ls(WALI_LS).split(/\n+/).map(function(l){ var p=l.split('|').map(function(x){return x.trim();}); if(!p[0]&&!p[1]) return null; return {nama:p[0]||'',no:nomorNorm(p[1]||''),kelas:p[2]||''}; }).filter(Boolean); }
+  function cariWali(nama, no){
+    var L=getWali(), n=nomorNorm(no), nm=norm(String(nama||'').replace(/^~\s*/,''));
+    if(n){ var a=L.find(function(w){ return w.no&&(w.no===n||w.no.slice(-9)===n.slice(-9)); }); if(a) return a; }
+    if(nm&&nm!=='you'&&nm!=='anda'){ var b=L.find(function(w){ var wn=norm(w.nama); return wn&&(wn===nm||wn.indexOf(nm)>=0||nm.indexOf(wn)>=0); }); if(b) return b; }
+    return null;
+  }
+  function infoPengirim(c){
+    var d=(c&&c.ai)||{}, nm=String(d.penerus||'').replace(/^~\s*/,'').trim(), no=nomorNorm(d.penerus_nomor);
+    var self=/^(you|anda|kamu)$/i.test(nm);
+    var w=cariWali(nm,no);
+    return {nama:(w&&w.nama)||nm, no:no||(w&&w.no)||'', kelas:(w&&w.kelas)||'', terdaftar:!!w, self:self, mentah:nm};
+  }
+  window.btSimpanWali=function(id){
+    var c=C(id); if(!c) return; var P=infoPengirim(c);
+    var nama=prompt('Nama pengirim (mis. Bu Maria):',P.mentah||''); if(nama===null) return;
+    var no=prompt('Nomor WA:',P.no?nomorFmt(P.no):''); if(no===null) return;
+    var kl=prompt('Kelas yang dipegang (mis. 2 SD). Kosongkan bila admin / semua kelas:',''); if(kl===null) return;
+    var cur=ls(WALI_LS).trim(); lsw(WALI_LS,(cur?cur+'\n':'')+[nama.trim(),nomorNorm(no)?nomorFmt(no):'',kl.trim()].join(' | '));
+    btLog('Pengirim didaftarkan',c,{ket:nama+' · '+(no||'-')+' · '+(kl||'semua kelas')});
+    var t=$('bt-wali'); if(t) t.value=ls(WALI_LS);
+    bangunRows(c); render();
+  };
+  window.btSimpanWaliList=function(){ lsw(WALI_LS,($('bt-wali').value||'').trim()); var i=$('bt-wali-info'); if(i) i.textContent='✓ Tersimpan ('+getWali().length+' orang)'; Q.forEach(function(c){ if(c.state==='ok'&&!c.rows.some(function(r){return r.doneNo;})) bangunRows(c); }); render(); };
 
   // ---------- Isi ke form Kuitansi ----------
   window.btIsi=function(id,i){
@@ -10634,7 +10706,7 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
     var d=c.ai||{};
     window._btPending={id:id,row:i,nama:s.nama,bayar:Number(r.bayar)||0,prev:window._lastNewRecs,
       meta:{sig:sig({nominal:c.nominal,tanggal:c.tanggal,jam:d.jam,rekening_tujuan:d.rekening_tujuan}),bank:d.bank||'',tglTf:c.tanggal||'',jam:d.jam||'',nominalTf:c.nominal,
-        rekTujuan:String(d.rekening_tujuan||'').replace(/\D/g,''),namaTujuan:d.nama_tujuan||'',pengirim:d.nama_pengirim||'',penerus:d.penerus||'',ket:(d.teks_chat||[]).join(' | ').slice(0,300)}};
+        rekTujuan:String(d.rekening_tujuan||'').replace(/\D/g,''),namaTujuan:d.nama_tujuan||'',pengirim:d.nama_pengirim||'',penerus:infoPengirim(c).nama||d.penerus||'',penerusNo:infoPengirim(c).no||'',ket:(d.teks_chat||[]).join(' | ').slice(0,300)}};
     setTimeout(banner,60);
     window.scrollTo(0,0);
   };
@@ -10697,7 +10769,7 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
     k.value=has?'••••••••••••'+ls(KEY_LS).slice(-4):'';
     $('bt-key-hint').style.display=has?'none':'block';
     $('bt-set').style.display=has?'none':'block';
-    $('bt-rek').value=ls(REK_LS);
+    $('bt-rek').value=ls(REK_LS); if($('bt-wali')) $('bt-wali').value=ls(WALI_LS);
   }
 
   // ---------- Pasang halaman ----------
@@ -10722,6 +10794,9 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
           '<p style="margin-bottom:6px"><b>Nomor rekening sekolah</b> (opsional, pisahkan dengan koma). Bila diisi, bukti yang ditransfer ke rekening lain diberi tanda merah.</p>'+
           '<div class="bt-krow"><textarea id="bt-rek" placeholder="contoh: 8210508288"></textarea></div>'+
           '<div class="bt-krow" style="margin-top:6px"><span class="bt-b" onclick="btSimpanRek()">Simpan rekening</span><span id="bt-rek-info" style="font-size:12px;color:#2f7a55"></span></div>'+
+          '<p style="margin:14px 0 6px"><b>Daftar wali kelas / pengirim</b> (opsional) — satu orang per baris: <code>Nama | Nomor WA | Kelas</code>. Kelas dikosongkan untuk admin. Dipakai untuk menebak kelas siswa & tombol Tanya Wali Kelas langsung ke nomornya.</p>'+
+          '<div class="bt-krow"><textarea id="bt-wali" style="min-height:90px" placeholder="Tloo | 0813-6335-153 | 2 SD&#10;Bu Maria | 0812-xxxx-xxxx | 3 SD&#10;Admin TU | 0811-xxxx-xxxx |"></textarea></div>'+
+          '<div class="bt-krow" style="margin-top:6px"><span class="bt-b" onclick="btSimpanWaliList()">Simpan daftar</span><span id="bt-wali-info" style="font-size:12px;color:#2f7a55"></span></div>'+
         '</div></div>'+
         '<div class="bt-drop" id="bt-drop"><div class="bt-ic"><svg width="24" height="24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v4h16v-4"/></svg></div>'+
           '<div style="flex:1"><b>Tempel screenshot bukti TF di sini</b><p>Di WA Web tekan <kbd>Win</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd>, kotakkan gelembung chat (foto + caption + nama siswa), lalu di halaman ini tekan <kbd>Ctrl</kbd>+<kbd>V</kbd>. Bisa juga seret banyak gambar sekaligus.</p></div>'+
@@ -10762,9 +10837,9 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
 <!-- ===================== VERSI APLIKASI ===================== -->
 <script>
 // Ubah setiap kali ada update: x.y.z  (z = perbaikan kecil, y = fitur baru, x = perubahan besar)
-window.APP_VERSION='3.1.2';
+window.APP_VERSION='3.2.1';
 window.APP_BUILD='2026-10-16';
-window.APP_NOTES='Perbaikan tarif SPP di Tagihan (Agustus–Juni sempat pakai tarif kelas tahun lalu). Catatan mini tidak lagi menghalangi tombol (klik tembus saat pudar) + tombol Tandai dibaca. Bukti Transfer (AI) early test.';
+window.APP_NOTES='Rekening: tombol ✓ Rekening benar / + Jadikan rekening sekolah, deteksi salah baca 1–2 angka, daftar rekening dipisah spasi tetap terbaca. Bukti Transfer: tampil siapa yang mem-forward (nama + nomor WA), daftar wali kelas → tebak kelas + Tanya Wali Kelas langsung ke nomornya. Tombol 1-klik betulkan tahun tanggal transfer. Bukti Transfer: bulan tanpa tahun ikut Tahun Ajaran aktif + peringatan tanggal transfer janggal. Perbaikan tarif SPP di Tagihan (Agustus–Juni sempat pakai tarif kelas tahun lalu). Catatan mini tidak lagi menghalangi tombol (klik tembus saat pudar) + tombol Tandai dibaca. Bukti Transfer (AI) early test.';
 (function(){
   function tgl(s){ var d=new Date(s+'T00:00:00'); return d.toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'}); }
   function pasang(){
