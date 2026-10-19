@@ -10307,7 +10307,10 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
     if(c.state==='error') return {lvl:'bad',R:[{c:'b',t:c.err}],can:false};
     var d=c.ai||{};
     if(d.bukti_valid===false) b('Gambar ini sepertinya bukan bukti transfer.');
-    if(d.status_transfer&&!/berhasil|sukses|success|selesai/i.test(d.status_transfer)) b('Status transfer: "'+d.status_transfer+'" (bukan BERHASIL).');
+    if(d.status_transfer){ var stt=String(d.status_transfer);
+      if(/gagal|failed|fail|ditolak|rejected|dibatalkan|batal|cancel|expired|kedaluwarsa/i.test(stt)) b('Status transfer: "'+stt+'" — transfer GAGAL/dibatalkan.');
+      else if(/proses|process|pending|menunggu|tertunda|waiting|on ?hold/i.test(stt)) w('Status transfer: "'+stt+'" — masih diproses; pastikan dana sudah masuk ke rekening sekolah.');
+      else if(!/berhasil|sukses|success|selesai|terkirim|dikirim|sent|done|complete|lunas|ok\b|approved|diterima/i.test(stt)) w('Status transfer: "'+stt+'" — cek di foto bahwa transfer berhasil.'); }
     if(!c.nominal) b('Nominal tidak terbaca — isi manual.');
     if(!c.tanggal) w('Tanggal transfer tidak terbaca — isi manual.');
     else { var hr=Math.round((new Date(c.tanggal+'T00:00:00')-new Date(today()+'T00:00:00'))/864e5);
@@ -10997,9 +11000,9 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
 <!-- ===================== VERSI APLIKASI ===================== -->
 <script>
 // Ubah setiap kali ada update: x.y.z  (z = perbaikan kecil, y = fitur baru, x = perubahan besar)
-window.APP_VERSION='3.4.0';
+window.APP_VERSION='3.4.1';
 window.APP_BUILD='2026-10-16';
-window.APP_NOTES='Siswa pindahan/baru: bulan sebelum Mulai Pendidikan tidak ditagih (Tagihan, Status SPP, Dari otomatis, Bukti Transfer). SYNC AMAN: sebelum menyimpan ke cloud, aplikasi cek dulu apakah cloud punya data lebih baru (dari HP/laptop lain) → pilih Muat / Gabungkan, tidak lagi saling menimpa. Rekening: tombol ✓ Rekening benar / + Jadikan rekening sekolah, deteksi salah baca 1–2 angka, daftar rekening dipisah spasi tetap terbaca. Bukti Transfer: tampil siapa yang mem-forward (nama + nomor WA), daftar wali kelas → tebak kelas + Tanya Wali Kelas langsung ke nomornya. Tombol 1-klik betulkan tahun tanggal transfer. Bukti Transfer: bulan tanpa tahun ikut Tahun Ajaran aktif + peringatan tanggal transfer janggal. Perbaikan tarif SPP di Tagihan (Agustus–Juni sempat pakai tarif kelas tahun lalu). Catatan mini tidak lagi menghalangi tombol (klik tembus saat pudar) + tombol Tandai dibaca. Bukti Transfer (AI) early test.';
+window.APP_NOTES='Status transfer "Terkirim" dianggap berhasil (UOB/TMRW dll); status diproses = peringatan, gagal = blokir. Siswa pindahan/baru: bulan sebelum Mulai Pendidikan tidak ditagih (Tagihan, Status SPP, Dari otomatis, Bukti Transfer). SYNC AMAN: sebelum menyimpan ke cloud, aplikasi cek dulu apakah cloud punya data lebih baru (dari HP/laptop lain) → pilih Muat / Gabungkan, tidak lagi saling menimpa. Rekening: tombol ✓ Rekening benar / + Jadikan rekening sekolah, deteksi salah baca 1–2 angka, daftar rekening dipisah spasi tetap terbaca. Bukti Transfer: tampil siapa yang mem-forward (nama + nomor WA), daftar wali kelas → tebak kelas + Tanya Wali Kelas langsung ke nomornya. Tombol 1-klik betulkan tahun tanggal transfer. Bukti Transfer: bulan tanpa tahun ikut Tahun Ajaran aktif + peringatan tanggal transfer janggal. Perbaikan tarif SPP di Tagihan (Agustus–Juni sempat pakai tarif kelas tahun lalu). Catatan mini tidak lagi menghalangi tombol (klik tembus saat pudar) + tombol Tandai dibaca. Bukti Transfer (AI) early test.';
 (function(){
   function tgl(s){ var d=new Date(s+'T00:00:00'); return d.toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'}); }
   function pasang(){
