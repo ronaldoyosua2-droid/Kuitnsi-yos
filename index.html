@@ -312,6 +312,7 @@ function getTunggakanSiswa(nama, kelas){
     // Hitung per bulan TA yang sudah lewat/sekarang
     taBulan.forEach((bln, idx)=>{
       if(batasIdx >= 0 && idx > batasIdx) return; // belum waktunya
+      if(sppSebelumMulai(nama, bln)) return;       // siswa pindahan/baru: belum sekolah di bulan ini
       const sudahBayar = hist.paid.has(bln);
       const adaSisa = (sisamap[bln]||0) > 0;
       const partial = hist.partial.has(bln);
@@ -3297,6 +3298,7 @@ function renderItemForms(){
             const taBulanList=[];
             for(let b=6;b<12;b++) taBulanList.push(BULAN[b]+' '+taY);
             for(let b=0;b<6;b++) taBulanList.push(BULAN[b]+' '+(taY+1));
+            for(let k=taBulanList.length-1;k>=0;k--){ if(sppSebelumMulai(snm,taBulanList[k])) taBulanList.splice(k,1); }
             const sudahTA=taBulanList.filter(m=>hist.paid.has(m)||hist.partial.has(m));
             const belumTA=taBulanList.filter(m=>!hist.paid.has(m)&&!hist.partial.has(m)&&!(sisamap[m]>0));
             const lastPaidIdx=sudahTA.length>0?taBulanList.lastIndexOf(sudahTA[sudahTA.length-1]):-1;
@@ -3316,7 +3318,7 @@ function renderItemForms(){
               +'<div style="font-weight:700;color:'+statusColor+'">'+statusIcon+' Status SPP: '+statusText+'</div>'
               +(bulanSisa?'<div style="color:#92400e;margin-top:3px;font-size:11px">'+bulanSisa+'</div>':'')
               +(skipBulan.length>0?'<div style="color:#c2410c;margin-top:3px;font-size:11px">⚠️ Belum bayar (skip): <strong>'+skipBulan.join(', ')+'</strong></div>':'')
-              +'<div style="color:var(--text2);margin-top:3px;font-size:11px">TA ini: '+sudahTA.length+'/12 bulan'+(berikutnya?' · Berikutnya: <strong style="color:var(--blue)">'+berikutnya+'</strong>':sudahTA.length===12?' · <strong style="color:var(--green)">Lunas semua TA ini! 🎉</strong>':'')+'</div>'
+              +'<div style="color:var(--text2);margin-top:3px;font-size:11px">TA ini: '+sudahTA.length+'/'+taBulanList.length+' bulan'+(sppMulaiIdx(snm)>=0&&taBulanList.length<12?' (mulai '+sppMulaiLabel(snm)+')':'')+(berikutnya?' · Berikutnya: <strong style="color:var(--blue)">'+berikutnya+'</strong>':sudahTA.length===12?' · <strong style="color:var(--green)">Lunas semua TA ini! 🎉</strong>':'')+'</div>'
               +(function(){
                   // Bulan SPP terakhir yang sudah dibayar (bukan tanggal kwitansi / pengeditan)
                   var best=null,bestIdx=-1,isPart=false;
@@ -3983,6 +3985,18 @@ function onSppCicilanToggle(i, checked){
   renderItemForms();
 }
 
+// Bulan mulai sekolah (Kelola Siswa → Mulai Pendidikan, format YYYY-MM). Bulan sebelum ini TIDAK ditagih SPP.
+function sppMulaiIdx(nama){
+  var s=(getSiswa()||[]).find(function(x){return x.nama===nama;}), m=s&&s.mulaiPendidikan;
+  if(!m) return -1; var p=String(m).split('-'), y=parseInt(p[0]), b=parseInt(p[1])-1;
+  return (y&&b>=0&&b<12)?y*12+b:-1;
+}
+function sppSebelumMulai(nama, key){
+  var mi=sppMulaiIdx(nama); if(mi<0) return false;
+  var mm=String(key||'').trim().split(/\s+/), bi=BULAN.indexOf(mm[0]), y=parseInt(mm[1]);
+  if(bi<0||!y) return false; return y*12+bi<mi;
+}
+function sppMulaiLabel(nama){ var mi=sppMulaiIdx(nama); return mi<0?'':BULAN[mi%12]+' '+Math.floor(mi/12); }
 // Bulan SPP berikutnya yang belum dibayar di TA aktif (sama dengan "Berikutnya" di Status SPP)
 function sppBulanBerikutnya(nama){
   if(!nama) return null;
@@ -3991,6 +4005,7 @@ function sppBulanBerikutnya(nama){
   for(let b=6;b<12;b++) list.push([b,taY]);
   for(let b=0;b<6;b++) list.push([b,taY+1]);
   const key=x=>BULAN[x[0]]+' '+x[1];
+  for(let k=list.length-1;k>=0;k--){ if(sppSebelumMulai(nama,key(list[k]))) list.splice(k,1); }   // siswa pindahan: mulai dari bulan masuk
   let last=-1; list.forEach((x,k)=>{ if(hist.paid.has(key(x))||hist.partial.has(key(x))) last=k; });
   // bulan sebagian (masih kurang) didahulukan
   for(let k=0;k<list.length;k++){ if(sisamap[key(list[k])]>0) return {bulan:list[k][0],tahun:list[k][1]}; }
@@ -4845,7 +4860,10 @@ function buatKwitansiSiswaBaru(){
   // If siswa not in list, add them
   const siswaDb=getSiswa();
   if(!siswaDb.find(s=>s.nama.toLowerCase()===nama.toLowerCase())){
-    siswaDb.push({nama,kelas:kelasStr});
+    const _ns={nama,kelas:kelasStr};
+    // Siswa baru/pindahan masuk: catat bulan mulai = bulan SPP pertama, agar bulan sebelumnya tidak ditagih
+    if(withSpp&&sppBulan){ const bi=BULAN.indexOf(String(sppBulan).trim().split(/\s+/)[0]); if(bi>=0){ const taT=parseInt(getTADariTanggal(tanggal).split('/')[0]); _ns.mulaiPendidikan=(bi>=6?taT:taT+1)+'-'+String(bi+1).padStart(2,'0'); } }
+    siswaDb.push(_ns);
     siswaDb.sort((a,b)=>a.nama.localeCompare(b.nama));
     setSiswa(siswaDb);
   }
@@ -10309,6 +10327,7 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
       if(r.ambigu&&!r.dikonfirmasi) w(lbl+': ada '+r.ambigu+' data siswa mirip untuk "'+r.aiNama+'"'+(r.pilihNominal?' — dipilih yang tarifnya pas dengan nominal; tetap cek (lihat "kandidat").':' — pastikan yang dipilih benar (lihat "kandidat").'));
       if(r.bulanTebak&&!r.dikonfirmasi) w(lbl+': bulan tidak disebut — ditebak bulan berikutnya yang belum dibayar.');
       if(r.lunasSudah&&r.lunasSudah.length) b(lbl+': '+r.lunasSudah.join(', ')+' sudah LUNAS sebelumnya.');
+      if(r.dari!=null&&typeof sppSebelumMulai==='function'&&sppSebelumMulai(r.nama,mKey(fromIdx(r.dari)))) b(lbl+': '+mKey(fromIdx(r.dari))+' sebelum siswa mulai sekolah ('+sppMulaiLabel(r.nama)+') — pilih bulan mulai '+sppMulaiLabel(r.nama)+' atau sesudahnya.');
       if(r.mode==='cicil'&&r.tagihan>0&&r.bayar>=r.tagihan) w(lbl+': mode Cicil — ketik nominal yang dibayar.');
       else if(r.mode==='cicil'&&r.tagihan>0) w(lbl+': dicicil, kurang '+rp(r.tagihan-r.bayar)+' (masuk tunggakan).');
       total+=Number(r.bayar)||0;
@@ -10834,12 +10853,153 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
 })();
 </script>
 
+<!-- ===================== SYNC AMAN (HP / PC tidak saling menimpa) ===================== -->
+<style>
+#ss-modal{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:100001;display:none;align-items:center;justify-content:center;padding:16px}
+#ss-modal .ss-box{background:var(--surface,#fff);color:var(--ink,#111);border-radius:16px;max-width:520px;width:100%;padding:20px 22px;box-shadow:0 20px 50px rgba(0,0,0,.25);max-height:90vh;overflow:auto}
+#ss-modal h3{margin:0 0 8px;font-size:17px}
+#ss-modal p{margin:0 0 10px;font-size:13.5px;line-height:1.55;color:var(--ink,#333)}
+#ss-modal .ss-num{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0}
+#ss-modal .ss-num div{background:var(--soft,#f3f4f6);border-radius:12px;padding:10px 12px;font-size:12px;color:var(--muted,#6b7280)}
+#ss-modal .ss-num b{display:block;font-size:20px;color:var(--ink,#111)}
+#ss-modal .ss-list{font-size:12px;background:var(--soft,#f7f7f7);border-radius:10px;padding:8px 10px;margin:0 0 12px;max-height:120px;overflow:auto;line-height:1.6}
+#ss-modal .ss-acts{display:flex;flex-direction:column;gap:8px;margin-top:6px}
+#ss-modal .ss-b{border:1px solid var(--line,#ddd);background:var(--surface,#fff);color:var(--ink,#111);border-radius:12px;padding:10px 14px;font-size:13.5px;font-weight:600;cursor:pointer;text-align:left}
+#ss-modal .ss-b small{display:block;font-weight:400;color:var(--muted,#6b7280);font-size:12px;margin-top:2px}
+#ss-modal .ss-b.pri{background:#5a9a78;border-color:#5a9a78;color:#fff}#ss-modal .ss-b.pri small{color:#e6f3ec}
+#ss-bar{position:fixed;left:50%;transform:translateX(-50%);bottom:16px;z-index:100000;background:#fff6ee;border:1px solid #f3c9a5;color:#7a3a10;border-radius:14px;padding:9px 14px;font-size:13px;display:none;gap:10px;align-items:center;box-shadow:0 6px 20px rgba(0,0,0,.12);max-width:92vw}
+#ss-bar button{border:0;background:#e8833a;color:#fff;border-radius:10px;padding:6px 12px;font-weight:700;cursor:pointer}
+</style>
+<div id="ss-modal"><div class="ss-box" id="ss-box"></div></div>
+<div id="ss-bar">⚠ Sync ke cloud ditahan: ada data lebih baru di cloud. <button onclick="ssTampil()">Selesaikan</button></div>
+<script>
+(function(){
+  if(typeof window.syncToCloud!=='function'||typeof window.checkAndLoadCloud!=='function') return;
+  var HOLD=false, CONF=null, CEK=0, CEK_MS=15*60*1000;
+  var _sync=window.syncToCloud;
+  function arr(x){ if(Array.isArray(x)) return x; if(typeof x==='string'){ try{ var a=JSON.parse(x); return Array.isArray(a)?a:[]; }catch(e){ return []; } } return []; }
+  function obj(x){ if(x&&typeof x==='object'&&!Array.isArray(x)) return x; if(typeof x==='string'){ try{ var o=JSON.parse(x); return (o&&typeof o==='object')?o:{}; }catch(e){} } return {}; }
+  function kunci(r){ return r&&r.id!=null?'id:'+r.id:'x:'+(r&&r.no||'')+'|'+(r&&r.nama||'')+'|'+(r&&r.tanggal||''); }
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+  function tg(s){ try{ return new Date(s+'T00:00:00').toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'}); }catch(e){ return s||''; } }
+
+  async function ambilCloud(){
+    var json=null;
+    try{
+      var resp=await Promise.race([ fetch(SCRIPT_URL+'?action=load_all&_t='+Date.now()), new Promise(function(_,r){ setTimeout(function(){ r(new Error('timeout')); },20000); }) ]);
+      if(!resp.ok) throw new Error('HTTP '+resp.status);
+      json=await resp.json();
+    }catch(e){ json=await jsonpFetch(SCRIPT_URL+'?action=load_all&_t='+Date.now(),20000); }
+    if(!json||!json.ok||!json.data) throw new Error('Respon cloud kosong');
+    return json.data;
+  }
+  function banding(d){
+    var L=getRiwayat()||[], C=arr(d.riwayat);
+    var lk={}, ck={}; L.forEach(function(r){ lk[kunci(r)]=1; }); C.forEach(function(r){ ck[kunci(r)]=1; });
+    return { cloudBaru:C.filter(function(r){ return !lk[kunci(r)]; }), lokalBaru:L.filter(function(r){ return !ck[kunci(r)]; }), C:C, L:L };
+  }
+  // Cek cloud dulu; true = aman untuk upload
+  async function cekDulu(){
+    if(HOLD) return false;
+    if(Date.now()-CEK<CEK_MS) return true;
+    var d; try{ d=await ambilCloud(); }catch(e){ console.warn('Sync aman: cloud tidak terbaca —',e.message); return null; }
+    var b=banding(d); CEK=Date.now();
+    if(b.cloudBaru.length){ HOLD=true; CONF={d:d,b:b}; try{ setSyncStatus('pending'); }catch(_){} tampil(); return false; }
+    return true;
+  }
+  window.syncToCloud=async function(){
+    var args=arguments, ok=await cekDulu();
+    if(ok===false) return 'hold';
+    if(ok===null) return 'error';          // cloud tidak bisa dibaca → jangan timpa
+    var r=await _sync.apply(this,args);
+    if(r==='verified'||r==='mismatch'||r==='unverified') CEK=Date.now();
+    return r;
+  };
+  window.checkAndLoadCloud=async function(){
+    setSyncStatus('syncing');
+    var connected=false;
+    try{ var p=await jsonpFetch(SCRIPT_URL+'?action=ping',8000); connected=!!(p&&p.ok); }catch(e){}
+    if(!connected){ _isOnline=false; setSyncStatus('offline'); return; }
+    _isOnline=true; setSyncStatus('online');
+    var L=getRiwayat();
+    if(!L||!L.length){ await loadFromCloud(); CEK=Date.now(); return; }
+    var hasil=await window.syncToCloud(false);
+    if(hasil==='error') setSyncStatus('online');
+  };
+
+  function unduhBackup(){
+    try{
+      var data={dibuat:new Date().toISOString(), perangkat:navigator.userAgent, riwayat:getRiwayat(), siswa:getSiswa(),
+        tarif:{spp:getSPP(),pgm:getPGM(),daftar:getDaftar(),diskon:getDiskon()}, kasHarian:lsGet('ya_kas_awal_harian')||{},
+        pengeluaran:getPengeluaran(), pinjaman:getPinjaman()};
+      var d=new Date(), nm='Backup perangkat ini_'+String(d.getDate()).padStart(2,'0')+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+d.getFullYear()+'_'+String(d.getHours()).padStart(2,'0')+String(d.getMinutes()).padStart(2,'0')+'.json';
+      var a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([JSON.stringify(data)],{type:'application/json'})); a.download=nm;
+      document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },1500);
+    }catch(e){ console.warn('backup',e); }
+  }
+  function terapkanCloud(d){
+    if(d.riwayat) lsSet('ya_riwayat', arr(d.riwayat));
+    if(d.siswa) lsSet('ya_siswa', arr(d.siswa));
+    var t=obj(d.tarif); if(t.spp) setSPP(t.spp); if(t.pgm) setPGM(t.pgm); if(t.daftar) setDaftar(t.daftar); if(t.diskon) setDiskon(t.diskon);
+    if(d.kasHarian) lsSet('ya_kas_awal_harian', obj(d.kasHarian));
+    if(d.pengeluaran) lsSet('ya_pengeluaran', arr(d.pengeluaran));
+    if(d.pinjaman) lsSet('ya_pinjaman', arr(d.pinjaman));
+    lsSet('ya_last_sync', new Date().toISOString());
+  }
+  function gabungArr(lok, cl, kf){ var m={}, out=lok.slice(); lok.forEach(function(x){ m[kf(x)]=1; }); cl.forEach(function(x){ if(!m[kf(x)]) out.push(x); }); return out; }
+  function kId(x){ return x&&x.id!=null?'id:'+x.id:JSON.stringify(x); }
+
+  window.ssMuat=function(){
+    if(!CONF) return;
+    if(CONF.b.lokalBaru.length&&!confirm('Perangkat ini punya '+CONF.b.lokalBaru.length+' transaksi yang TIDAK ada di cloud — akan hilang dari perangkat ini.\nFile backup akan diunduh dulu.\n\nLanjut muat dari cloud?')) return;
+    unduhBackup(); terapkanCloud(CONF.d); HOLD=false;
+    try{ localStorage.setItem('ya_sync_aksi','muat '+new Date().toISOString()); }catch(e){}
+    setTimeout(function(){ location.reload(); },700);
+  };
+  window.ssGabung=function(){
+    if(!CONF) return;
+    unduhBackup();
+    var d=CONF.d;
+    var rw=gabungArr(getRiwayat()||[], arr(d.riwayat), kunci).sort(function(a,b){ return (Number(b.id)||0)-(Number(a.id)||0); });
+    lsSet('ya_riwayat', rw);
+    lsSet('ya_siswa', gabungArr(getSiswa()||[], arr(d.siswa), function(s){ return String(s.nama||'').trim().toLowerCase(); }));
+    lsSet('ya_pengeluaran', gabungArr(getPengeluaran()||[], arr(d.pengeluaran), kId));
+    lsSet('ya_pinjaman', gabungArr(getPinjaman()||[], arr(d.pinjaman), kId));
+    lsSet('ya_kas_awal_harian', Object.assign({}, obj(d.kasHarian), lsGet('ya_kas_awal_harian')||{}));
+    HOLD=false; CEK=Date.now(); tutup();
+    try{ localStorage.setItem('ya_sync_aksi','gabung '+new Date().toISOString()); }catch(e){}
+    _sync(true).then(function(){ location.reload(); });
+  };
+  window.ssNanti=function(){ tutup(); var b=document.getElementById('ss-bar'); if(b) b.style.display='flex'; };
+  window.ssTampil=function(){ tampil(); };
+  function tutup(){ var m=document.getElementById('ss-modal'); if(m) m.style.display='none'; var b=document.getElementById('ss-bar'); if(b) b.style.display=HOLD?'flex':'none'; }
+  function tampil(){
+    var m=document.getElementById('ss-modal'), box=document.getElementById('ss-box'); if(!m||!box||!CONF) return;
+    var b=CONF.b, cb=b.cloudBaru, lb=b.lokalBaru;
+    var terbaru=cb.map(function(r){return r.tanggal||'';}).sort().pop();
+    function daftar(L){ return L.slice(0,8).map(function(r){ return '• '+esc(tg(r.tanggal))+' — '+esc(r.nama)+' ('+esc(r.no||'')+')'+(r.nominalBayar?' · Rp '+Number(r.nominalBayar).toLocaleString('id-ID'):''); }).join('<br>')+(L.length>8?'<br>… dan '+(L.length-8)+' lainnya':''); }
+    var h='<h3>☁️ Ada data lebih baru di cloud</h3>'+
+      '<p>Cloud berisi transaksi yang <b>belum ada di perangkat ini</b> — biasanya dibuat dari laptop/HP lain. Agar tidak saling menimpa, sync otomatis <b>ditahan</b> sampai Anda memilih.</p>'+
+      '<div class="ss-num"><div><b>'+cb.length+'</b>baru di cloud'+(terbaru?' (terbaru '+esc(tg(terbaru))+')':'')+'</div><div><b>'+lb.length+'</b>hanya ada di perangkat ini</div></div>'+
+      (cb.length?'<div class="ss-list"><b>Contoh data baru di cloud:</b><br>'+daftar(cb)+'</div>':'')+
+      (lb.length?'<div class="ss-list"><b>Hanya di perangkat ini:</b><br>'+daftar(lb)+'</div>':'')+
+      '<div class="ss-acts">'+
+        '<button class="ss-b'+(lb.length?'':' pri')+'" onclick="ssMuat()">⬇ Muat dari cloud'+(lb.length?'':' (disarankan)')+'<small>Data perangkat ini diganti dengan data cloud. Backup otomatis diunduh dulu.</small></button>'+
+        '<button class="ss-b'+(lb.length?' pri':'')+'" onclick="ssGabung()">⇄ Gabungkan'+(lb.length?' (disarankan)':'')+'<small>Data cloud ditambahkan ke perangkat ini, lalu disimpan ke cloud. Pilih ini bila perangkat ini juga membuat kuitansi baru. Catatan: transaksi yang sudah dihapus di perangkat lain bisa muncul lagi.</small></button>'+
+        '<button class="ss-b" onclick="ssNanti()">Nanti<small>Tidak ada yang diubah. Sync ke cloud tetap ditahan.</small></button>'+
+      '</div>';
+    box.innerHTML=h; m.style.display='flex';
+  }
+  window._ssDebug={state:function(){ return {HOLD:HOLD,CONF:CONF&&{cb:CONF.b.cloudBaru.length,lb:CONF.b.lokalBaru.length}}; }, reset:function(){ CEK=0; HOLD=false; CONF=null; }};
+})();
+</script>
+
 <!-- ===================== VERSI APLIKASI ===================== -->
 <script>
 // Ubah setiap kali ada update: x.y.z  (z = perbaikan kecil, y = fitur baru, x = perubahan besar)
-window.APP_VERSION='3.2.1';
+window.APP_VERSION='3.4.0';
 window.APP_BUILD='2026-10-16';
-window.APP_NOTES='Rekening: tombol ✓ Rekening benar / + Jadikan rekening sekolah, deteksi salah baca 1–2 angka, daftar rekening dipisah spasi tetap terbaca. Bukti Transfer: tampil siapa yang mem-forward (nama + nomor WA), daftar wali kelas → tebak kelas + Tanya Wali Kelas langsung ke nomornya. Tombol 1-klik betulkan tahun tanggal transfer. Bukti Transfer: bulan tanpa tahun ikut Tahun Ajaran aktif + peringatan tanggal transfer janggal. Perbaikan tarif SPP di Tagihan (Agustus–Juni sempat pakai tarif kelas tahun lalu). Catatan mini tidak lagi menghalangi tombol (klik tembus saat pudar) + tombol Tandai dibaca. Bukti Transfer (AI) early test.';
+window.APP_NOTES='Siswa pindahan/baru: bulan sebelum Mulai Pendidikan tidak ditagih (Tagihan, Status SPP, Dari otomatis, Bukti Transfer). SYNC AMAN: sebelum menyimpan ke cloud, aplikasi cek dulu apakah cloud punya data lebih baru (dari HP/laptop lain) → pilih Muat / Gabungkan, tidak lagi saling menimpa. Rekening: tombol ✓ Rekening benar / + Jadikan rekening sekolah, deteksi salah baca 1–2 angka, daftar rekening dipisah spasi tetap terbaca. Bukti Transfer: tampil siapa yang mem-forward (nama + nomor WA), daftar wali kelas → tebak kelas + Tanya Wali Kelas langsung ke nomornya. Tombol 1-klik betulkan tahun tanggal transfer. Bukti Transfer: bulan tanpa tahun ikut Tahun Ajaran aktif + peringatan tanggal transfer janggal. Perbaikan tarif SPP di Tagihan (Agustus–Juni sempat pakai tarif kelas tahun lalu). Catatan mini tidak lagi menghalangi tombol (klik tembus saat pudar) + tombol Tandai dibaca. Bukti Transfer (AI) early test.';
 (function(){
   function tgl(s){ var d=new Date(s+'T00:00:00'); return d.toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'}); }
   function pasang(){
