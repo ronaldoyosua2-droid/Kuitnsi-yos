@@ -10587,7 +10587,7 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
               o.ditambah=new Date(o.ditambah||Date.now());
               o.imgs=(o.imgs||[]).map(function(im){ return {url:im.url,mime:im.mime||'image/jpeg',b64:String(im.url||'').split(',')[1]||''}; });
               if(!o.img&&o.imgs[0]) o.img=o.imgs[0].url;
-              if(o.drvState==='up') o.drvState=''; o._drvCek=0;
+              if(o.drvState==='up') o.drvState=''; o._drvCek=0; o._catatCoba=0;
               if(o.state==='reading'){ o.state='error'; o.err='Pembacaan AI terputus karena halaman di-refresh — klik Baca ulang.'; }
               o.statusTxt=''; return o; });
             L.sort(function(a,b){ return b.ditambah-a.ditambah; });
@@ -10634,8 +10634,8 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
     if(c.imgs&&c.imgs.length>1) h+='<div class="bt-more">'+c.imgs.slice(1).map(function(im,k){ return '<img src="'+im.url+'" onclick="btZoom(\''+c.id+'\','+(k+1)+')" title="Screenshot lanjutan '+(k+1)+'">'; }).join('')+'</div>';
     if(c.img&&c.state!=='reading') h+=(ATTACH===c.id?'<div class="bt-attach on">📋 Sekarang tekan <b>Ctrl+V</b> untuk menempel screenshot lanjutan ke bukti ini<br><span class="bt-b sm" onclick="btLanjut(\''+c.id+'\')">Batal</span></div>':'<span class="bt-b sm bt-attach-btn" onclick="btLanjut(\''+c.id+'\')" title="Tambahkan potongan chat di bawah/atas bukti ini">＋ Screenshot lanjutan</span>');
     if(c.imgs&&c.imgs.length&&c.state!=='reading'){
-      if(c.drive&&c.drive.length) setTimeout(function(){ cekDrive(c); },0);
-      if(c.drive&&c.drive.length) h+='<a class="bt-b sm bt-attach-btn" style="color:#2f7a55;border-color:#bfe0cb;text-decoration:none" href="'+esc(c.drive[0].url)+'" target="_blank" rel="noopener">✓ Tersimpan · Buka di Drive</a>'+(c.drvCatatErr?'<div style="font-size:11px;color:#b4581a;margin-top:4px">⚠ '+esc(c.drvCatatErr)+'</div>':(c.drvCatat?'<div style="font-size:11px;color:#2f7a55;margin-top:4px;text-align:center">✓ keterangan dicatat di "Daftar Bukti Transfer"</div>':''));
+      if(c.drive&&c.drive.length) setTimeout(function(){ cekDrive(c); if(c.drvCatatErr&&(!c._catatCoba||Date.now()-c._catatCoba>60000)) catatDrive(c); },0);
+      if(c.drive&&c.drive.length) h+='<a class="bt-b sm bt-attach-btn" style="color:#2f7a55;border-color:#bfe0cb;text-decoration:none" href="'+esc(c.drive[0].url)+'" target="_blank" rel="noopener">✓ Tersimpan · Buka di Drive</a>'+(c.drvCatatErr?'<div style="font-size:11px;color:#b4581a;margin-top:4px">⚠ '+esc(c.drvCatatErr)+'<br><span class="bt-b sm" style="margin-top:4px" onclick="btCatatLagi(\''+c.id+'\')">↻ Coba catat lagi</span></div>':(c.drvCatat?'<div style="font-size:11px;color:#2f7a55;margin-top:4px;text-align:center">✓ keterangan dicatat di "Daftar Bukti Transfer"</div>':''));
       else if(c.drvState==='up') h+='<span class="bt-b sm bt-attach-btn"><span class="bt-spin"></span> Menyimpan ke Drive...</span>';
       else h+=(c.drvState==='hilang'?'<div style="font-size:11px;color:#b4581a;margin-top:6px;text-align:center">⚠ File di Drive sudah dihapus</div>':'')+'<span class="bt-b sm bt-attach-btn" onclick="btSimpanDrive(\''+c.id+'\')" title="Simpan foto bukti ini ke Google Drive untuk dilihat lagi nanti">☁ '+(c.drvState==='hilang'?'Simpan lagi ke Drive':'Simpan ke Drive')+'</span>'+(c.drvState==='err'?'<div style="font-size:11px;color:#b91c1c;margin-top:4px">✗ '+esc(c.drvErr||'Gagal')+'</div>':'');
     }
@@ -10813,9 +10813,11 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
     }).catch(function(){ /* Apps Script versi lama: abaikan */ });
   }
   function catatDrive(c){
+    c.drvCatatErr=''; c._catatCoba=Date.now();
     drvKirim({action:'catat',info:infoBukti(c)}).then(function(){ c.drvCatat=true; render(); })
       .catch(function(e){ c.drvCatatErr=/tidak dikenal/i.test(e.message)?'Foto tersimpan, tapi keterangan belum tercatat — update Apps Script ke versi terbaru.':e.message; render(); });
   }
+  window.btCatatLagi=function(id){ var c=C(id); if(c&&c.drive&&c.drive.length){ catatDrive(c); render(); } };
   window.btSimpanDrive=function(id){
     var c=C(id); if(!c||!c.imgs||!c.imgs.length) return;
     if(!ls(DRV_URL)){ alert('Isi dulu URL penyimpanan Google Drive di ⚙ Pengaturan AI (lihat panduan Apps Script).'); var s=$('bt-set'); if(s) s.style.display='block'; return; }
@@ -11158,9 +11160,9 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
 <!-- ===================== VERSI APLIKASI ===================== -->
 <script>
 // Ubah setiap kali ada update: x.y.z  (z = perbaikan kecil, y = fitur baru, x = perubahan besar)
-window.APP_VERSION='3.6.2';
+window.APP_VERSION='3.6.3';
 window.APP_BUILD='2026-10-16';
-window.APP_NOTES='Status ☁ di kartu dicek ke Drive: bila file sudah dihapus di Drive, tombol kembali jadi Simpan lagi. Keterangan bukti (siswa, kelas, bulan, pengirim, chat, no kuitansi) dicatat di spreadsheet Daftar Bukti Transfer di Drive. Simpan foto bukti ke Google Drive (tombol ☁ di kartu, opsional otomatis) + link di detail kuitansi & Log. Antrian Bukti Transfer (beserta foto) tersimpan di browser — tidak hilang saat refresh, terhapus otomatis setelah kuitansinya dibuat. No. rekening tujuan bisa diketik/dipilih manual di kartu bila AI salah/tidak terbaca. Status transfer "Terkirim" dianggap berhasil (UOB/TMRW dll); status diproses = peringatan, gagal = blokir. Siswa pindahan/baru: bulan sebelum Mulai Pendidikan tidak ditagih (Tagihan, Status SPP, Dari otomatis, Bukti Transfer). SYNC AMAN: sebelum menyimpan ke cloud, aplikasi cek dulu apakah cloud punya data lebih baru (dari HP/laptop lain) → pilih Muat / Gabungkan, tidak lagi saling menimpa. Rekening: tombol ✓ Rekening benar / + Jadikan rekening sekolah, deteksi salah baca 1–2 angka, daftar rekening dipisah spasi tetap terbaca. Bukti Transfer: tampil siapa yang mem-forward (nama + nomor WA), daftar wali kelas → tebak kelas + Tanya Wali Kelas langsung ke nomornya. Tombol 1-klik betulkan tahun tanggal transfer. Bukti Transfer: bulan tanpa tahun ikut Tahun Ajaran aktif + peringatan tanggal transfer janggal. Perbaikan tarif SPP di Tagihan (Agustus–Juni sempat pakai tarif kelas tahun lalu). Catatan mini tidak lagi menghalangi tombol (klik tembus saat pudar) + tombol Tandai dibaca. Bukti Transfer (AI) early test.';
+window.APP_NOTES='Keterangan yang gagal dicatat dicoba ulang otomatis + tombol ↻ Coba catat lagi. Status ☁ di kartu dicek ke Drive: bila file sudah dihapus di Drive, tombol kembali jadi Simpan lagi. Keterangan bukti (siswa, kelas, bulan, pengirim, chat, no kuitansi) dicatat di spreadsheet Daftar Bukti Transfer di Drive. Simpan foto bukti ke Google Drive (tombol ☁ di kartu, opsional otomatis) + link di detail kuitansi & Log. Antrian Bukti Transfer (beserta foto) tersimpan di browser — tidak hilang saat refresh, terhapus otomatis setelah kuitansinya dibuat. No. rekening tujuan bisa diketik/dipilih manual di kartu bila AI salah/tidak terbaca. Status transfer "Terkirim" dianggap berhasil (UOB/TMRW dll); status diproses = peringatan, gagal = blokir. Siswa pindahan/baru: bulan sebelum Mulai Pendidikan tidak ditagih (Tagihan, Status SPP, Dari otomatis, Bukti Transfer). SYNC AMAN: sebelum menyimpan ke cloud, aplikasi cek dulu apakah cloud punya data lebih baru (dari HP/laptop lain) → pilih Muat / Gabungkan, tidak lagi saling menimpa. Rekening: tombol ✓ Rekening benar / + Jadikan rekening sekolah, deteksi salah baca 1–2 angka, daftar rekening dipisah spasi tetap terbaca. Bukti Transfer: tampil siapa yang mem-forward (nama + nomor WA), daftar wali kelas → tebak kelas + Tanya Wali Kelas langsung ke nomornya. Tombol 1-klik betulkan tahun tanggal transfer. Bukti Transfer: bulan tanpa tahun ikut Tahun Ajaran aktif + peringatan tanggal transfer janggal. Perbaikan tarif SPP di Tagihan (Agustus–Juni sempat pakai tarif kelas tahun lalu). Catatan mini tidak lagi menghalangi tombol (klik tembus saat pudar) + tombol Tandai dibaca. Bukti Transfer (AI) early test.';
 (function(){
   function tgl(s){ var d=new Date(s+'T00:00:00'); return d.toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'}); }
   function pasang(){
