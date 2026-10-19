@@ -10101,6 +10101,7 @@ body.ui-dark .navbar.scrolled{background:rgba(15,23,42,.85)!important}
 .bt-setup .bt-krow{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .bt-setup input{flex:1;min-width:220px;padding:9px 12px;border:1px solid var(--line,#e5e7eb);border-radius:10px;font-size:13px;background:var(--surface,#fff);color:var(--ink,#111)}
 .bt-setup textarea{width:100%;min-height:54px;padding:8px 12px;border:1px solid var(--line,#e5e7eb);border-radius:10px;font-size:13px;background:var(--surface,#fff);color:var(--ink,#111);box-sizing:border-box}
+.bt-logbox{max-height:60vh;overflow:auto}.bt-logbox thead th{position:sticky;top:0;background:var(--surface,#fff);z-index:1}.bt-pager{display:flex;align-items:center;gap:10px;justify-content:space-between;padding:6px 2px;font-size:12px;color:var(--muted,#6b7280)}.bt-pager .bt-b[disabled]{opacity:.4;pointer-events:none}
 .bt-prog-wrap{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px;margin-bottom:12px}.bt-prog{background:var(--surface,#fff);border:1px solid var(--line,#e5e7eb);border-radius:14px;padding:12px 14px}.bt-prog-h{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:14px}.bt-prog-n{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin:10px 0 8px}.bt-prog-n span{font-size:11px;color:var(--muted,#6b7280);line-height:1.3}.bt-prog-n b{display:block;font-size:17px;color:var(--ink,#1f2a24)}.bt-prog-bar{height:7px;border-radius:9px;background:var(--soft,#eef1ef);overflow:hidden}.bt-prog-bar i{display:block;height:100%;background:#5a9a78;border-radius:9px}.bt-prog-c{list-style:none;margin:8px 0 0;padding:0;font-size:12px;color:var(--muted,#6b7280);display:flex;flex-wrap:wrap;gap:4px 14px}.bt-prog-c li.ok{color:#2f7a55;font-weight:600}
 .bk-card{display:block!important}.bk-head{display:flex;gap:14px;align-items:center;margin-bottom:10px}.bk-thumb{width:120px;height:90px;object-fit:cover;border-radius:10px;cursor:zoom-in;background:var(--soft,#eef1ef);flex:none}
 .bk-tbl-wrap{overflow-x:auto;margin-top:8px;max-width:100%}
@@ -10514,7 +10515,7 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
   }
 
   // ---------- LOG BUKTI TRANSFER (terpisah dari Log Aktivitas) ----------
-  var BTLOG_LS='ya_bt_log', LOGQ='', LOGD='';
+  var BTLOG_LS='ya_bt_log', LOGQ='', LOGD='', LOGP=0, LOG_PER=25;
   function getBtLog(){ try{ return JSON.parse(localStorage.getItem(BTLOG_LS))||[]; }catch(e){ return []; } }
   function btLog(aksi, c, extra){
     try{
@@ -10582,8 +10583,10 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
       '<span class="bt-b sm" onclick="btLogExcel()">⬇ Download Excel</span></div>'+
       '<div style="font-size:12px;color:var(--muted,#6b7280);margin-top:8px">'+F.length+' catatan · <b style="color:#2f7a55">'+nKw.length+' kuitansi dibuat</b> dari bukti transfer · total '+rp(tot)+'</div></div>';
     if(!F.length) return h+'<div class="bt-empty">Belum ada catatan.</div>';
-    h+='<div class="bt-card" style="display:block;padding:6px 10px"><table class="bt-logt"><thead><tr><th>Waktu</th><th>Aksi</th><th>Bukti transfer</th><th>Siswa</th><th>Keterangan</th></tr></thead><tbody>';
-    F.slice(0,500).forEach(function(l){
+    var nh=Math.ceil(F.length/LOG_PER); if(LOGP>=nh) LOGP=nh-1; if(LOGP<0) LOGP=0;
+    var pager='<div class="bt-pager"><span class="bt-b sm"'+(LOGP>0?' onclick="btLogHal('+(LOGP-1)+')"':' disabled')+'>‹ Sebelumnya</span><span>Halaman <b>'+(LOGP+1)+'</b> / '+nh+' · catatan '+(LOGP*LOG_PER+1)+'–'+Math.min(F.length,(LOGP+1)*LOG_PER)+' dari '+F.length+'</span><span class="bt-b sm"'+(LOGP<nh-1?' onclick="btLogHal('+(LOGP+1)+')"':' disabled')+'>Berikutnya ›</span></div>';
+    h+='<div class="bt-card" style="display:block;padding:6px 10px">'+pager+'<div class="bt-logbox"><table class="bt-logt"><thead><tr><th>Waktu</th><th>Aksi</th><th>Bukti transfer</th><th>Siswa</th><th>Keterangan</th></tr></thead><tbody>';
+    F.slice(LOGP*LOG_PER,(LOGP+1)*LOG_PER).forEach(function(l){
       var dt=new Date(l.t), w=dt.toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric'})+' · '+dt.toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'});
       var bukti=[l.nominal?rp(l.nominal):'',l.bank,[l.tglTf?tglFmt(l.tglTf):'',l.jam].filter(Boolean).join(' ')].filter(Boolean).join(' · ');
       var ket=l.aksi==='Kuitansi dibuat'?'<b>'+esc(l.no||'')+'</b> · '+esc(l.siswaKw||'')+' · '+rp(l.bayar||0)+(l.mode==='cicil'?' (cicil)':''):esc(l.ket||'');
@@ -10591,11 +10594,12 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
       h+='<tr><td style="white-space:nowrap;color:var(--muted,#6b7280)">'+w+'</td><td><span class="bt-st" style="background:transparent;border:1px solid '+(AKSI_WARNA[l.aksi]||'#999')+';color:'+(AKSI_WARNA[l.aksi]||'#666')+'">'+esc(l.aksi)+'</span></td>'+
         '<td style="white-space:nowrap">'+esc(bukti)+'</td><td>'+esc(l.siswa||'')+'</td><td>'+ket+'</td></tr>';
     });
-    h+='</tbody></table>'+(F.length>500?'<div class="bt-empty">Menampilkan 500 terbaru — gunakan pencarian / tanggal.</div>':'')+'</div>';
+    h+='</tbody></table></div>'+(nh>1?pager:'')+'</div>';
     return h;
   }
-  window.btLogCari=function(v){ LOGQ=v; render(); var el=$('bt-log-q'); if(el){ el.focus(); el.setSelectionRange(v.length,v.length); } };
-  window.btLogTgl=function(v){ LOGD=v; render(); };
+  window.btLogHal=function(p){ LOGP=p; render(); var b=document.querySelector('.bt-logbox'); if(b) b.scrollTop=0; };
+  window.btLogCari=function(v){ LOGQ=v; LOGP=0; render(); var el=$('bt-log-q'); if(el){ el.focus(); el.setSelectionRange(v.length,v.length); } };
+  window.btLogTgl=function(v){ LOGD=v; LOGP=0; render(); };
   window.btLogExcel=function(){
     if(typeof XLSX==='undefined'){ alert('Library Excel belum termuat. Coba lagi sebentar.'); return; }
     var rows=getBtLog().map(function(l){ return {Waktu:new Date(l.t).toLocaleString('id-ID'),Aksi:l.aksi,Nominal:l.nominal||0,'Tgl Transfer':l.tglTf||'',Jam:l.jam||'',Bank:l.bank||'',
@@ -11468,9 +11472,9 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
 <!-- ===================== VERSI APLIKASI ===================== -->
 <script>
 // Ubah setiap kali ada update: x.y.z  (z = perbaikan kecil, y = fitur baru, x = perubahan besar)
-window.APP_VERSION='3.7.2';
+window.APP_VERSION='3.7.3';
 window.APP_BUILD='2026-10-19';
-window.APP_NOTES='Progres tes lebih adil: dihitung per bukti (bukan per klik) & dipisah “AI salah baca” vs “dilengkapi manual” (nama tidak ada di chat/daftar, cek rekening). Progres masa tes otomatis di tab 📋 Log (tanggal mulai tes, jumlah bukti/halaman, kuitansi, koreksi manual, target naik Beta). Koreksi di tabel Buku Kas (siswa, bulan, nominal, tanggal, metode) kini tercatat di Log. BARU: Buku Kas (AI) — di halaman Bukti, tab 📒 Buku Kas: foto halaman buku kas harian per jenjang → AI membaca nama, kelas, bulan SPP & nominal → centang lalu buat banyak kuitansi SPP sekaligus (tanggal = tanggal di buku). Baris coret merah & yang sudah ada di aplikasi dilewati, selain SPP ditandai manual. Tidak ada lagi kedipan tampilan biru lama saat refresh. Keterangan yang gagal dicatat dicoba ulang otomatis + tombol ↻ Coba catat lagi. Status ☁ di kartu dicek ke Drive: bila file sudah dihapus di Drive, tombol kembali jadi Simpan lagi. Keterangan bukti (siswa, kelas, bulan, pengirim, chat, no kuitansi) dicatat di spreadsheet Daftar Bukti Transfer di Drive. Simpan foto bukti ke Google Drive (tombol ☁ di kartu, opsional otomatis) + link di detail kuitansi & Log. Antrian Bukti Transfer (beserta foto) tersimpan di browser — tidak hilang saat refresh, terhapus otomatis setelah kuitansinya dibuat. No. rekening tujuan bisa diketik/dipilih manual di kartu bila AI salah/tidak terbaca. Status transfer "Terkirim" dianggap berhasil (UOB/TMRW dll); status diproses = peringatan, gagal = blokir. Siswa pindahan/baru: bulan sebelum Mulai Pendidikan tidak ditagih (Tagihan, Status SPP, Dari otomatis, Bukti Transfer). SYNC AMAN: sebelum menyimpan ke cloud, aplikasi cek dulu apakah cloud punya data lebih baru (dari HP/laptop lain) → pilih Muat / Gabungkan, tidak lagi saling menimpa. Rekening: tombol ✓ Rekening benar / + Jadikan rekening sekolah, deteksi salah baca 1–2 angka, daftar rekening dipisah spasi tetap terbaca. Bukti Transfer: tampil siapa yang mem-forward (nama + nomor WA), daftar wali kelas → tebak kelas + Tanya Wali Kelas langsung ke nomornya. Tombol 1-klik betulkan tahun tanggal transfer. Bukti Transfer: bulan tanpa tahun ikut Tahun Ajaran aktif + peringatan tanggal transfer janggal. Perbaikan tarif SPP di Tagihan (Agustus–Juni sempat pakai tarif kelas tahun lalu). Catatan mini tidak lagi menghalangi tombol (klik tembus saat pudar) + tombol Tandai dibaca. Bukti Transfer (AI) early test.';
+window.APP_NOTES='Log Bukti Transfer dibagi per halaman (25 catatan) dengan tombol Sebelumnya/Berikutnya; tabel punya kotak gulir sendiri dengan judul kolom tetap di atas. Progres tes lebih adil: dihitung per bukti (bukan per klik) & dipisah “AI salah baca” vs “dilengkapi manual” (nama tidak ada di chat/daftar, cek rekening). Progres masa tes otomatis di tab 📋 Log (tanggal mulai tes, jumlah bukti/halaman, kuitansi, koreksi manual, target naik Beta). Koreksi di tabel Buku Kas (siswa, bulan, nominal, tanggal, metode) kini tercatat di Log. BARU: Buku Kas (AI) — di halaman Bukti, tab 📒 Buku Kas: foto halaman buku kas harian per jenjang → AI membaca nama, kelas, bulan SPP & nominal → centang lalu buat banyak kuitansi SPP sekaligus (tanggal = tanggal di buku). Baris coret merah & yang sudah ada di aplikasi dilewati, selain SPP ditandai manual. Tidak ada lagi kedipan tampilan biru lama saat refresh. Keterangan yang gagal dicatat dicoba ulang otomatis + tombol ↻ Coba catat lagi. Status ☁ di kartu dicek ke Drive: bila file sudah dihapus di Drive, tombol kembali jadi Simpan lagi. Keterangan bukti (siswa, kelas, bulan, pengirim, chat, no kuitansi) dicatat di spreadsheet Daftar Bukti Transfer di Drive. Simpan foto bukti ke Google Drive (tombol ☁ di kartu, opsional otomatis) + link di detail kuitansi & Log. Antrian Bukti Transfer (beserta foto) tersimpan di browser — tidak hilang saat refresh, terhapus otomatis setelah kuitansinya dibuat. No. rekening tujuan bisa diketik/dipilih manual di kartu bila AI salah/tidak terbaca. Status transfer "Terkirim" dianggap berhasil (UOB/TMRW dll); status diproses = peringatan, gagal = blokir. Siswa pindahan/baru: bulan sebelum Mulai Pendidikan tidak ditagih (Tagihan, Status SPP, Dari otomatis, Bukti Transfer). SYNC AMAN: sebelum menyimpan ke cloud, aplikasi cek dulu apakah cloud punya data lebih baru (dari HP/laptop lain) → pilih Muat / Gabungkan, tidak lagi saling menimpa. Rekening: tombol ✓ Rekening benar / + Jadikan rekening sekolah, deteksi salah baca 1–2 angka, daftar rekening dipisah spasi tetap terbaca. Bukti Transfer: tampil siapa yang mem-forward (nama + nomor WA), daftar wali kelas → tebak kelas + Tanya Wali Kelas langsung ke nomornya. Tombol 1-klik betulkan tahun tanggal transfer. Bukti Transfer: bulan tanpa tahun ikut Tahun Ajaran aktif + peringatan tanggal transfer janggal. Perbaikan tarif SPP di Tagihan (Agustus–Juni sempat pakai tarif kelas tahun lalu). Catatan mini tidak lagi menghalangi tombol (klik tembus saat pudar) + tombol Tandai dibaca. Bukti Transfer (AI) early test.';
 (function(){
   function tgl(s){ var d=new Date(s+'T00:00:00'); return d.toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'}); }
   function pasang(){
