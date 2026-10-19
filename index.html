@@ -3,6 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style id="anti-flash">html.af body{visibility:hidden}html.af *,html.af *::before,html.af *::after{transition:none!important;animation:none!important}</style>
+<script>/* sembunyikan tampilan lama (biru) sampai tema & UI modern siap */document.documentElement.classList.add('af');window._afT=setTimeout(function(){document.documentElement.classList.remove('af');},4000);</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <title>Kwitansi — Sekolah Swasta Yos Anugerah</title>
 <style>
@@ -11160,9 +11162,9 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
 <!-- ===================== VERSI APLIKASI ===================== -->
 <script>
 // Ubah setiap kali ada update: x.y.z  (z = perbaikan kecil, y = fitur baru, x = perubahan besar)
-window.APP_VERSION='3.6.3';
+window.APP_VERSION='3.6.4';
 window.APP_BUILD='2026-10-16';
-window.APP_NOTES='Keterangan yang gagal dicatat dicoba ulang otomatis + tombol ↻ Coba catat lagi. Status ☁ di kartu dicek ke Drive: bila file sudah dihapus di Drive, tombol kembali jadi Simpan lagi. Keterangan bukti (siswa, kelas, bulan, pengirim, chat, no kuitansi) dicatat di spreadsheet Daftar Bukti Transfer di Drive. Simpan foto bukti ke Google Drive (tombol ☁ di kartu, opsional otomatis) + link di detail kuitansi & Log. Antrian Bukti Transfer (beserta foto) tersimpan di browser — tidak hilang saat refresh, terhapus otomatis setelah kuitansinya dibuat. No. rekening tujuan bisa diketik/dipilih manual di kartu bila AI salah/tidak terbaca. Status transfer "Terkirim" dianggap berhasil (UOB/TMRW dll); status diproses = peringatan, gagal = blokir. Siswa pindahan/baru: bulan sebelum Mulai Pendidikan tidak ditagih (Tagihan, Status SPP, Dari otomatis, Bukti Transfer). SYNC AMAN: sebelum menyimpan ke cloud, aplikasi cek dulu apakah cloud punya data lebih baru (dari HP/laptop lain) → pilih Muat / Gabungkan, tidak lagi saling menimpa. Rekening: tombol ✓ Rekening benar / + Jadikan rekening sekolah, deteksi salah baca 1–2 angka, daftar rekening dipisah spasi tetap terbaca. Bukti Transfer: tampil siapa yang mem-forward (nama + nomor WA), daftar wali kelas → tebak kelas + Tanya Wali Kelas langsung ke nomornya. Tombol 1-klik betulkan tahun tanggal transfer. Bukti Transfer: bulan tanpa tahun ikut Tahun Ajaran aktif + peringatan tanggal transfer janggal. Perbaikan tarif SPP di Tagihan (Agustus–Juni sempat pakai tarif kelas tahun lalu). Catatan mini tidak lagi menghalangi tombol (klik tembus saat pudar) + tombol Tandai dibaca. Bukti Transfer (AI) early test.';
+window.APP_NOTES='Tidak ada lagi kedipan tampilan biru lama saat refresh. Keterangan yang gagal dicatat dicoba ulang otomatis + tombol ↻ Coba catat lagi. Status ☁ di kartu dicek ke Drive: bila file sudah dihapus di Drive, tombol kembali jadi Simpan lagi. Keterangan bukti (siswa, kelas, bulan, pengirim, chat, no kuitansi) dicatat di spreadsheet Daftar Bukti Transfer di Drive. Simpan foto bukti ke Google Drive (tombol ☁ di kartu, opsional otomatis) + link di detail kuitansi & Log. Antrian Bukti Transfer (beserta foto) tersimpan di browser — tidak hilang saat refresh, terhapus otomatis setelah kuitansinya dibuat. No. rekening tujuan bisa diketik/dipilih manual di kartu bila AI salah/tidak terbaca. Status transfer "Terkirim" dianggap berhasil (UOB/TMRW dll); status diproses = peringatan, gagal = blokir. Siswa pindahan/baru: bulan sebelum Mulai Pendidikan tidak ditagih (Tagihan, Status SPP, Dari otomatis, Bukti Transfer). SYNC AMAN: sebelum menyimpan ke cloud, aplikasi cek dulu apakah cloud punya data lebih baru (dari HP/laptop lain) → pilih Muat / Gabungkan, tidak lagi saling menimpa. Rekening: tombol ✓ Rekening benar / + Jadikan rekening sekolah, deteksi salah baca 1–2 angka, daftar rekening dipisah spasi tetap terbaca. Bukti Transfer: tampil siapa yang mem-forward (nama + nomor WA), daftar wali kelas → tebak kelas + Tanya Wali Kelas langsung ke nomornya. Tombol 1-klik betulkan tahun tanggal transfer. Bukti Transfer: bulan tanpa tahun ikut Tahun Ajaran aktif + peringatan tanggal transfer janggal. Perbaikan tarif SPP di Tagihan (Agustus–Juni sempat pakai tarif kelas tahun lalu). Catatan mini tidak lagi menghalangi tombol (klik tembus saat pudar) + tombol Tandai dibaca. Bukti Transfer (AI) early test.';
 (function(){
   function tgl(s){ var d=new Date(s+'T00:00:00'); return d.toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'}); }
   function pasang(){
@@ -11219,5 +11221,16 @@ window.APP_NOTES='Keterangan yang gagal dicatat dicoba ulang otomatis + tombol �
 </script>
 <style>.np-mini-read{align-self:flex-end;border:1px solid rgba(0,0,0,.12);background:var(--surface,#fff);color:var(--ink,#333);border-radius:12px;padding:3px 10px;font-size:10.5px;font-weight:600;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.08)}.np-mini-read:hover{background:var(--hover,#f3f4f6)}</style>
 
+<script>
+/* tampilkan halaman setelah tema & UI modern terpasang (cegah kedip tampilan biru lama) */
+(function(){
+  function siap(){
+    try{ if(typeof loadTema==='function') loadTema(); }catch(e){}
+    requestAnimationFrame(function(){ document.documentElement.classList.remove('af'); clearTimeout(window._afT); });
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',function(){ setTimeout(siap,260); });
+  else setTimeout(siap,260);
+})();
+</script>
 </body>
 </html>
