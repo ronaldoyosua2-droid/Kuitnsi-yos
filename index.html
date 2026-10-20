@@ -11491,16 +11491,25 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
     alert('Cara memasang aplikasi:\n\n• Laptop (Chrome/Edge): klik ikon ⊕ / "Instal" di ujung kanan kolom alamat, atau menu ⋮ → Transmisikan, simpan, dan bagikan → Instal halaman sebagai aplikasi.\n• HP Android (Chrome): menu ⋮ → Instal aplikasi / Tambahkan ke layar utama.\n\nSetelah itu ikon Kwitansi Yos Anugerah muncul di desktop / layar HP.');
   };
   function tombol(){
-    var show=web&&!standalone();
+    var show=web&&!standalone(), hide=false; try{ hide=localStorage.getItem('pwa_hide')==='1'; }catch(e){}
     document.querySelectorAll('.pwa-inst').forEach(function(b){ b.style.display=show?'':'none'; b.classList.toggle('siap',!!DP); });
+    var bn=document.getElementById('pwa-bn'); if(bn) bn.style.display=(show&&!hide)?'':'none';
   }
   function pasang(){
     var nav=document.querySelector('.nav-btns');
     if(nav&&!nav.querySelector('.pwa-inst')){ var b=document.createElement('button'); b.type='button'; b.className='pwa-inst'; b.innerHTML='📲 Install aplikasi'; b.title='Pasang sebagai aplikasi (ikon di desktop / HP, tetap bisa dibuka saat offline)'; b.onclick=pwaInstall;
       var v=nav.querySelector('.app-ver-sb'); if(v) nav.insertBefore(b,v); else nav.appendChild(b); }
+    // HP: menu bawah sempit → tampilkan sebagai kotak kecil (bisa ditutup), bukan di menu
+    if(!document.getElementById('pwa-bn')){ var bn=document.createElement('div'); bn.id='pwa-bn';
+      bn.innerHTML='<span>📲 Pasang Kwitansi sebagai aplikasi di HP ini</span><button type="button" class="pwa-inst-m">Install</button><button type="button" class="pwa-x" title="Tutup">✕</button>';
+      bn.querySelector('.pwa-inst-m').onclick=pwaInstall;
+      bn.querySelector('.pwa-x').onclick=function(){ try{ localStorage.setItem('pwa_hide','1'); }catch(e){} bn.style.display='none'; };
+      document.body.appendChild(bn); }
+    var ad=document.getElementById('app-ver-admin');
+    if(ad&&!ad.querySelector('.pwa-inst')){ var b2=document.createElement('button'); b2.type='button'; b2.className='pwa-inst'; b2.style.margin='0'; b2.innerHTML='📲 Install aplikasi'; b2.onclick=pwaInstall; ad.insertBefore(b2,ad.querySelector('.app-riw')); }
     tombol();
   }
-  var st=document.createElement('style'); st.textContent='.pwa-inst{display:block;margin:6px auto 2px;padding:6px 12px;border-radius:10px;border:1px dashed #a9cbb8;background:transparent;color:#2f7a55;font-size:12px;font-weight:600;cursor:pointer}.pwa-inst.siap{border-style:solid;background:rgba(90,154,120,.1)}.pwa-inst:hover{background:rgba(90,154,120,.18)}';
+  var st=document.createElement('style'); st.textContent='.pwa-inst{display:block;margin:6px auto 2px;padding:6px 12px;border-radius:10px;border:1px dashed #a9cbb8;background:transparent;color:#2f7a55;font-size:12px;font-weight:600;cursor:pointer}.pwa-inst.siap{border-style:solid;background:rgba(90,154,120,.1)}.pwa-inst:hover{background:rgba(90,154,120,.18)}#pwa-bn{display:none}@media(max-width:700px){.nav-btns .pwa-inst{display:none!important}#pwa-bn{position:fixed;left:10px;right:84px;bottom:calc(84px + env(safe-area-inset-bottom));z-index:900;display:flex;align-items:center;gap:8px;background:var(--surface,#fff);border:1px solid #a9cbb8;border-radius:14px;padding:8px 8px 8px 12px;box-shadow:0 4px 16px rgba(0,0,0,.12);font-size:12.5px;color:var(--ink,#1f2a24)}#pwa-bn span{flex:1;line-height:1.3}#pwa-bn .pwa-inst-m{border:0;background:#5a9a78;color:#fff;font-weight:700;border-radius:10px;padding:7px 12px;font-size:12.5px}#pwa-bn .pwa-x{border:0;background:transparent;color:var(--muted,#6b7280);font-size:15px;padding:4px 6px}}';
   document.head.appendChild(st);
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',function(){ setTimeout(pasang,400); }); else setTimeout(pasang,400);
 })();
@@ -11508,11 +11517,12 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
 <!-- ===================== VERSI APLIKASI ===================== -->
 <script>
 // Ubah setiap kali ada update: x.y.z  (z = perbaikan kecil, y = fitur baru, x = perubahan besar)
-window.APP_VERSION='3.8.0';
+window.APP_VERSION='3.8.1';
 window.APP_BUILD='2026-10-20';
-window.APP_NOTES='Bisa di-install sebagai aplikasi (ikon logo sekolah, tetap terbuka tanpa internet).';
+window.APP_NOTES='Tombol Install di HP tidak lagi menyempitkan menu bawah (jadi kotak kecil yang bisa ditutup; juga ada di halaman Admin).';
 // riwayat singkat (terbaru di atas) — tampil terlipat di halaman Admin
 window.APP_RIWAYAT=[
+  ['3.8.1','2026-10-20','Tombol Install di HP pindah dari menu bawah ke kotak kecil yang bisa ditutup + di halaman Admin.'],
   ['3.8.0','2026-10-20','Bisa di-install sebagai aplikasi di laptop & HP (tombol 📲 Install aplikasi), tetap terbuka tanpa internet, data browser ditandai permanen. Catatan versi di Admin diringkas.'],
   ['3.7.3','2026-10-19','Log Bukti Transfer per halaman (25 catatan).'],
   ['3.7.2','2026-10-19','Progres tes dihitung per bukti: “AI salah baca” dipisah dari “dilengkapi manual”.'],
