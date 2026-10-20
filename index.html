@@ -11509,6 +11509,8 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
           '<div class="bt-krow"><input id="bt-drv-url" placeholder="URL aplikasi web (…/exec)" autocomplete="off"><input id="bt-drv-tok" type="password" placeholder="Token" style="flex:0 0 160px;min-width:0" autocomplete="off" onfocus="if(this.value.indexOf(\'•\')>=0)this.value=\'\'"></div>'+
           '<label style="display:flex;gap:6px;align-items:center;font-size:12.5px;margin-top:6px"><input type="checkbox" id="bt-drv-auto"> Simpan otomatis ke Drive setiap kuitansi dari bukti dibuat</label>'+
           '<div class="bt-krow" style="margin-top:6px"><span class="bt-b" onclick="btDrvSimpanSet()">Simpan &amp; tes</span><span id="bt-drv-info" style="font-size:12px"></span></div>'+
+          '<p style="margin:14px 0 6px"><b>📲 Pakai pengaturan ini di HP</b> — kirim link sekali klik (berisi API key, URL &amp; token Drive, rekening, wali kelas). Buka link itu di HP → pengaturan langsung terisi. <span style="color:#b4581a">Jangan bagikan link ke orang lain.</span></p>'+
+          '<div class="bt-krow"><span class="bt-b pri" onclick="kwSetupKirim(\'wa\')">Kirim ke WA saya</span><span class="bt-b" onclick="kwSetupKirim(\'salin\')">Salin link</span></div>'+
         '</div></div>'+
         '<div class="bt-tabs" id="bt-modesw" style="margin-bottom:12px"><span class="bt-tab" data-m="tf" onclick="btMode(\'tf\')">📷 Bukti Transfer</span><span class="bt-tab" data-m="bk" onclick="btMode(\'bk\')">📒 Buku Kas <i>baru</i></span></div>'+
         '<div id="bt-mode-tf">'+
@@ -11980,6 +11982,35 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',function(){ setTimeout(function(){ pasang(); sync(); },2500); }); else setTimeout(function(){ pasang(); sync(); },2500);
 })();
 </script>
+<!-- ===================== KIRIM PENGATURAN KE HP (link sekali klik) ===================== -->
+<script>
+(function(){
+  var KEYS=['kwbt_drv_url','kwbt_drv_tok','kwbt_drv_auto','kwbt_key','kwbt_rek','kwbt_wali'];
+  function g(k){ try{ return localStorage.getItem(k)||''; }catch(e){ return ''; } }
+  function b64e(s){ return btoa(unescape(encodeURIComponent(s))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); }
+  function b64d(s){ s=s.replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4) s+='='; return decodeURIComponent(escape(atob(s))); }
+  function link(){ var o={}; KEYS.forEach(function(k){ var v=g(k); if(v) o[k]=v; }); return location.origin+location.pathname+'#setup='+b64e(JSON.stringify(o)); }
+  window.kwSetupKirim=function(cara){
+    if(!g('kwbt_drv_url')&&!g('kwbt_key')){ alert('Isi dulu pengaturan di perangkat ini (API key / URL Drive), lalu kirim ke HP.'); return; }
+    if(!/^https?:/.test(location.protocol)){ alert('Buka aplikasi dari link GitHub (bukan file lokal) untuk membuat link pengaturan.'); return; }
+    var L=link();
+    if(cara==='wa'){ window.open('https://wa.me/?text='+encodeURIComponent('Pengaturan aplikasi Kwitansi (buka di HP, JANGAN diteruskan ke orang lain):\n'+L),'_blank'); return; }
+    var done=function(){ alert('Link pengaturan disalin. Tempel & buka di HP.\n\n⚠ Link ini berisi token & API key — jangan dibagikan ke orang lain.'); };
+    if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(L).then(done,function(){ prompt('Salin link ini:',L); }); else prompt('Salin link ini:',L);
+  };
+  function terima(){
+    var m=String(location.hash||'').match(/^#setup=([A-Za-z0-9_-]+)/); if(!m) return;
+    try{ history.replaceState(null,'',location.pathname+location.search); }catch(e){}
+    var o; try{ o=JSON.parse(b64d(m[1])); }catch(e){ alert('Link pengaturan rusak/terpotong.'); return; }
+    var isi=[o.kwbt_key?'API key AI':'',o.kwbt_drv_url?'Simpan ke Drive (URL & token)':'',o.kwbt_rek?'rekening sekolah':'',o.kwbt_wali?'daftar wali kelas':''].filter(Boolean).join(', ');
+    if(!confirm('Pakai pengaturan dari perangkat lain?\n\n'+isi+'\n\nPengaturan yang sama di perangkat ini akan diganti.')) return;
+    KEYS.forEach(function(k){ if(o[k]!=null){ try{ localStorage.setItem(k,o[k]); }catch(e){} } });
+    alert('✓ Pengaturan tersimpan di perangkat ini. Catatan & Drive akan tersinkron.');
+    if(typeof window.npSyncNow==='function') setTimeout(window.npSyncNow,500);
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',function(){ setTimeout(terima,900); }); else setTimeout(terima,900);
+})();
+</script>
 <!-- ===================== PWA (install sebagai aplikasi + offline) ===================== -->
 <script>
 (function(){
@@ -12023,11 +12054,12 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
 <!-- ===================== VERSI APLIKASI ===================== -->
 <script>
 // Ubah setiap kali ada update: x.y.z  (z = perbaikan kecil, y = fitur baru, x = perubahan besar)
-window.APP_VERSION='3.12.0';
+window.APP_VERSION='3.12.1';
 window.APP_BUILD='2026-10-20';
-window.APP_NOTES='Catatan sekarang tersinkron antara laptop dan HP lewat Google Drive, perlu Apps Script Drive v5 dan pengaturan Drive di tiap perangkat.';
+window.APP_NOTES='Kirim pengaturan ke HP sekali klik (Pengaturan AI, tombol Kirim ke WA saya), tidak perlu menyalin URL dan token manual.';
 // riwayat singkat (terbaru di atas) — tampil terlipat di halaman Admin
 window.APP_RIWAYAT=[
+  ['3.12.1','2026-10-20','📲 Kirim pengaturan ke HP: link sekali klik (API key, URL & token Drive, rekening, wali kelas) lewat WA / salin.'],
   ['3.12.0','2026-10-20','Catatan (📝) tersinkron laptop ⇄ HP lewat Apps Script Drive v5 (gabung per catatan, terbaru menang, hapus ikut terhapus); status ☁ di popup Catatan.'],
   ['3.11.0','2026-10-20','BARU: 🏷 Potongan / diskon per item (Rp atau %, alasan: lebih bayar, pengembalian buku, dll.) — SPP tetap lunas, tampil di kuitansi & detail; AI Buku Kas & Bukti Transfer membaca potongan.'],
   ['3.10.4','2026-10-20','Buku Kas: tombol ✓ Kelas data benar — menghapus peringatan kelas bila AI salah baca angka kelas di buku (tercatat di Log).'],
