@@ -10841,8 +10841,9 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
   }
   window.btDrvSimpanSet=function(){ lsw(DRV_URL,($('bt-drv-url').value||'').trim()); var t=$('bt-drv-tok').value||''; if(t.indexOf('•')<0) lsw(DRV_TOK,t.trim()); lsw(DRV_AUTO,$('bt-drv-auto').checked?'1':''); btDrvTes(); };
   window.btDrvTes=function(){ var i=$('bt-drv-info'); if(i) i.innerHTML='Mengetes...';
-    drvKirim({action:'ping'}).then(function(j){ if(i) i.innerHTML='<span style="color:#2f7a55;font-weight:600">✓ Terhubung — folder "'+esc(j.folder||'')+'" di Google Drive.</span>'; })
+    drvKirim({action:'ping'}).then(function(j){ if(i) i.innerHTML='<span style="color:#2f7a55;font-weight:600">✓ Terhubung — folder "'+esc(j.folder||'')+'" di Google Drive.</span>'+(j.v>=4?'':' <span style="color:#b4581a;font-weight:600">⚠ Apps Script versi lama — perbarui ke v4 agar tiap bulan berisi folder Bukti Transfer & Buku Kas.</span>'); })
       .catch(function(e){ if(i) i.innerHTML='<span style="color:#b91c1c;font-weight:600">✗ '+esc(e.message)+'</span>'; }); };
+  function folderSiswa(c){ var L=[]; (c.rows||[]).forEach(function(r){ var s=(r.nama||r.aiNama||'').split('(')[0].trim(); if(s&&L.indexOf(s)<0) L.push(s); }); return L.join(' & ')||'Tanpa nama'; }
   function namaFile(c,k,n){
     var d=c.ai||{}, t=(c.tanggal||today()), j=String(d.jam||'').replace(/\D/g,'').slice(0,4);
     var s=c.rows.map(function(r){ return (r.nama||r.aiNama||'').split('(')[0].trim(); }).filter(Boolean).join(' & ')||'tanpa nama';
@@ -10892,7 +10893,7 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
     (function next(){
       if(k>=n){ c.drive=hasil; c.drvState='ok'; btLog('Disimpan ke Drive',c,{ket:(hasil[0]&&hasil[0].folder||'')+' · '+n+' foto',url:hasil[0]&&hasil[0].url}); tempelDriveKeRiwayat(c); render(); catatDrive(c); return; }
       var im=c.imgs[k], b64=im.b64||String(im.url||'').split(',')[1]||'';
-      drvKirim({action:'upload',data:b64,mime:im.mime||'image/jpeg',nama:namaFile(c,k,n),bulan:bulan,ket:ket})
+      drvKirim({action:'upload',data:b64,mime:im.mime||'image/jpeg',nama:namaFile(c,k,n),bulan:bulan,ket:ket,sub:['Bukti Transfer',folderSiswa(c)]})
         .then(function(j){ hasil.push({id:j.id,url:j.url,nama:j.nama,folder:j.folder}); k++; next(); })
         .catch(function(e){ c.drvState='err'; c.drvErr=e.message; render(); });
     })();
@@ -11180,8 +11181,8 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
     (function next(){
       if(k>=files.length){ p.drive=hasil; p.drvState='ok'; p.drvWaktu=new Date().toISOString(); btLog('Buku kas disimpan ke Drive',null,{ket:'Buku '+p.jenjang+' · '+tgls.filter(Boolean).join(', ')+' · '+files.length+' file',url:hasil[0]&&hasil[0].url}); bkRender(); return; }
       var f=files[k];
-      drvKirim({action:'upload',data:f.data,mime:f.mime,nama:f.nama,bulan:f.bulan,ket:f.ket})
-        .then(function(j){ hasil.push({tgl:f.tgl,url:j.url,nama:j.nama}); k++; next(); })
+      drvKirim({action:'upload',data:f.data,mime:f.mime,nama:f.nama,bulan:f.bulan,ket:f.ket,sub:['Buku Kas',p.jenjang]})
+        .then(function(j){ hasil.push({tgl:f.tgl,url:j.url,nama:j.nama,folder:j.folder}); p.drvLama=!j.v; k++; next(); })
         .catch(function(e){ p.drvState='err'; p.drvErr=e.message; bkRender(); });
     })();
   };
@@ -11189,6 +11190,7 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
     if(p.drvState==='up') return '<span class="bt-sub" style="margin-left:6px"><span class="bt-spin"></span> Menyimpan ke Drive...</span>';
     var h='';
     if(p.drvState==='err') h+='<span class="bt-sub w" style="margin-left:6px">✗ Drive: '+esc(p.drvErr||'')+'</span>';
+    if(p.drive&&p.drive.length&&p.drvLama) h+='<span class="bt-sub w" style="margin-left:6px">⚠ Apps Script Drive versi lama — file masuk folder bulan saja (perbarui ke v4 untuk folder Buku Kas/'+esc(p.jenjang)+')</span>';
     if(p.drive&&p.drive.length) h+='<span class="bt-sub" style="margin-left:6px">☁ Tersimpan: '+p.drive.map(function(d){ return '<a href="'+esc(d.url)+'" target="_blank" rel="noopener">'+(d.tgl==='foto'?'foto':d.tgl?esc(tglFmt(d.tgl).replace(/ \d{4}$/,'')):'tanpa tgl')+'</a>'; }).join(' · ')+'</span>';
     return h;
   }
@@ -11673,11 +11675,12 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
 <!-- ===================== VERSI APLIKASI ===================== -->
 <script>
 // Ubah setiap kali ada update: x.y.z  (z = perbaikan kecil, y = fitur baru, x = perubahan besar)
-window.APP_VERSION='3.9.1';
+window.APP_VERSION='3.9.2';
 window.APP_BUILD='2026-10-20';
-window.APP_NOTES='Buku Kas: baris yang terbaca coret merah dicocokkan dengan data siswa, bila belum ada di aplikasi dianggap belum diinput.';
+window.APP_NOTES='Drive: tiap folder bulan berisi folder Bukti Transfer (per siswa) dan Buku Kas (per jenjang), perlu Apps Script v4.';
 // riwayat singkat (terbaru di atas) — tampil terlipat di halaman Admin
 window.APP_RIWAYAT=[
+  ['3.9.2','2026-10-20','Drive tersusun: <bulan>/Bukti Transfer/<nama siswa> dan <bulan>/Buku Kas/<jenjang> (Apps Script v4).'],
   ['3.9.1','2026-10-20','Buku Kas: coret merah dicocokkan dengan data siswa — belum ada di aplikasi = belum diinput (siap dibuat); AI lebih ketat membaca coret merah; tombol Lewati / Belum diinput?.'],
   ['3.9.0','2026-10-20','Buku Kas: ☁ Simpan rekap ke Drive — gambar tabel per tanggal (tulisan buku, siswa, bulan, nominal, metode, status/no kuitansi) + foto halaman; link tampil di kartu & Log.'],
   ['3.8.4','2026-10-20','Kotak pengingat Buku Kas di atas form (tidak menutupi Total Bayar), tidak ikut tercetak.'],
