@@ -7,6 +7,10 @@
 <script>/* sembunyikan tampilan lama (biru) sampai tema & UI modern siap */document.documentElement.classList.add('af');window._afT=setTimeout(function(){document.documentElement.classList.remove('af');},4000);</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <title>Kwitansi — Sekolah Swasta Yos Anugerah</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#f4f5f4">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
 <style>
 *{box-sizing:border-box;margin:0;padding:0;font-family:'Segoe UI',Arial,sans-serif}
 :root{--blue:#1a56a0;--blue-light:#e8f0fb;--green:#15803d;--green-light:#dcfce7;--orange:#c2410c;--orange-light:#fff7ed;--gray:#6b7280;--gray-light:#f3f4f6;--border:#d1d5db;--white:#fff;--text:#111827;--text2:#6b7280;--danger:#dc2626;--danger-light:#fee2e2}
@@ -11469,12 +11473,58 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
   };
 })();
 </script>
+
+<!-- ===================== PWA (install sebagai aplikasi + offline) ===================== -->
+<script>
+(function(){
+  var DP=null, web=/^https?:$/.test(location.protocol);
+  function standalone(){ return (window.matchMedia&&matchMedia('(display-mode: standalone)').matches)||navigator.standalone===true; }
+  if(web&&'serviceWorker' in navigator){
+    window.addEventListener('load',function(){ navigator.serviceWorker.register('sw.js').catch(function(e){ console.warn('SW',e); }); });
+  }
+  // minta browser menyimpan data secara permanen (tidak dihapus otomatis saat memori penuh)
+  if(navigator.storage&&navigator.storage.persist){ navigator.storage.persisted().then(function(p){ if(!p) navigator.storage.persist().catch(function(){}); }).catch(function(){}); }
+  window.addEventListener('beforeinstallprompt',function(e){ e.preventDefault(); DP=e; tombol(); });
+  window.addEventListener('appinstalled',function(){ DP=null; tombol(); });
+  window.pwaInstall=function(){
+    if(DP){ DP.prompt(); DP.userChoice.then(function(){ DP=null; tombol(); }); return; }
+    alert('Cara memasang aplikasi:\n\n• Laptop (Chrome/Edge): klik ikon ⊕ / "Instal" di ujung kanan kolom alamat, atau menu ⋮ → Transmisikan, simpan, dan bagikan → Instal halaman sebagai aplikasi.\n• HP Android (Chrome): menu ⋮ → Instal aplikasi / Tambahkan ke layar utama.\n\nSetelah itu ikon Kwitansi Yos Anugerah muncul di desktop / layar HP.');
+  };
+  function tombol(){
+    var show=web&&!standalone();
+    document.querySelectorAll('.pwa-inst').forEach(function(b){ b.style.display=show?'':'none'; b.classList.toggle('siap',!!DP); });
+  }
+  function pasang(){
+    var nav=document.querySelector('.nav-btns');
+    if(nav&&!nav.querySelector('.pwa-inst')){ var b=document.createElement('button'); b.type='button'; b.className='pwa-inst'; b.innerHTML='📲 Install aplikasi'; b.title='Pasang sebagai aplikasi (ikon di desktop / HP, tetap bisa dibuka saat offline)'; b.onclick=pwaInstall;
+      var v=nav.querySelector('.app-ver-sb'); if(v) nav.insertBefore(b,v); else nav.appendChild(b); }
+    tombol();
+  }
+  var st=document.createElement('style'); st.textContent='.pwa-inst{display:block;margin:6px auto 2px;padding:6px 12px;border-radius:10px;border:1px dashed #a9cbb8;background:transparent;color:#2f7a55;font-size:12px;font-weight:600;cursor:pointer}.pwa-inst.siap{border-style:solid;background:rgba(90,154,120,.1)}.pwa-inst:hover{background:rgba(90,154,120,.18)}';
+  document.head.appendChild(st);
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',function(){ setTimeout(pasang,400); }); else setTimeout(pasang,400);
+})();
+</script>
 <!-- ===================== VERSI APLIKASI ===================== -->
 <script>
 // Ubah setiap kali ada update: x.y.z  (z = perbaikan kecil, y = fitur baru, x = perubahan besar)
-window.APP_VERSION='3.7.3';
-window.APP_BUILD='2026-10-19';
-window.APP_NOTES='Log Bukti Transfer dibagi per halaman (25 catatan) dengan tombol Sebelumnya/Berikutnya; tabel punya kotak gulir sendiri dengan judul kolom tetap di atas. Progres tes lebih adil: dihitung per bukti (bukan per klik) & dipisah “AI salah baca” vs “dilengkapi manual” (nama tidak ada di chat/daftar, cek rekening). Progres masa tes otomatis di tab 📋 Log (tanggal mulai tes, jumlah bukti/halaman, kuitansi, koreksi manual, target naik Beta). Koreksi di tabel Buku Kas (siswa, bulan, nominal, tanggal, metode) kini tercatat di Log. BARU: Buku Kas (AI) — di halaman Bukti, tab 📒 Buku Kas: foto halaman buku kas harian per jenjang → AI membaca nama, kelas, bulan SPP & nominal → centang lalu buat banyak kuitansi SPP sekaligus (tanggal = tanggal di buku). Baris coret merah & yang sudah ada di aplikasi dilewati, selain SPP ditandai manual. Tidak ada lagi kedipan tampilan biru lama saat refresh. Keterangan yang gagal dicatat dicoba ulang otomatis + tombol ↻ Coba catat lagi. Status ☁ di kartu dicek ke Drive: bila file sudah dihapus di Drive, tombol kembali jadi Simpan lagi. Keterangan bukti (siswa, kelas, bulan, pengirim, chat, no kuitansi) dicatat di spreadsheet Daftar Bukti Transfer di Drive. Simpan foto bukti ke Google Drive (tombol ☁ di kartu, opsional otomatis) + link di detail kuitansi & Log. Antrian Bukti Transfer (beserta foto) tersimpan di browser — tidak hilang saat refresh, terhapus otomatis setelah kuitansinya dibuat. No. rekening tujuan bisa diketik/dipilih manual di kartu bila AI salah/tidak terbaca. Status transfer "Terkirim" dianggap berhasil (UOB/TMRW dll); status diproses = peringatan, gagal = blokir. Siswa pindahan/baru: bulan sebelum Mulai Pendidikan tidak ditagih (Tagihan, Status SPP, Dari otomatis, Bukti Transfer). SYNC AMAN: sebelum menyimpan ke cloud, aplikasi cek dulu apakah cloud punya data lebih baru (dari HP/laptop lain) → pilih Muat / Gabungkan, tidak lagi saling menimpa. Rekening: tombol ✓ Rekening benar / + Jadikan rekening sekolah, deteksi salah baca 1–2 angka, daftar rekening dipisah spasi tetap terbaca. Bukti Transfer: tampil siapa yang mem-forward (nama + nomor WA), daftar wali kelas → tebak kelas + Tanya Wali Kelas langsung ke nomornya. Tombol 1-klik betulkan tahun tanggal transfer. Bukti Transfer: bulan tanpa tahun ikut Tahun Ajaran aktif + peringatan tanggal transfer janggal. Perbaikan tarif SPP di Tagihan (Agustus–Juni sempat pakai tarif kelas tahun lalu). Catatan mini tidak lagi menghalangi tombol (klik tembus saat pudar) + tombol Tandai dibaca. Bukti Transfer (AI) early test.';
+window.APP_VERSION='3.8.0';
+window.APP_BUILD='2026-10-20';
+window.APP_NOTES='Bisa di-install sebagai aplikasi (ikon logo sekolah, tetap terbuka tanpa internet).';
+// riwayat singkat (terbaru di atas) — tampil terlipat di halaman Admin
+window.APP_RIWAYAT=[
+  ['3.8.0','2026-10-20','Bisa di-install sebagai aplikasi di laptop & HP (tombol 📲 Install aplikasi), tetap terbuka tanpa internet, data browser ditandai permanen. Catatan versi di Admin diringkas.'],
+  ['3.7.3','2026-10-19','Log Bukti Transfer per halaman (25 catatan).'],
+  ['3.7.2','2026-10-19','Progres tes dihitung per bukti: “AI salah baca” dipisah dari “dilengkapi manual”.'],
+  ['3.7.1','2026-10-19','Progres masa tes otomatis di tab Log; koreksi di Buku Kas ikut tercatat.'],
+  ['3.7.0','2026-10-19','BARU: Buku Kas (AI) — foto buku kas harian → banyak kuitansi SPP sekaligus.'],
+  ['3.6.x','2026-10-19','Simpan bukti ke Google Drive + daftar CSV; cek file terhapus; anti-kedip saat refresh.'],
+  ['3.5.0','2026-10-19','Antrian Bukti Transfer (beserta foto) tidak hilang saat refresh.'],
+  ['3.4.x','2026-10-19','Rekening bisa diisi manual; status “Terkirim” = berhasil; Mulai Pendidikan siswa pindahan/baru.'],
+  ['3.3.0','2026-10-18','SYNC AMAN: cek data cloud lebih baru sebelum menyimpan (Muat / Gabungkan).'],
+  ['3.2.x','2026-10-16','Rekening benar / jadikan rekening sekolah; pengirim WA & daftar wali kelas.'],
+  ['3.1.x','2026-10-16','Bukti Transfer (AI) early test, perbaikan tarif SPP di Tagihan, catatan mini.']
+];
 (function(){
   function tgl(s){ var d=new Date(s+'T00:00:00'); return d.toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'}); }
   function pasang(){
@@ -11485,7 +11535,9 @@ window.APP_NOTES='Log Bukti Transfer dibagi per halaman (25 catatan) dengan tomb
     if(ad&&!document.getElementById('app-ver-admin')){
       var d=document.createElement('div'); d.id='app-ver-admin';
       d.style.cssText='font-size:12px;color:var(--muted,#6b7280);margin:0 0 10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap';
-      d.innerHTML='<span style="font-weight:700;background:var(--soft,#eef1ef);color:var(--ink,#1f2a24);border-radius:8px;padding:2px 9px">Versi '+lbl+'</span><span>build '+tgl(APP_BUILD)+'</span><span style="opacity:.8">— '+APP_NOTES+'</span>';
+      var R=window.APP_RIWAYAT||[];
+      d.innerHTML='<span style="font-weight:700;background:var(--soft,#eef1ef);color:var(--ink,#1f2a24);border-radius:8px;padding:2px 9px">Versi '+lbl+'</span><span>build '+tgl(APP_BUILD)+'</span><span style="opacity:.85">— '+APP_NOTES+'</span>'+
+        (R.length?'<details class="app-riw"><summary>Riwayat update</summary><ul>'+R.map(function(x){ return '<li><b>v'+x[0]+'</b> <span>'+tgl(x[1])+'</span> — '+x[2]+'</li>'; }).join('')+'</ul></details>':'');
       ad.insertBefore(d,ad.firstChild);
     }
     try{ console.log('%cKwitansi Yos Anugerah '+lbl+' ('+APP_BUILD+')','color:#5a9a78;font-weight:700'); }catch(e){}
@@ -11493,7 +11545,8 @@ window.APP_NOTES='Log Bukti Transfer dibagi per halaman (25 catatan) dengan tomb
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',function(){setTimeout(pasang,120);}); else setTimeout(pasang,120);
 })();
 </script>
-<style>.app-ver-sb{order:100;font-size:10.5px;color:var(--muted,#9ca3af);text-align:center;padding:6px 0 0;cursor:help;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}body.sn-collapsed .app-ver-sb{font-size:9px}@media(max-width:700px){.app-ver-sb{display:none}}</style>
+<style>.app-riw{flex-basis:100%}.app-riw summary{cursor:pointer;color:#2f7a55;font-weight:600;width:max-content}.app-riw ul{margin:6px 0 0 18px;line-height:1.6}.app-riw li span{opacity:.7}
+.app-ver-sb{order:100;font-size:10.5px;color:var(--muted,#9ca3af);text-align:center;padding:6px 0 0;cursor:help;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}body.sn-collapsed .app-ver-sb{font-size:9px}@media(max-width:700px){.app-ver-sb{display:none}}</style>
 
 <!-- ===================== CATATAN MINI: tidak menghalangi klik + Tandai dibaca ===================== -->
 <script>
