@@ -11027,8 +11027,9 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
     else if(r.ambigu&&!r.dikonfirmasi) cek('Ada '+r.ambigu+' nama mirip — pastikan siswanya');
     if(r.dari==null) cek('Bulan tidak terbaca — pilih bulan');
     if(!r.bayar) cek('Nominal kosong');
-    if(r.nama&&pg.jenjang!=='TK'&&!r.taLalu){ var sK=siswaByNama(r.nama), kb=kelasDariBuku(r.aiKelas,pg.jenjang);
-      if(sK&&kb&&kb!==sK.kelas) cek('Di buku tertulis kelas '+r.aiKelas+' ('+kb+'), di data siswa '+sK.kelas+' — cek kelas siswa (Kelola Siswa)'); }
+    r.kelasBeda='';
+    if(r.nama&&pg.jenjang!=='TK'&&!r.taLalu&&!r.kelasOk){ var sK=siswaByNama(r.nama), kb=kelasDariBuku(r.aiKelas,pg.jenjang);
+      if(sK&&kb&&kb!==sK.kelas&&(r.kelasBeda=sK.kelas)) cek('Di buku tertulis kelas '+r.aiKelas+' ('+kb+'), di data siswa '+sK.kelas+' — cek kelas siswa (Kelola Siswa)'); }
     if(r.nama&&r.dari!=null){
       hitungRow(r);
       var z=r.sampai!=null&&r.sampai>=r.dari?r.sampai:r.dari; sa=sudahAda(r.nama,r.dari,z);
@@ -11149,7 +11150,7 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
       h+='<td style="white-space:nowrap"><select onchange="bkBulan(\''+pg.id+'\','+i+',\'dari\',this.value)"'+(dis||r.jenis!=='SPP'?' disabled':'')+'><option value="">—</option>'+monthOpts(r.dari)+'</select> → <select onchange="bkBulan(\''+pg.id+'\','+i+',\'sampai\',this.value)"'+(dis||r.jenis!=='SPP'?' disabled':'')+'><option value="">—</option>'+monthOpts(r.sampai)+'</select>'+'<div class="bt-sub">'+(r.tagihan?'Tagihan '+rp(r.tagihan):'')+(r.taLalu?' · <span style="color:#b4581a">tahun ajaran lalu</span>':'')+'</div></td>';
       h+='<td><input type="number" value="'+(r.bayar||'')+'" onchange="bkSet(\''+pg.id+'\','+i+',\'bayar\',this.value)"'+(dis?' disabled':'')+' style="width:110px">'+(r.mode==='cicil'&&r.tagihan?'<div class="bt-sub w">cicil · sisa '+rp(r.tagihan-r.bayar)+'</div>':'')+'</td>';
       h+='<td><select onchange="bkSet(\''+pg.id+'\','+i+',\'metode\',this.value)"'+(dis?' disabled':'')+'><option'+(r.metode==='Kas'?' selected':'')+'>Kas</option><option'+(r.metode==='Transfer'?' selected':'')+'>Transfer</option></select></td>';
-      h+='<td><span class="bt-st '+stt[0]+'">'+esc(stt[1])+(r.doneNo?' '+esc(r.doneNo):'')+'</span>'+(r.status!=='done'&&r.status!=='coret'&&r.status!=='ada'?' <span class="bt-b sm'+(r.status==='manual'?'':' pri')+' bk-isi" onclick="bkIsi(\''+pg.id+'\','+i+')" title="Isi form Kwitansi untuk siswa ini (bisa tambah item lain)">Isi ke Kuitansi</span>':'')+(r.coretRagu&&r.status!=='done'?'<div style="margin-top:4px;display:flex;gap:4px;flex-wrap:wrap"><a href="javascript:void 0" class="bt-sub" onclick="bkCoret(\''+pg.id+'\','+i+',\'sudah\')" title="Lewati baris ini (misalnya sudah diinput dengan nama/bulan lain)">Lewati, sudah diinput</a></div>':'')+(r.status==='coret'?' <a href="javascript:void 0" class="bt-sub" onclick="bkCoret(\''+pg.id+'\','+i+',\'belum\')">Belum diinput?</a>':'')+(r.note&&r.note.length?'<div class="bt-sub'+(r.status==='cek'||r.status==='err'?' w':'')+'" style="white-space:normal">'+r.note.map(esc).join('<br>')+'</div>':'')+'</td>';
+      h+='<td><span class="bt-st '+stt[0]+'">'+esc(stt[1])+(r.doneNo?' '+esc(r.doneNo):'')+'</span>'+(r.status!=='done'&&r.status!=='coret'&&r.status!=='ada'?' <span class="bt-b sm'+(r.status==='manual'?'':' pri')+' bk-isi" onclick="bkIsi(\''+pg.id+'\','+i+')" title="Isi form Kwitansi untuk siswa ini (bisa tambah item lain)">Isi ke Kuitansi</span>':'')+(r.coretRagu&&r.status!=='done'?'<div style="margin-top:4px;display:flex;gap:4px;flex-wrap:wrap"><a href="javascript:void 0" class="bt-sub" onclick="bkCoret(\''+pg.id+'\','+i+',\'sudah\')" title="Lewati baris ini (misalnya sudah diinput dengan nama/bulan lain)">Lewati, sudah diinput</a></div>':'')+(r.kelasBeda&&r.status!=='done'?'<div style="margin-top:4px"><span class="bt-b sm bk-isi" onclick="bkKelasOk(\''+pg.id+'\','+i+')" title="AI salah baca kelas di buku — pakai kelas di data siswa">✓ Kelas data benar ('+esc(r.kelasBeda)+')</span></div>':'')+(r.status==='coret'?' <a href="javascript:void 0" class="bt-sub" onclick="bkCoret(\''+pg.id+'\','+i+',\'belum\')">Belum diinput?</a>':'')+(r.note&&r.note.length?'<div class="bt-sub'+(r.status==='cek'||r.status==='err'?' w':'')+'" style="white-space:normal">'+r.note.map(esc).join('<br>')+'</div>':'')+'</td>';
       h+='</tr>';
     });
     h+='</tbody></table></div>';
@@ -11224,6 +11225,8 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
     if(p.drive&&p.drive.length) h+='<span class="bt-sub" style="margin-left:6px">☁ Tersimpan: '+p.drive.map(function(d){ return '<a href="'+esc(d.url)+'" target="_blank" rel="noopener">'+(d.tgl==='foto'?'foto':d.tgl?esc(tglFmt(d.tgl).replace(/ \d{4}$/,'')):'tanpa tgl')+'</a>'; }).join(' · ')+'</span>';
     return h;
   }
+  window.bkKelasOk=function(id,i){ var p=bkP(id), r=p&&p.rows[i]; if(!r) return; var s=siswaByNama(r.nama);
+    bkKoreksi(p,r,'Kelas di buku',r.aiKelas,(s?s.kelas:'')+' (data siswa benar)'); r.kelasOk=true; r._pilihAuto=true; bkEvalRow(p,r); bkRender(); };
   window.bkCoret=function(id,i,v){ var p=bkP(id), r=p&&p.rows[i]; if(!r) return;
     if(v==='belum'){ if(r.coret) bkKoreksi(p,r,'Coret merah','ya','tidak (belum diinput)'); r.coret=false; r.coretOk=false; r._pilihAuto=true; }
     else { r.coretOk=true; }
@@ -11912,11 +11915,12 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
 <!-- ===================== VERSI APLIKASI ===================== -->
 <script>
 // Ubah setiap kali ada update: x.y.z  (z = perbaikan kecil, y = fitur baru, x = perubahan besar)
-window.APP_VERSION='3.10.3';
+window.APP_VERSION='3.10.4';
 window.APP_BUILD='2026-10-20';
-window.APP_NOTES='Buku Kas: otomatis dihitung ulang setelah data siswa diubah (mis. kelas jadi Plus) + peringatan bila kelas di buku beda dengan data siswa.';
+window.APP_NOTES='Buku Kas: tombol Kelas data benar bila AI salah baca kelas di buku (mis. 7 terbaca 9).';
 // riwayat singkat (terbaru di atas) — tampil terlipat di halaman Admin
 window.APP_RIWAYAT=[
+  ['3.10.4','2026-10-20','Buku Kas: tombol ✓ Kelas data benar — menghapus peringatan kelas bila AI salah baca angka kelas di buku (tercatat di Log).'],
   ['3.10.3','2026-10-20','Perbaikan tampilan pilihan jenjang di kartu Buku Kas.'],
   ['3.10.2','2026-10-20','Buku Kas: hitung ulang otomatis saat kembali ke halaman (kelas/riwayat terbaru) + tombol ↻ Hitung ulang; peringatan kelas buku ≠ data siswa (mis. 9+ vs 9 SMP).'],
   ['3.10.1','2026-10-20','Buku Kas: pilih jenjang tiap kali menempel foto (tombol / tekan 1–4), peringatan kelas tidak cocok + Ganti ke buku X, jenjang bisa diganti di kartu.'],
