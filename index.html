@@ -11552,6 +11552,7 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
   // hitung ulang tagihan (data riwayat bisa berubah) tanpa mengubah pembagian manual
   function alokasiKeep(c){ c.rows.forEach(function(r){ if(!r.doneNo) hitungRow(r); }); cekDobelKeep(c); }
   function cekDobelKeep(c){ if(!c.rows.some(function(r){return r.doneNo;})) cekDobel(c); }
+  window.kwDrv=drvKirim;
   window.kwAI=function(prompt,text,onStatus){ return bacaAI([],text,onStatus,prompt); };
   window._btDebug={Q:function(){return Q;},cariSiswa:cariSiswa,addFake:function(ai,img){ var c={id:idBaru(),state:'ok',rows:[],ditambah:new Date(),ai:ai,img:img||''}; c.nominal=ai.nominal; c.tanggal=ai.tanggal; bangunRows(c); cekDobel(c); Q.unshift(c); render(); return c; }};
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',function(){setTimeout(init,50);}); else setTimeout(init,50);
@@ -11924,6 +11925,61 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
   window._kaDebug={S:function(){return S;},hitung:hitung,setD:function(d){ S.d=d; render(); }};
 })();
 </script>
+<!-- ===================== SYNC CATATAN (laptop ⇄ HP lewat Apps Script Drive v5) ===================== -->
+<script>
+(function(){
+  var DEL_LS='np_catatan_del', KEY='catatan', _t=null, _busy=false, _last='', _stat='';
+  function getDel(){ try{ return JSON.parse(localStorage.getItem(DEL_LS)||'{}')||{}; }catch(e){ return {}; } }
+  function setDel(d){ try{ localStorage.setItem(DEL_LS,JSON.stringify(d)); }catch(e){} }
+  function siap(){ try{ return !!(localStorage.getItem('kwbt_drv_url')&&typeof window.kwDrv==='function'); }catch(e){ return false; } }
+  function status(t,warna){ _stat=t; var el=document.getElementById('np-sync'); if(el){ el.textContent=t; el.style.color=warna||''; } }
+  function lokal(){ try{ var d=JSON.parse(localStorage.getItem(NP_KEY)||'{}'); return d.notes||[]; }catch(e){ return []; } }
+  function gabung(L,R,del){
+    var m={}, all=[];
+    (L||[]).concat(R||[]).forEach(function(n){ if(!n||n.id==null) return; var k=String(n.id), o=m[k];
+      if(!o||String(n.updatedAt||'')>String(o.updatedAt||'')) m[k]=n; });
+    Object.keys(m).forEach(function(k){ var n=m[k]; if(del[k]&&String(del[k])>=String(n.updatedAt||'')) return; all.push(n); });
+    all.sort(function(a,b){ return String(b.createdAt||b.id).localeCompare(String(a.createdAt||a.id)); });
+    return all;
+  }
+  function sig(a){ return JSON.stringify((a||[]).map(function(n){return [n.id,n.updatedAt];})); }
+  function sedangKetik(){ var p=document.getElementById('note-popup'), a=document.activeElement; return !!(p&&a&&p.contains(a)&&/INPUT|TEXTAREA/.test(a.tagName)); }
+  function sync(){
+    if(!siap()){ status('☁ Belum tersinkron — atur Simpan ke Drive di Bukti Transfer → ⚙ Pengaturan AI (laptop & HP)','#b4581a'); return Promise.resolve(); }
+    if(_busy) return Promise.resolve(); _busy=true; status('☁ Menyinkronkan...');
+    return window.kwDrv({action:'kv_get',key:KEY}).then(function(j){
+      if(!j.v||j.v<5) throw new Error('Apps Script Drive perlu diperbarui ke v5');
+      var R=(j.value&&j.value.notes)||[], RD=(j.value&&j.value.del)||{}, LD=getDel(), del={};
+      Object.keys(LD).concat(Object.keys(RD)).forEach(function(k){ var a=String(LD[k]||''), b=String(RD[k]||''); del[k]=a>b?a:b; });
+      // buang tanda hapus yang sudah > 60 hari
+      var batas=new Date(Date.now()-60*864e5).toISOString(); Object.keys(del).forEach(function(k){ if(del[k]<batas) delete del[k]; });
+      var L=lokal(), G=gabung(L,R,del);
+      setDel(del);
+      if(sig(G)!==sig(L)){
+        if(sedangKetik()){ _busy=false; status('☁ Ada perubahan dari perangkat lain — dimuat setelah selesai mengetik'); return; }
+        try{ localStorage.setItem(NP_KEY,JSON.stringify({notes:G})); }catch(e){}
+        npNotes=G; if(window.npPopupOpen&&typeof npRender==='function') npRender(); else if(typeof npRenderMini==='function'&&G.length) npRenderMini();
+      }
+      if(sig(G)!==sig(R)||JSON.stringify(del)!==JSON.stringify(RD)) return window.kwDrv({action:'kv_set',key:KEY,value:{notes:G,del:del}});
+    }).then(function(){ _busy=false; _last=new Date().toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'}); status('☁ Tersinkron '+_last,'#2f7a55'); })
+      .catch(function(e){ _busy=false; status('☁ Gagal sinkron: '+e.message,'#b91c1c'); });
+  }
+  function nanti(ms){ clearTimeout(_t); _t=setTimeout(sync,ms||2500); }
+  window.npSyncNow=sync;
+  // simpan → kirim; hapus → tanda hapus
+  var _sv=window.npSave; window.npSave=function(){ var r=_sv.apply(this,arguments); nanti(2500); return r; };
+  var _dl=window.npDelNote; window.npDelNote=function(i){ var n=npNotes[i]; if(n){ var d=getDel(); d[String(n.id)]=new Date().toISOString(); setDel(d); } return _dl.apply(this,arguments); };
+  var _tg=window.toggleNotePopup; window.toggleNotePopup=function(){ var r=_tg.apply(this,arguments); if(window.npPopupOpen){ pasang(); nanti(300); } return r; };
+  function pasang(){
+    var p=document.getElementById('note-popup'); if(!p||document.getElementById('np-sync')) return;
+    var el=document.createElement('div'); el.id='np-sync'; el.style.cssText='font-size:10.5px;padding:4px 12px 6px;color:#6b7280;cursor:pointer'; el.title='Klik untuk sinkron sekarang'; el.onclick=sync; el.textContent=_stat||'☁ …';
+    var tb=p.querySelector('.np-toolbar'); if(tb) p.insertBefore(el,tb); else p.appendChild(el);
+  }
+  document.addEventListener('visibilitychange',function(){ if(!document.hidden) nanti(800); });
+  setInterval(function(){ if(!document.hidden) sync(); },90000);
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',function(){ setTimeout(function(){ pasang(); sync(); },2500); }); else setTimeout(function(){ pasang(); sync(); },2500);
+})();
+</script>
 <!-- ===================== PWA (install sebagai aplikasi + offline) ===================== -->
 <script>
 (function(){
@@ -11967,11 +12023,12 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
 <!-- ===================== VERSI APLIKASI ===================== -->
 <script>
 // Ubah setiap kali ada update: x.y.z  (z = perbaikan kecil, y = fitur baru, x = perubahan besar)
-window.APP_VERSION='3.11.0';
+window.APP_VERSION='3.12.0';
 window.APP_BUILD='2026-10-20';
-window.APP_NOTES='BARU: Potongan atau diskon per item di Daftar Pembayaran (nominal atau persen, beserta alasan), tetap dihitung lunas. AI Buku Kas dan Bukti Transfer ikut membaca potongan.';
+window.APP_NOTES='Catatan sekarang tersinkron antara laptop dan HP lewat Google Drive, perlu Apps Script Drive v5 dan pengaturan Drive di tiap perangkat.';
 // riwayat singkat (terbaru di atas) — tampil terlipat di halaman Admin
 window.APP_RIWAYAT=[
+  ['3.12.0','2026-10-20','Catatan (📝) tersinkron laptop ⇄ HP lewat Apps Script Drive v5 (gabung per catatan, terbaru menang, hapus ikut terhapus); status ☁ di popup Catatan.'],
   ['3.11.0','2026-10-20','BARU: 🏷 Potongan / diskon per item (Rp atau %, alasan: lebih bayar, pengembalian buku, dll.) — SPP tetap lunas, tampil di kuitansi & detail; AI Buku Kas & Bukti Transfer membaca potongan.'],
   ['3.10.4','2026-10-20','Buku Kas: tombol ✓ Kelas data benar — menghapus peringatan kelas bila AI salah baca angka kelas di buku (tercatat di Log).'],
   ['3.10.3','2026-10-20','Perbaikan tampilan pilihan jenjang di kartu Buku Kas.'],
