@@ -10107,6 +10107,7 @@ body.ui-dark .navbar.scrolled{background:rgba(15,23,42,.85)!important}
 .bt-setup textarea{width:100%;min-height:54px;padding:8px 12px;border:1px solid var(--line,#e5e7eb);border-radius:10px;font-size:13px;background:var(--surface,#fff);color:var(--ink,#111);box-sizing:border-box}
 .bt-logbox{max-height:60vh;overflow:auto}.bt-logbox thead th{position:sticky;top:0;background:var(--surface,#fff);z-index:1}.bt-pager{display:flex;align-items:center;gap:10px;justify-content:space-between;padding:6px 2px;font-size:12px;color:var(--muted,#6b7280)}.bt-pager .bt-b[disabled]{opacity:.4;pointer-events:none}
 .bt-prog-wrap{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px;margin-bottom:12px}.bt-prog{background:var(--surface,#fff);border:1px solid var(--line,#e5e7eb);border-radius:14px;padding:12px 14px}.bt-prog-h{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:14px}.bt-prog-n{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin:10px 0 8px}.bt-prog-n span{font-size:11px;color:var(--muted,#6b7280);line-height:1.3}.bt-prog-n b{display:block;font-size:17px;color:var(--ink,#1f2a24)}.bt-prog-bar{height:7px;border-radius:9px;background:var(--soft,#eef1ef);overflow:hidden}.bt-prog-bar i{display:block;height:100%;background:#5a9a78;border-radius:9px}.bt-prog-c{list-style:none;margin:8px 0 0;padding:0;font-size:12px;color:var(--muted,#6b7280);display:flex;flex-wrap:wrap;gap:4px 14px}.bt-prog-c li.ok{color:#2f7a55;font-weight:600}
+#bk-jpick{position:fixed;inset:0;z-index:9990;background:rgba(15,20,18,.45);display:none;align-items:center;justify-content:center;padding:16px}.bk-jp-box{background:var(--surface,#fff);border-radius:18px;padding:18px;width:min(440px,100%);box-shadow:0 20px 50px rgba(0,0,0,.25)}.bk-jp-box img{width:90px;height:70px;object-fit:cover;border-radius:10px}.bk-jp-btns{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:14px}.bk-jp-btns button{border:1.5px solid var(--line,#d6dbd8);background:var(--surface,#fff);border-radius:12px;padding:14px 4px 8px;font-size:18px;font-weight:800;cursor:pointer;color:inherit;display:flex;flex-direction:column;align-items:center;gap:2px}.bk-jp-btns button small{font-size:10px;font-weight:500;color:var(--muted,#6b7280)}.bk-jp-btns button:hover{border-color:#4b55a0;background:#eef0fb}.bk-jp-btns button.last{border-style:dashed}.bk-jsel{font-size:12px;padding:1px 4px;border-radius:6px;margin-left:4px}
 .bk-card{display:block!important}.bk-head{display:flex;gap:14px;align-items:center;margin-bottom:10px}.bk-thumb{width:120px;height:90px;object-fit:cover;border-radius:10px;cursor:zoom-in;background:var(--soft,#eef1ef);flex:none}
 .bk-tbl-wrap{overflow-x:auto;margin-top:8px;max-width:100%}
 .bk-tbl select{width:auto!important;min-width:0}.bk-tbl input[type=number]{width:96px!important}.bk-tbl input[type=date]{width:126px!important}.bk-tbl td:nth-child(3){min-width:140px}.bk-tbl .bt-sub{margin-top:3px}
@@ -10521,7 +10522,9 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
   }
 
   // ---------- LOG BUKTI TRANSFER (terpisah dari Log Aktivitas) ----------
-  var BTLOG_LS='ya_bt_log', LOGQ='', LOGD='', LOGP=0, LOG_PER=25;
+  var BTLOG_LS='ya_bt_log', LOGQ='', LOGD='', LOGP=0, LOG_PER=25, LOGJ='tf';
+  function logBK(l){ return /buku kas/i.test(l.aksi||''); }
+  function logJenis(L){ return L.filter(function(l){ return LOGJ==='bk'?logBK(l):!logBK(l); }); }
   function getBtLog(){ try{ return JSON.parse(localStorage.getItem(BTLOG_LS))||[]; }catch(e){ return []; } }
   function btLog(aksi, c, extra){
     try{
@@ -10546,7 +10549,7 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
     if(l.aksi==='Siswa diubah'){ var m=String(l.ket||'').match(/:\s*([^:]*?)\s*→/); return (!m||m[1]==='-'||m[1]==='')?'lengkap':'salah'; }
     return null;
   }
-  function jenisKoreksiBK(l){ if(l.aksi!=='Koreksi buku kas') return null; return /· (Siswa|Bulan dari|Bulan sampai|Nominal|Tanggal): \(kosong\)|: — →/.test(l.ket||'')?'lengkap':'salah'; }
+  function jenisKoreksiBK(l){ if(l.aksi!=='Koreksi buku kas') return null; if(/Jenjang buku/.test(l.ket||'')) return null; return /· (Siswa|Bulan dari|Bulan sampai|Nominal|Tanggal): \(kosong\)|: — →/.test(l.ket||'')?'lengkap':'salah'; }
   function progresTes(L, cfg){
     var mine=L.filter(function(l){ return cfg.aksi.indexOf(l.aksi)>=0; });
     var dibaca=mine.filter(function(l){return l.aksi===cfg.baca;});
@@ -10570,32 +10573,33 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
   }
   function progresHtml(){
     var L=getBtLog(); if(!L.length) return '';
-    return '<div class="bt-prog-wrap">'+
+    return '<div class="bt-prog-wrap">'+(LOGJ==='bk'?'':
       progresTes(L,{judul:'📷 Bukti Transfer',baca:'Dibaca AI',kw:'Kuitansi dibuat',aksi:['Dibaca AI','Kuitansi dibuat','Siswa diubah','Data dikoreksi','Rekening dicek manual','Gagal dibaca'],
-        jenis:jenisKoreksiBT,key:logKey,keyKor:logKey,unitLbl:'bukti dibaca',unitKor:'bukti'})+
+        jenis:jenisKoreksiBT,key:logKey,keyKor:logKey,unitLbl:'bukti dibaca',unitKor:'bukti'}))+(LOGJ!=='bk'?'':
       progresTes(L,{judul:'📒 Buku Kas',baca:'Buku kas dibaca',kw:'Kuitansi dibuat (buku kas)',aksi:['Buku kas dibaca','Kuitansi dibuat (buku kas)','Koreksi buku kas','Gagal dibaca (buku kas)'],
-        jenis:jenisKoreksiBK,key:function(l){return l.t;},keyKor:function(l){return (l.ket||'').split(' · tulisan: ')[1]||l.t;},unitBaris:function(d){return d.reduce(function(a,l){return a+(l.baris||0);},0);},unitLbl:'baris dibaca',unitKor:'baris'})+
+        jenis:jenisKoreksiBK,key:function(l){return l.t;},keyKor:function(l){return (l.ket||'').split(' · tulisan: ')[1]||l.t;},unitBaris:function(d){return d.reduce(function(a,l){return a+(l.baris||0);},0);},unitLbl:'baris dibaca',unitKor:'baris'}))+
       '</div>';
   }
   function logHtml(){
-    var L=getBtLog(), q=LOGQ.toLowerCase();
+    var ALL=getBtLog(), L=logJenis(ALL), q=LOGQ.toLowerCase(), nBK=ALL.filter(logBK).length;
     var F=L.filter(function(l){ if(LOGD&&String(l.t).slice(0,10)!==LOGD&&l.tglTf!==LOGD) return false; if(!q) return true;
       return [l.aksi,l.siswa,l.no,l.bank,l.ket,String(l.nominal)].join(' ').toLowerCase().indexOf(q)>=0; });
-    var nKw=F.filter(function(l){return l.aksi==='Kuitansi dibuat';}), tot=nKw.reduce(function(a,l){return a+(l.bayar||0);},0);
-    var h=progresHtml()+'<div class="bt-setup" style="padding:12px 14px"><div class="bt-krow">'+
+    var nKw=F.filter(function(l){return l.aksi===(LOGJ==='bk'?'Kuitansi dibuat (buku kas)':'Kuitansi dibuat');}), tot=nKw.reduce(function(a,l){return a+(l.bayar||0);},0);
+    var h='<div class="bt-tabs" style="margin-bottom:10px"><span class="bt-tab'+(LOGJ!=='bk'?' on':'')+'" onclick="btLogJenis(\'tf\')">📷 Log Bukti Transfer<i>'+(ALL.length-nBK)+'</i></span><span class="bt-tab'+(LOGJ==='bk'?' on':'')+'" onclick="btLogJenis(\'bk\')">📒 Log Buku Kas<i>'+nBK+'</i></span></div>'+
+      progresHtml()+'<div class="bt-setup" style="padding:12px 14px"><div class="bt-krow">'+
       '<input type="text" placeholder="Cari nama siswa, no kuitansi, bank, nominal..." value="'+esc(LOGQ)+'" oninput="btLogCari(this.value)" id="bt-log-q">'+
       '<input type="date" value="'+esc(LOGD)+'" onchange="btLogTgl(this.value)" style="flex:0 0 160px;min-width:0" title="Tanggal (waktu log atau tanggal transfer)">'+
       (LOGD?'<span class="bt-b sm" onclick="btLogTgl(\'\')">Semua tanggal</span>':'')+
       '<span class="bt-b sm" onclick="btLogExcel()">⬇ Download Excel</span></div>'+
-      '<div style="font-size:12px;color:var(--muted,#6b7280);margin-top:8px">'+F.length+' catatan · <b style="color:#2f7a55">'+nKw.length+' kuitansi dibuat</b> dari bukti transfer · total '+rp(tot)+'</div></div>';
+      '<div style="font-size:12px;color:var(--muted,#6b7280);margin-top:8px">'+F.length+' catatan · <b style="color:#2f7a55">'+nKw.length+' kuitansi dibuat</b> dari '+(LOGJ==='bk'?'buku kas':'bukti transfer')+' · total '+rp(tot)+'</div></div>';
     if(!F.length) return h+'<div class="bt-empty">Belum ada catatan.</div>';
     var nh=Math.ceil(F.length/LOG_PER); if(LOGP>=nh) LOGP=nh-1; if(LOGP<0) LOGP=0;
     var pager='<div class="bt-pager"><span class="bt-b sm"'+(LOGP>0?' onclick="btLogHal('+(LOGP-1)+')"':' disabled')+'>‹ Sebelumnya</span><span>Halaman <b>'+(LOGP+1)+'</b> / '+nh+' · catatan '+(LOGP*LOG_PER+1)+'–'+Math.min(F.length,(LOGP+1)*LOG_PER)+' dari '+F.length+'</span><span class="bt-b sm"'+(LOGP<nh-1?' onclick="btLogHal('+(LOGP+1)+')"':' disabled')+'>Berikutnya ›</span></div>';
-    h+='<div class="bt-card" style="display:block;padding:6px 10px">'+pager+'<div class="bt-logbox"><table class="bt-logt"><thead><tr><th>Waktu</th><th>Aksi</th><th>Bukti transfer</th><th>Siswa</th><th>Keterangan</th></tr></thead><tbody>';
+    h+='<div class="bt-card" style="display:block;padding:6px 10px">'+pager+'<div class="bt-logbox"><table class="bt-logt"><thead><tr><th>Waktu</th><th>Aksi</th><th>'+(LOGJ==='bk'?'Tanggal buku · nominal':'Bukti transfer')+'</th><th>Siswa</th><th>Keterangan</th></tr></thead><tbody>';
     F.slice(LOGP*LOG_PER,(LOGP+1)*LOG_PER).forEach(function(l){
       var dt=new Date(l.t), w=dt.toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric'})+' · '+dt.toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'});
       var bukti=[l.nominal?rp(l.nominal):'',l.bank,[l.tglTf?tglFmt(l.tglTf):'',l.jam].filter(Boolean).join(' ')].filter(Boolean).join(' · ');
-      var ket=l.aksi==='Kuitansi dibuat'?'<b>'+esc(l.no||'')+'</b> · '+esc(l.siswaKw||'')+' · '+rp(l.bayar||0)+(l.mode==='cicil'?' (cicil)':''):esc(l.ket||'');
+      var ket=(l.aksi==='Kuitansi dibuat'||l.aksi==='Kuitansi dibuat (buku kas)')&&l.no?'<b>'+esc(l.no||'')+'</b> · '+esc(l.siswaKw||'')+' · '+rp(l.bayar||0)+(l.mode==='cicil'?' (cicil)':''):esc(l.ket||'');
       if(l.url) ket+=' · <a href="'+esc(l.url)+'" target="_blank" rel="noopener">☁ Buka bukti</a>';
       h+='<tr><td style="white-space:nowrap;color:var(--muted,#6b7280)">'+w+'</td><td><span class="bt-st" style="background:transparent;border:1px solid '+(AKSI_WARNA[l.aksi]||'#999')+';color:'+(AKSI_WARNA[l.aksi]||'#666')+'">'+esc(l.aksi)+'</span></td>'+
         '<td style="white-space:nowrap">'+esc(bukti)+'</td><td>'+esc(l.siswa||'')+'</td><td>'+ket+'</td></tr>';
@@ -10603,15 +10607,16 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
     h+='</tbody></table></div>'+(nh>1?pager:'')+'</div>';
     return h;
   }
+  window.btLogJenis=function(j){ LOGJ=j; LOGP=0; render(); };
   window.btLogHal=function(p){ LOGP=p; render(); var b=document.querySelector('.bt-logbox'); if(b) b.scrollTop=0; };
   window.btLogCari=function(v){ LOGQ=v; LOGP=0; render(); var el=$('bt-log-q'); if(el){ el.focus(); el.setSelectionRange(v.length,v.length); } };
   window.btLogTgl=function(v){ LOGD=v; LOGP=0; render(); };
   window.btLogExcel=function(){
     if(typeof XLSX==='undefined'){ alert('Library Excel belum termuat. Coba lagi sebentar.'); return; }
-    var rows=getBtLog().map(function(l){ return {Waktu:new Date(l.t).toLocaleString('id-ID'),Aksi:l.aksi,Nominal:l.nominal||0,'Tgl Transfer':l.tglTf||'',Jam:l.jam||'',Bank:l.bank||'',
+    var rows=logJenis(getBtLog()).map(function(l){ return {Waktu:new Date(l.t).toLocaleString('id-ID'),Aksi:l.aksi,Nominal:l.nominal||0,'Tgl Transfer':l.tglTf||'',Jam:l.jam||'',Bank:l.bank||'',
       'Rek Tujuan':l.rek||'','Dikirim oleh':l.penerus||'','No WA pengirim':l.penerusNo?nomorFmt(l.penerusNo):'',Siswa:l.siswa||'','No Kuitansi':l.no||'','Siswa Kuitansi':l.siswaKw||'','Link Drive':l.url||'',Dibayar:l.bayar||'',Mode:l.mode||'',Keterangan:l.ket||''}; });
-    var ws=XLSX.utils.json_to_sheet(rows), wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Log Bukti Transfer');
-    var d=new Date(); XLSX.writeFile(wb,'Log Bukti Transfer_'+String(d.getDate()).padStart(2,'0')+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+d.getFullYear()+'.xlsx');
+    var ws=XLSX.utils.json_to_sheet(rows), wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,LOGJ==='bk'?'Log Buku Kas':'Log Bukti Transfer');
+    var d=new Date(); XLSX.writeFile(wb,(LOGJ==='bk'?'Log Buku Kas_':'Log Bukti Transfer_')+String(d.getDate()).padStart(2,'0')+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+d.getFullYear()+'.xlsx');
   };
 
   // ---------- Antrian tersimpan (IndexedDB) — bertahan saat refresh sampai kuitansinya dibuat ----------
@@ -11067,21 +11072,43 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
     });
     pg.rows=rows; rows.forEach(function(r){ bkEvalRow(pg,r); });
   }
+  // setiap menempel/memilih foto: tanya dulu buku jenjang apa (supaya tidak salah masuk jenjang)
   function bkAdd(files){
-    var j=ls(BK_JENJANG_LS);
-    if(!j){ alert('Pilih dulu jenjang buku (TK / SD / SMP / SMK) di atas.'); return; }
-    [].slice.call(files||[]).filter(function(f){return /^image\//.test(f.type);}).forEach(function(f){
+    var F=[].slice.call(files||[]).filter(function(f){return /^image\//.test(f.type);}); if(!F.length) return;
+    var m=$('bk-jpick'); if(!m){ m=document.createElement('div'); m.id='bk-jpick'; document.body.appendChild(m); }
+    var last=ls(BK_JENJANG_LS), url=URL.createObjectURL(F[0]);
+    m.innerHTML='<div class="bk-jp-box"><div style="display:flex;gap:14px;align-items:center"><img src="'+url+'" alt=""><div><b style="font-size:16px">Ini foto buku kas jenjang apa?</b><div class="bt-sub" style="margin-top:4px">'+F.length+' foto · pastikan sesuai buku yang difoto'+(last?' (terakhir: <b>'+esc(last)+'</b>)':'')+'</div></div></div>'+
+      '<div class="bk-jp-btns">'+['TK','SD','SMP','SMK'].map(function(j,k){ return '<button type="button" data-j="'+j+'"'+(j===last?' class="last"':'')+'>'+j+'<small>tekan '+(k+1)+'</small></button>'; }).join('')+'</div>'+
+      '<div style="text-align:right;margin-top:10px"><span class="bt-b sm" data-x="1">Batal</span></div></div>';
+    m.style.display='flex';
+    function tutup(){ m.style.display='none'; document.removeEventListener('keydown',kb,true); try{ URL.revokeObjectURL(url); }catch(e){} }
+    function pilih(j){ tutup(); lsw(BK_JENJANG_LS,j); bkRender(); bkMasuk(F,j); }
+    function kb(e){ var k={'1':'TK','2':'SD','3':'SMP','4':'SMK'}[e.key]; if(k){ e.preventDefault(); e.stopPropagation(); pilih(k); } else if(e.key==='Escape'){ e.preventDefault(); tutup(); } }
+    document.addEventListener('keydown',kb,true);
+    m.onclick=function(e){ var b=e.target.closest('[data-j]'); if(b) return pilih(b.dataset.j); if(e.target===m||e.target.closest('[data-x]')) tutup(); };
+  }
+  function bkMasuk(F,j){
+    F.filter(function(f){return /^image\//.test(f.type);}).forEach(function(f){
       var pg={id:'bk'+Date.now().toString(36)+(++seq), jenjang:j, state:'reading', rows:[], ditambah:new Date()};
       BK.unshift(pg); bkRender();
       prepImage(f).then(function(im){ pg.img=im.url; pg.imgs=[im]; bkRender(); return bkProses(pg); })
         .catch(function(e){ pg.state='error'; pg.err=e.message; bkRender(); });
     });
   }
+  // cek kecocokan kelas di halaman dengan jenjang buku
+  function bkCekJenjang(pg){
+    var n={TK:0,SD:0,SMP:0,SMK:0}, tot=0;
+    ((pg.ai||{}).hari||[]).forEach(function(h){ (h.baris||[]).forEach(function(b){ var k=String(b.kelas||''); var x=parseInt(k);
+      if(/TK|^[AB]$/i.test(k)){ n.TK++; tot++; } else if(x>=1&&x<=6){ n.SD++; tot++; } else if(x>=7&&x<=9){ n.SMP++; tot++; } else if(x>=10&&x<=12){ n.SMK++; tot++; } }); });
+    var best=Object.keys(n).sort(function(a,b){return n[b]-n[a];})[0];
+    pg.jSaran=(tot>=3&&best!==pg.jenjang&&n[best]>=tot*0.6&&n[pg.jenjang]<=tot*0.25)?best:'';
+  }
+  window.bkGantiJenjang=function(id,j){ var p=bkP(id); if(!p) return; p.jenjang=j; p.jSaran=''; bkBangun(p); btLog('Koreksi buku kas',null,{ket:'Buku · Jenjang buku: diganti ke '+j}); bkRender(); };
   async function bkProses(pg){
     pg.state='reading'; pg.err=''; bkRender();
     try{
       var d=await bacaAI(pg.imgs||[], 'Jenjang buku: '+pg.jenjang, function(t){ pg.statusTxt=t; bkRender(); }, PROMPT_BUKU);
-      pg.statusTxt=''; pg.ai=d; pg.state='ok'; bkBangun(pg);
+      pg.statusTxt=''; pg.ai=d; pg.state='ok'; bkBangun(pg); bkCekJenjang(pg);
       btLog('Buku kas dibaca',null,{baris:pg.rows.length,ket:pg.jenjang+' · '+pg.rows.length+' baris · '+pg.rows.filter(function(r){return r.status==='siap';}).length+' siap'});
     }catch(e){ pg.state='error'; pg.err=e.message; }
     bkRender();
@@ -11099,11 +11126,12 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
   function bkCard(pg){
     var h='<div class="bt-card bk-card" id="'+pg.id+'">';
     h+='<div class="bk-head">'+(pg.img?'<img class="bk-thumb" src="'+pg.img+'" onclick="bkZoom(\''+pg.id+'\')" title="Klik untuk memperbesar">':'<div class="bk-thumb"></div>')+
-      '<div style="font-size:12.5px;color:var(--muted,#6b7280)">📒 Buku <b style="color:var(--ink,#1f2a24)">'+esc(pg.jenjang)+'</b> · ditambah '+pg.ditambah.toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'})+'<br><span style="font-size:11.5px">Klik foto untuk memperbesar & mencocokkan dengan tabel.</span></div></div><div>';
+      '<div style="font-size:12.5px;color:var(--muted,#6b7280)">📒 Buku <b style="color:var(--ink,#1f2a24)">'+esc(pg.jenjang)+'</b>'+(pg.state==='ok'&&!pg.rows.some(function(r){return r.doneNo;})?' <select class="bk-jsel" onchange="bkGantiJenjang(\''+pg.id+'\',this.value)" title="Ganti jenjang buku">'+['TK','SD','SMP','SMK'].map(function(j){return '<option'+(j===pg.jenjang?' selected':'')+'>'+j+'</option>';}).join('')+'</select>':'')+' · ditambah '+pg.ditambah.toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'})+'<br><span style="font-size:11.5px">Klik foto untuk memperbesar & mencocokkan dengan tabel.</span></div></div><div>';
     if(pg.state==='reading') return h+'<div style="font-size:13px;color:#4b55a0"><span class="bt-spin"></span> '+esc(pg.statusTxt||'AI sedang membaca halaman buku...')+'</div></div></div>';
     if(pg.state==='error') return h+'<ul class="bt-reasons"><li class="b">✗ '+esc(pg.err)+'</li></ul><div class="bt-acts"><span class="bt-b pri" onclick="bkUlang(\''+pg.id+'\')">Baca ulang</span><span class="bt-b red" onclick="bkHapus(\''+pg.id+'\')">Hapus</span></div></div></div>';
     var n={siap:0,cek:0,coret:0,ada:0,manual:0,done:0,err:0}, pil=0, tot=0;
     pg.rows.forEach(function(r){ n[r.status]=(n[r.status]||0)+1; if(r.pilih&&r.status!=='done'&&r.status!=='manual'){ pil++; tot+=Number(r.bayar)||0; } });
+    if(pg.jSaran) h+='<div class="bt-q" style="background:#fdeaea;border:1px solid #f5c2c2;color:#b33a3a;border-radius:10px;padding:8px 12px;margin-bottom:8px;font-size:13px">⚠ Kelas di halaman ini kebanyakan <b>'+esc(pg.jSaran)+'</b>, tapi dimasukkan sebagai buku <b>'+esc(pg.jenjang)+'</b>. <span class="bt-b sm pri" onclick="bkGantiJenjang(\''+pg.id+'\',\''+pg.jSaran+'\')">Ganti ke buku '+esc(pg.jSaran)+'</span> <span class="bt-b sm" onclick="bkGantiJenjang(\''+pg.id+'\',\''+pg.jenjang+'\')">Tetap '+esc(pg.jenjang)+'</span></div>';
     h+='<div class="bt-meta">'+pg.rows.length+' baris terbaca · <span class="bt-st ok">'+n.siap+' siap</span> <span class="bt-st warn">'+n.cek+' perlu dicek</span> <span class="bt-st done">'+(n.coret+n.ada)+' sudah diinput</span> <span class="bt-st done">'+n.manual+' manual</span>'+(n.done?' <span class="bt-st ok">'+n.done+' dibuat</span>':'')+'</div>';
     h+='<div class="bk-tbl-wrap"><table class="bt-logt bk-tbl"><thead><tr><th style="width:26px"><input type="checkbox" title="Pilih semua yang siap" onchange="bkPilihSemua(\''+pg.id+'\',this.checked)"></th><th>Tanggal</th><th>Dari buku</th><th style="min-width:190px">Siswa</th><th>Bulan SPP · tagihan</th><th>Dibayar</th><th>Metode</th><th style="min-width:170px">Status</th></tr></thead><tbody>';
     var lastT=null;
@@ -11430,7 +11458,7 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
         '<div id="bt-mode-bk" style="display:none">'+
           '<div class="bt-tabs" id="bk-jenjang" style="margin-bottom:10px;align-items:center"><b style="font-size:13px;margin-right:6px">Buku jenjang:</b>'+['TK','SD','SMP','SMK'].map(function(j){return '<span class="bt-tab" data-j="'+j+'" onclick="bkJenjang(\''+j+'\')">'+j+'</span>';}).join('')+'</div>'+
           '<div class="bt-drop" id="bk-drop"><div class="bt-ic" style="background:#4b55a0"><svg width="24" height="24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M4 4h11a3 3 0 0 1 3 3v13H7a3 3 0 0 1-3-3z"/><path d="M8 8h6M8 12h6"/></svg></div>'+
-            '<div style="flex:1"><b>Foto halaman buku kas harian</b><p>Pilih jenjang dulu, lalu tempel (<kbd>Ctrl</kbd>+<kbd>V</kbd>) / seret / pilih foto. AI membaca nama, kelas, bulan SPP &amp; nominal. Baris <b>coret merah</b> = sudah diinput (dilewati). Selain SPP (pendaftaran, buku, seragam) → input manual.</p></div>'+
+            '<div style="flex:1"><b>Foto halaman buku kas harian</b><p>Tempel (<kbd>Ctrl</kbd>+<kbd>V</kbd>) / seret / pilih foto → aplikasi menanyakan jenjang bukunya. AI membaca nama, kelas, bulan SPP &amp; nominal. Baris <b>coret merah</b> = sudah diinput (dilewati). Selain SPP (pendaftaran, buku, seragam) → input manual.</p></div>'+
             '<label class="bt-b" style="cursor:pointer">Pilih foto<input type="file" accept="image/*" multiple style="display:none" onchange="bkFiles(this.files);this.value=\'\'"></label></div>'+
           '<div id="bk-list"></div></div>'+
         '<datalist id="bt-dl"></datalist><datalist id="bt-rek-dl"></datalist></div>';
@@ -11463,6 +11491,7 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
   // hitung ulang tagihan (data riwayat bisa berubah) tanpa mengubah pembagian manual
   function alokasiKeep(c){ c.rows.forEach(function(r){ if(!r.doneNo) hitungRow(r); }); cekDobelKeep(c); }
   function cekDobelKeep(c){ if(!c.rows.some(function(r){return r.doneNo;})) cekDobel(c); }
+  window.kwAI=function(prompt,text,onStatus){ return bacaAI([],text,onStatus,prompt); };
   window._btDebug={Q:function(){return Q;},cariSiswa:cariSiswa,addFake:function(ai,img){ var c={id:idBaru(),state:'ok',rows:[],ditambah:new Date(),ai:ai,img:img||''}; c.nominal=ai.nominal; c.tanggal=ai.tanggal; bangunRows(c); cekDobel(c); Q.unshift(c); render(); return c; }};
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',function(){setTimeout(init,50);}); else setTimeout(init,50);
 })();
@@ -11632,6 +11661,208 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
 })();
 </script>
 
+<!-- ===================== KETIK AI: PENDAFTARAN (siswa baru) ===================== -->
+<script>
+(function(){
+  var $=function(i){return document.getElementById(i);};
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+  function rp(n){ return 'Rp '+(Number(n)||0).toLocaleString('id-ID'); }
+  var PROMPT=[
+    'Kamu asisten admin TU sekolah (Bahasa Indonesia). Admin mengetik pembayaran PENDAFTARAN siswa (siswa baru) dengan bahasa bebas.',
+    'Ambil datanya dari SELURUH percakapan (jawaban admin yang terbaru menimpa yang lama). Balas HANYA JSON:',
+    '{"nama":"","kelas":"","jenjang":"","plus":false,"tanggal":"YYYY-MM-DD","biaya_pendaftaran":null,"diskon_persen":null,"diskon_nominal":null,"bayar":null,"formulir":"tidak_disebut","catatan_formulir":"","metode":"","spp_bulan":"","catatan":"","pertanyaan":[]}',
+    'Aturan:',
+    '- Nominal angka bulat: 1jt/1 juta=1000000, 1,5jt=1500000, 500rb/500k=500000, 950.000=950000.',
+    '- kelas: angka kelas yang disebut ("kelas 7" → "7"), TK → "TK". jenjang: TK; 1–6 = SD; 7–9 = SMP; 10–12 = SMK. "plus"/"+" → plus true.',
+    '- tanggal: bila hanya tanggal ("tanggal 1") → bulan & tahun hari ini; bila bulan tanpa tahun → tahun hari ini. Tulis tahun apa adanya bila admin menulis tahun.',
+    '- formulir: "termasuk" bila bayar sudah termasuk/include formulir; "terpisah" bila formulir dibayar tambahan di luar jumlah bayar; "sudah_dibayar" bila formulir sudah dibayar sebelumnya; selain itu "tidak_disebut".',
+    '- diskon: persen ke diskon_persen (40% → 40); potongan rupiah ke diskon_nominal. Tidak disebut → null.',
+    '- metode: "Kas" (tunai/cash) atau "Transfer" (tf/transfer/bank) bila disebut, selain itu "".',
+    '- spp_bulan: bila sekalian bayar SPP bulan tertentu (mis. "sekalian spp juli" → "Juli").',
+    '- Jangan menebak. Field yang tidak disebut biarkan kosong/null.',
+    '- pertanyaan: daftar pertanyaan singkat HANYA bila nama, kelas/jenjang, atau jumlah bayar tidak jelas / bertentangan. Jangan bertanya soal hal lain.'
+  ].join('\n');
+  var S={msgs:[],d:null,ov:{},busy:false};
+  var FORM=function(j){ return (typeof FORMULIR_TARIF!=='undefined'&&FORMULIR_TARIF[j])||0; };
+  function jenjangDari(d){
+    var j=String(d.jenjang||'').toUpperCase(), k=String(d.kelas||'').toUpperCase();
+    if(/TK/.test(k)||j==='TK') return 'TK';
+    var n=parseInt(k); if(n>=1&&n<=6) return 'SD'; if(n>=7&&n<=9) return 'SMP'; if(n>=10&&n<=12) return 'SMK';
+    return ['SD','SMP','SMK'].indexOf(j)>=0?j:'';
+  }
+  function kelasFinal(c){ var j=c.jenjang; if(!j) return '';
+    if(j==='TK') return 'TK';
+    var n=parseInt(c.kelas)||(j==='SD'?1:j==='SMP'?7:10);
+    return n+' '+j+(c.plus&&(j==='SD'||j==='SMP')?' Plus':''); }
+  function hitung(){
+    var d=S.d||{}, o=S.ov, c={};
+    c.nama=o.nama!=null?o.nama:(d.nama||'');
+    if(c.nama&&c.nama===c.nama.toLowerCase()) c.nama=c.nama.replace(/\b\w/g,function(x){return x.toUpperCase();});
+    c.jenjang=o.jenjang||jenjangDari(d);
+    c.kelas=o.kelas!=null?o.kelas:(String(d.kelas||'').replace(/\D/g,'')||'');
+    c.plus=o.plus!=null?o.plus:!!d.plus;
+    c.kelasStr=kelasFinal(c);
+    c.tanggal=o.tanggal||(/^\d{4}-\d{2}-\d{2}$/.test(d.tanggal||'')?d.tanggal:today());
+    var daftar=(typeof getDaftar==='function'?getDaftar():{})||{};
+    c.biaya=o.biaya!=null?o.biaya:(Number(d.biaya_pendaftaran)||daftar[c.jenjang]||0);
+    var bln=BULAN[new Date(c.tanggal+'T00:00:00').getMonth()];
+    if(o.diskon!=null){ c.diskon=o.diskon; c.diskonSumber='diubah'; }
+    else if(d.diskon_persen!=null&&d.diskon_persen!==''){ c.diskon=Number(d.diskon_persen)||0; c.diskonSumber='diketik'; }
+    else if(d.diskon_nominal){ c.diskon=c.biaya?Math.round(Number(d.diskon_nominal)/c.biaya*10000)/100:0; c.diskonSumber='diketik (Rp)'; }
+    else { c.diskon=((typeof getDiskon==='function'?getDiskon():{})||{})[bln]||0; c.diskonSumber='diskon bulan '+bln; }
+    c.diskonAmt=Math.round(c.biaya*c.diskon/100); c.total=c.biaya-c.diskonAmt;
+    c.form=FORM(c.jenjang);
+    c.formulir=o.formulir||(d.formulir&&d.formulir!=='tidak_disebut'?d.formulir:'');
+    c.bayar=o.bayar!=null?o.bayar:(Number(d.bayar)||0);
+    c.dp=c.formulir==='termasuk'?c.bayar-c.form:c.bayar;
+    c.totalUang=c.formulir==='terpisah'||c.formulir==='termasuk'?c.dp+c.form:c.dp;
+    c.sisa=Math.max(0,c.total-c.dp);
+    c.catForm=o.catForm!=null?o.catForm:(d.catatan_formulir||'');
+    c.metode=o.metode||(d.metode==='Transfer'?'Transfer':d.metode==='Kas'?'Kas':'');
+    c.spp=o.spp!=null?o.spp:(d.spp_bulan||'');
+    // siswa di data
+    c.cand=[]; c.ada=null;
+    if(c.nama&&window._btDebug&&_btDebug.cariSiswa){ c.cand=_btDebug.cariSiswa(c.nama,c.kelasStr||'').slice(0,4); }
+    if(o.siswaAda) c.ada=o.siswaAda; else if(o.baru) c.ada=null;
+    c.tanya=[];
+    (d.pertanyaan||[]).forEach(function(q){ c.tanya.push({t:q}); });
+    if(!c.nama) c.tanya.push({t:'Siapa nama siswanya?'});
+    if(!c.jenjang) c.tanya.push({t:'Masuk kelas berapa / jenjang apa?',btn:[['TK','jenjang','TK'],['SD','jenjang','SD'],['SMP','jenjang','SMP'],['SMK','jenjang','SMK']]});
+    if(!c.bayar) c.tanya.push({t:'Berapa jumlah uang yang dibayar?'});
+    if(c.nama&&!o.siswaAda&&!o.baru){
+      if(c.cand.length&&c.cand[0].sc>=0.75) c.tanya.push({t:'"'+c.nama+'" mirip siswa yang sudah ada. Siswa yang mana?',btn:c.cand.slice(0,3).map(function(x){return [x.s.nama+' — '+x.s.kelas,'siswaAda',x.s.nama];}).concat([['Bukan, siswa baru','baru',1]])});
+      else c.tanya.push({t:'"'+c.nama+'" belum ada di daftar siswa. Tambahkan sebagai SISWA BARU'+(c.kelasStr?' ('+c.kelasStr+')':'')+'? (pastikan nama lengkapnya di kolom Nama)',btn:[['Ya, siswa baru','baru',1]]});
+    }
+    if(c.bayar&&!c.formulir&&c.form) c.tanya.push({t:'Apakah '+rp(c.bayar)+' sudah termasuk formulir ('+rp(c.form)+')?',btn:[['Sudah termasuk','formulir','termasuk'],['Formulir terpisah (+'+rp(c.form)+')','formulir','terpisah'],['Formulir sudah dibayar sebelumnya','formulir','sudah_dibayar']]});
+    var th=parseInt(c.tanggal), now=new Date().getFullYear();
+    if(th&&th!==now&&!o.tglOk) c.tanya.push({t:'Tanggal '+tglFmt(c.tanggal)+' — tahunnya benar '+th+'?',btn:[['Benar '+th,'tglOk',1],['Ganti ke '+now,'tanggal',now+c.tanggal.slice(4)]]});
+    if(c.bayar&&c.dp<=0) c.tanya.push({t:'Jumlah bayar habis untuk formulir — DP pendaftaran jadi Rp 0. Cek lagi jumlahnya.'});
+    if(c.dp>c.total&&c.total>0) c.tanya.push({t:'DP '+rp(c.dp)+' lebih besar dari total pendaftaran '+rp(c.total)+' — cek diskon/jumlah.'});
+    c.siap=!c.tanya.length||c.tanya.every(function(q){return false;});
+    return c;
+  }
+  function chatHtml(){
+    return S.msgs.map(function(m){ return '<div class="ka-m '+(m.role==='user'?'u':'a')+'">'+esc(m.text).replace(/\n/g,'<br>')+'</div>'; }).join('');
+  }
+  function fld(lbl,inp){ return '<label class="ka-f"><span>'+lbl+'</span>'+inp+'</label>'; }
+  function render(){
+    var box=$('ka-body'); if(!box) return;
+    var h='<div class="ka-chat">'+chatHtml()+(S.busy?'<div class="ka-m a"><span class="bt-spin"></span> AI sedang membaca...</div>':'')+'</div>';
+    if(S.d&&!S.busy){
+      var c=hitung(); S.c=c;
+      if(c.tanya.length){
+        h+='<div class="ka-q"><b>🤖 Perlu dipastikan:</b>'+c.tanya.map(function(q){ return '<div class="ka-qi">• '+esc(q.t)+(q.btn?'<div class="ka-qb">'+q.btn.map(function(b){ return '<span class="bt-b sm" onclick="kaSet(\''+b[1]+'\','+JSON.stringify(b[2]).replace(/"/g,'&quot;')+')">'+esc(b[0])+'</span>'; }).join('')+'</div>':'')+'</div>'; }).join('')+'<div class="ka-sub">Klik pilihan di atas, atau jawab dengan mengetik di bawah.</div></div>';
+      }
+      h+='<div class="ka-sum"><div class="ka-sum-h">📋 Ringkasan kuitansi pendaftaran <span class="ka-sub">(bisa diubah langsung)</span></div><div class="ka-grid">'+
+        fld('Nama siswa','<input value="'+esc(c.nama)+'" onchange="kaSet(\'nama\',this.value)">'+(c.ada?'<small class="ok">✓ siswa sudah ada</small>':(c.nama&&S.ov.baru?'<small>+ siswa baru</small>':'')))+
+        fld('Kelas','<div style="display:flex;gap:4px"><select onchange="kaSet(\'jenjang\',this.value)">'+['','TK','SD','SMP','SMK'].map(function(j){return '<option'+(j===c.jenjang?' selected':'')+'>'+j+'</option>';}).join('')+'</select><input style="width:56px" value="'+esc(c.kelas)+'" placeholder="kls" onchange="kaSet(\'kelas\',this.value)"><label style="display:flex;align-items:center;gap:3px;font-size:12px"><input type="checkbox"'+(c.plus?' checked':'')+' onchange="kaSet(\'plus\',this.checked)">Plus</label></div><small>'+esc(c.kelasStr||'—')+'</small>')+
+        fld('Tanggal','<input type="date" value="'+esc(c.tanggal)+'" onchange="kaSet(\'tanggal\',this.value)">')+
+        fld('Biaya pendaftaran','<input type="number" value="'+c.biaya+'" onchange="kaSet(\'biaya\',+this.value)">')+
+        fld('Diskon %','<input type="number" value="'+c.diskon+'" onchange="kaSet(\'diskon\',+this.value)"><small>'+esc(c.diskonSumber)+' · −'+rp(c.diskonAmt)+'</small>')+
+        fld('Total pendaftaran','<b>'+rp(c.total)+'</b>')+
+        fld('Uang diterima','<input type="number" value="'+(c.bayar||'')+'" onchange="kaSet(\'bayar\',+this.value)">')+
+        fld('Formulir ('+rp(c.form)+')','<select onchange="kaSet(\'formulir\',this.value)"><option value="">— pilih —</option><option value="termasuk"'+(c.formulir==='termasuk'?' selected':'')+'>Termasuk di uang diterima</option><option value="terpisah"'+(c.formulir==='terpisah'?' selected':'')+'>Dibayar terpisah (tambahan)</option><option value="sudah_dibayar"'+(c.formulir==='sudah_dibayar'?' selected':'')+'>Sudah dibayar sebelumnya</option></select>'+(c.formulir==='sudah_dibayar'?'<input placeholder="Catatan: kapan/bagaimana formulir dibayar" value="'+esc(c.catForm)+'" onchange="kaSet(\'catForm\',this.value)" style="margin-top:4px">':''))+
+        fld('DP pendaftaran','<b>'+rp(c.dp)+'</b><small>sisa '+rp(c.sisa)+(c.sisa?' (belum lunas)':' · lunas')+'</small>')+
+        fld('Metode','<select onchange="kaSet(\'metode\',this.value)"><option value="">pilih saat buat</option><option'+(c.metode==='Kas'?' selected':'')+'>Kas</option><option'+(c.metode==='Transfer'?' selected':'')+'>Transfer</option></select>')+
+        fld('Sekalian SPP','<select onchange="kaSet(\'spp\',this.value)"><option value="">— tidak —</option>'+BULAN.map(function(b){return '<option'+(b===c.spp?' selected':'')+'>'+b+'</option>';}).join('')+'</select>')+
+        '</div>'+
+        '<div class="ka-tot">Total uang masuk kuitansi: <b>'+rp(c.totalUang)+'</b>'+(c.formulir==='termasuk'?' (DP '+rp(c.dp)+' + formulir '+rp(c.form)+')':c.formulir==='terpisah'?' (DP '+rp(c.dp)+' + formulir '+rp(c.form)+')':'')+'</div>'+
+        '<div class="bt-acts"><span class="bt-b pri"'+(c.tanya.length?' disabled title="Jawab pertanyaan di atas dulu"':' onclick="kaBuat()"')+'>✓ Buat Kuitansi</span><span class="bt-b" onclick="kaIsiForm()">Isi ke form saja</span><span class="bt-b red" onclick="kaReset()">Mulai baru</span></div></div>';
+    }
+    box.innerHTML=h;
+    var ch=box.querySelector('.ka-chat'); if(ch) ch.scrollTop=ch.scrollHeight;
+  }
+  window.kaSet=function(k,v){
+    if(k==='siswaAda'){ S.ov.siswaAda=v; S.ov.baru=false; var s=(getSiswa()||[]).find(function(x){return x.nama===v;}); if(s){ S.ov.nama=s.nama; var m=String(s.kelas).match(/^(\d+)\s*(SD|SMP|SMK)/); if(/TK/.test(s.kelas)){S.ov.jenjang='TK';} else if(m){ S.ov.kelas=m[1]; S.ov.jenjang=m[2]; } S.ov.plus=/Plus/.test(s.kelas); } }
+    else if(k==='baru'){ S.ov.baru=true; S.ov.siswaAda=null; }
+    else if(k==='nama'){ S.ov.nama=v; S.ov.siswaAda=null; S.ov.baru=false; }
+    else S.ov[k]=v;
+    render();
+  };
+  window.kaReset=function(){ S={msgs:[],d:null,ov:{},busy:false}; render(); var t=$('ka-in'); if(t){ t.value=''; t.focus(); } };
+  window.kaKirim=function(){
+    var t=$('ka-in'), v=(t&&t.value||'').trim(); if(!v||S.busy) return;
+    if(typeof window.kwAI!=='function'){ alert('Fitur AI belum siap — buka menu Bukti Transfer → ⚙ Pengaturan AI dan isi API key Gemini.'); return; }
+    S.msgs.push({role:'user',text:v}); t.value=''; S.busy=true; render();
+    var conv=S.msgs.map(function(m){ return (m.role==='user'?'ADMIN: ':'ASISTEN: ')+m.text; }).join('\n');
+    var info='Tarif pendaftaran (Rp): '+JSON.stringify(getDaftar())+' · Formulir (Rp): '+JSON.stringify(FORMULIR_TARIF)+'\nPERCAKAPAN:\n'+conv;
+    window.kwAI(PROMPT,info,function(st){ }).then(function(d){
+      S.busy=false; S.d=d||{}; var c=hitung();
+      S.msgs.push({role:'ai',text:c.tanya.length?'Saya sudah membaca. Ada '+c.tanya.length+' hal yang perlu dipastikan (lihat di bawah).':'Sudah lengkap ✓ Cek ringkasan, lalu klik Buat Kuitansi.'});
+      render();
+    }).catch(function(e){ S.busy=false; S.msgs.push({role:'ai',text:'✗ '+e.message}); render(); });
+  };
+  function isiForm(c){
+    showPage('siswaBaru'); resetSiswaBaru();
+    $('sb-nama').value=c.nama;
+    if(c.ada){ var s=(getSiswa()||[]).find(function(x){return x.nama===c.ada;}); if(s) sbSiswaData={nama:s.nama,kelas:s.kelas}; }
+    $('sb-tanggal').value=c.tanggal;
+    $('sb-jenjang').value=c.jenjang; $('sb-plus').value=c.plus&&(c.jenjang==='SD'||c.jenjang==='SMP')?'plus':''; onSbJenjangChange();
+    $('sb-biaya-input').value=c.biaya; $('sb-diskon-input').value=c.diskon||''; onSbBiayaEdit();
+    var st=c.formulir==='sudah_dibayar'?'sudah':'sekarang';
+    document.querySelectorAll('input[name="sb-formulir-status"]').forEach(function(r){ r.checked=r.value===st; }); onSbFormulirChange(st);
+    if(st==='sudah'&&$('sb-catatan')) $('sb-catatan').value=c.catForm||'Formulir sudah dibayar sebelumnya';
+    $('sb-dp').value=c.dp; onSbDpInput();
+    if(c.spp){ $('sb-spp-check').checked=true; onSbSppCheck(); $('sb-spp-bulan').value=c.spp; }
+    if(c.metode){ document.querySelectorAll('input[name="sb-metode"]').forEach(function(r){ r.checked=r.value===c.metode; }); onSbMetodeChange(); }
+    updateSbBuatBtn();
+  }
+  window.kaIsiForm=function(){ var c=S.c||hitung(); isiForm(c); var w=$('sb-nama'); if(w) w.scrollIntoView({behavior:'smooth',block:'center'}); };
+  window.kaBuat=function(){
+    var c=S.c||hitung(); if(c.tanya.length) return;
+    isiForm(c);
+    var before=window._sbLastRecs, metode=c.metode;
+    window._kaPending={c:c,before:before};
+    buatKwitansiSiswaBaru();
+    var m=$('metode-modal');
+    if(m&&m.style.display!=='none'){
+      if(metode){ _metodePilih(metode); }
+      else setTimeout(function(){ m.querySelectorAll('.metode-opt').forEach(function(x){x.classList.remove('bt-hl');}); },60);
+    }
+  };
+  // setelah kuitansi siswa baru tersimpan → betulkan kelas (bila bukan kelas awal), catat di chat
+  var _orig=window.buatKwitansiSiswaBaru;
+  window.buatKwitansiSiswaBaru=function(){
+    var q=window._kaPending, before=window._sbLastRecs;
+    var r=_orig.apply(this,arguments);
+    try{
+      if(q&&window._sbLastRecs&&window._sbLastRecs!==before&&window._sbLastRecs.length){
+        var recs=window._sbLastRecs, c=q.c, ids=recs.map(function(x){return x.id;});
+        if(c.kelasStr&&recs[0].kelas!==c.kelasStr){
+          var rw=getRiwayat(); rw.forEach(function(x){ if(ids.indexOf(x.id)>=0) x.kelas=c.kelasStr; }); setRiwayat(rw);
+          recs.forEach(function(x){ x.kelas=c.kelasStr; });
+          var sd=getSiswa(), s=sd.find(function(x){return x.nama.toLowerCase()===c.nama.toLowerCase();}); if(s&&!c.ada){ s.kelas=c.kelasStr; setSiswa(sd); }
+        }
+        recs.forEach(function(x){ x.ketikAI=S.msgs.filter(function(m){return m.role==='user';}).map(function(m){return m.text;}).join(' | ').slice(0,300); });
+        var rw2=getRiwayat(); rw2.forEach(function(x){ var y=recs.find(function(z){return z.id===x.id;}); if(y){ x.ketikAI=y.ketikAI; x.kelas=y.kelas; } }); setRiwayat(rw2);
+        S.msgs.push({role:'ai',text:'✓ Kuitansi '+recs.map(function(x){return x.no;}).join(', ')+' dibuat untuk '+c.nama+' ('+(c.kelasStr||'')+'). Lihat pratinjau di bawah.'});
+        window._kaPending=null; S.d=null; S.ov={}; render();
+      }
+    }catch(e){ console.warn('ketik ai',e); }
+    return r;
+  };
+  function pasang(){
+    var pg=$('page-siswaBaru'); if(!pg||$('ka-card')) return;
+    var d=document.createElement('div'); d.className='card'; d.id='ka-card';
+    d.innerHTML='<div class="card-title">✨ Ketik AI — Pendaftaran <span style="font-size:11px;font-weight:700;background:#e6e9f5;color:#4b55a0;border-radius:8px;padding:2px 8px;vertical-align:middle">EARLY TEST</span></div>'+
+      '<p style="font-size:12.5px;color:var(--text2);margin:0 0 8px">Ketik seperti biasa, contoh: <i>alfaro bayar pendaftaran kelas 7 tanggal 1 september diskon 40%, bayar 1jt sudah include formulir</i>. AI menghitung & menanyakan yang kurang jelas.</p>'+
+      '<div id="ka-body"></div>'+
+      '<div class="ka-inrow"><textarea id="ka-in" rows="2" placeholder="Ketik pembayaran pendaftaran... (Enter = kirim, Shift+Enter = baris baru)"></textarea><button type="button" class="btn btn-primary" onclick="kaKirim()">Kirim</button></div>';
+    pg.insertBefore(d,pg.firstChild);
+    $('ka-in').addEventListener('keydown',function(e){ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); kaKirim(); } });
+    render();
+  }
+  var st=document.createElement('style');
+  st.textContent='#ka-card .ka-chat{max-height:260px;overflow:auto;display:flex;flex-direction:column;gap:6px;margin-bottom:8px}.ka-m{max-width:85%;padding:8px 12px;border-radius:12px;font-size:13px;line-height:1.45}.ka-m.u{align-self:flex-end;background:#e8f1ec;color:#1f2a24}.ka-m.a{align-self:flex-start;background:#eef0fb;color:#2c3470}'+
+   '.ka-q{background:#fff6ee;border:1px solid #f3c9a5;border-radius:12px;padding:10px 12px;font-size:13px;color:#7a3a10;margin-bottom:10px}.ka-qi{margin-top:6px}.ka-qb{display:flex;gap:6px;flex-wrap:wrap;margin:5px 0 0 12px}.ka-sub{font-size:11.5px;color:var(--text2);font-weight:400}'+
+   '.ka-sum{border:1px solid var(--line,#e5e7eb);border-radius:12px;padding:12px;margin-bottom:10px}.ka-sum-h{font-weight:700;font-size:13.5px;margin-bottom:8px}.ka-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px 12px}'+
+   '.ka-f{display:flex;flex-direction:column;gap:3px;font-size:12.5px}.ka-f>span{font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.03em}.ka-f input,.ka-f select{padding:6px 8px;border:1px solid var(--border);border-radius:8px;font-size:13px;width:100%}.ka-f small{font-size:11px;color:var(--text2)}.ka-f small.ok{color:#2f7a55;font-weight:600}'+
+   '.ka-tot{margin:10px 0 4px;font-size:13px}.ka-inrow{display:flex;gap:8px;align-items:flex-end}.ka-inrow textarea{flex:1;padding:9px 11px;border:1.5px solid var(--border);border-radius:10px;font-family:inherit;font-size:13.5px;resize:vertical}';
+  document.head.appendChild(st);
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',function(){ setTimeout(pasang,500); }); else setTimeout(pasang,500);
+  window._kaDebug={S:function(){return S;},hitung:hitung,setD:function(d){ S.d=d; render(); }};
+})();
+</script>
 <!-- ===================== PWA (install sebagai aplikasi + offline) ===================== -->
 <script>
 (function(){
@@ -11675,11 +11906,13 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
 <!-- ===================== VERSI APLIKASI ===================== -->
 <script>
 // Ubah setiap kali ada update: x.y.z  (z = perbaikan kecil, y = fitur baru, x = perubahan besar)
-window.APP_VERSION='3.9.2';
+window.APP_VERSION='3.10.1';
 window.APP_BUILD='2026-10-20';
-window.APP_NOTES='Drive: tiap folder bulan berisi folder Bukti Transfer (per siswa) dan Buku Kas (per jenjang), perlu Apps Script v4.';
+window.APP_NOTES='Buku Kas: setiap menempel foto aplikasi menanyakan jenjang bukunya, plus peringatan bila kelas di halaman tidak cocok dengan jenjang.';
 // riwayat singkat (terbaru di atas) — tampil terlipat di halaman Admin
 window.APP_RIWAYAT=[
+  ['3.10.1','2026-10-20','Buku Kas: pilih jenjang tiap kali menempel foto (tombol / tekan 1–4), peringatan kelas tidak cocok + Ganti ke buku X, jenjang bisa diganti di kartu.'],
+  ['3.10.0','2026-10-20','BARU: ✨ Ketik AI — Pendaftaran (menu Siswa Baru): ketik bebas → dihitung (biaya, diskon, formulir, DP, sisa), AI/aplikasi bertanya bila kurang jelas, tawarkan tambah siswa baru → Buat Kuitansi. Tab Log dipisah: Bukti Transfer / Buku Kas.'],
   ['3.9.2','2026-10-20','Drive tersusun: <bulan>/Bukti Transfer/<nama siswa> dan <bulan>/Buku Kas/<jenjang> (Apps Script v4).'],
   ['3.9.1','2026-10-20','Buku Kas: coret merah dicocokkan dengan data siswa — belum ada di aplikasi = belum diinput (siap dibuat); AI lebih ketat membaca coret merah; tombol Lewati / Belum diinput?.'],
   ['3.9.0','2026-10-20','Buku Kas: ☁ Simpan rekap ke Drive — gambar tabel per tanggal (tulisan buku, siswa, bulan, nominal, metode, status/no kuitansi) + foto halaman; link tampil di kartu & Log.'],
