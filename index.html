@@ -11027,6 +11027,8 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
     else if(r.ambigu&&!r.dikonfirmasi) cek('Ada '+r.ambigu+' nama mirip — pastikan siswanya');
     if(r.dari==null) cek('Bulan tidak terbaca — pilih bulan');
     if(!r.bayar) cek('Nominal kosong');
+    if(r.nama&&pg.jenjang!=='TK'&&!r.taLalu){ var sK=siswaByNama(r.nama), kb=kelasDariBuku(r.aiKelas,pg.jenjang);
+      if(sK&&kb&&kb!==sK.kelas) cek('Di buku tertulis kelas '+r.aiKelas+' ('+kb+'), di data siswa '+sK.kelas+' — cek kelas siswa (Kelola Siswa)'); }
     if(r.nama&&r.dari!=null){
       hitungRow(r);
       var z=r.sampai!=null&&r.sampai>=r.dari?r.sampai:r.dari; sa=sudahAda(r.nama,r.dari,z);
@@ -11152,7 +11154,7 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
     });
     h+='</tbody></table></div>';
     h+='<div class="bt-tot '+(pil?'good':'bad')+'" style="margin-top:10px"><span><b>'+pil+'</b> baris dipilih · total <b>'+rp(tot)+'</b></span><span style="font-size:12px">Centang baris yang mau dibuat kuitansinya</span></div>';
-    h+='<div class="bt-acts"><span class="bt-b pri" '+(pil?'onclick="bkBuat(\''+pg.id+'\')"':'disabled')+'>✓ Buat '+pil+' kuitansi</span><span class="bt-b" onclick="bkDrive(\''+pg.id+'\')" title="Simpan gambar rekap per tanggal + foto halaman ke Google Drive">☁ '+(pg.drive&&pg.drive.length?'Simpan ulang':'Simpan rekap')+' ke Drive</span><span class="bt-b" onclick="bkUlang(\''+pg.id+'\')">Baca ulang</span><span class="bt-b red" onclick="bkHapus(\''+pg.id+'\')">Hapus</span>'+bkDriveHtml(pg)+'</div>';
+    h+='<div class="bt-acts"><span class="bt-b pri" '+(pil?'onclick="bkBuat(\''+pg.id+'\')"':'disabled')+'>✓ Buat '+pil+' kuitansi</span><span class="bt-b" onclick="bkDrive(\''+pg.id+'\')" title="Simpan gambar rekap per tanggal + foto halaman ke Google Drive">☁ '+(pg.drive&&pg.drive.length?'Simpan ulang':'Simpan rekap')+' ke Drive</span><span class="bt-b" onclick="bkHitungUlang()" title="Cocokkan ulang dengan data siswa & riwayat terbaru (tanpa AI)">↻ Hitung ulang</span><span class="bt-b" onclick="bkUlang(\''+pg.id+'\')">Baca ulang</span><span class="bt-b red" onclick="bkHapus(\''+pg.id+'\')">Hapus</span>'+bkDriveHtml(pg)+'</div>';
     return h+'</div></div>';
   }
   function bkKoreksi(p,r,apa,lama,baru){ if(String(lama==null?'':lama)===String(baru==null?'':baru)) return; btLog('Koreksi buku kas',null,{siswa:r.nama||r.aiNama,tglTf:r.tgl||'',nominal:Number(r.bayar)||0,ket:'Buku '+p.jenjang+' · '+apa+': '+(lama===''||lama==null?'(kosong)':lama)+' → '+(baru===''||baru==null?'(kosong)':baru)+' · tulisan: '+(r.aiNama+' ('+r.aiKelas+') '+r.ket).slice(0,80)}); }
@@ -11396,11 +11398,15 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
       }catch(e){ res(0); }
     });
   }
+  // hitung ulang semua baris Buku Kas (data siswa/riwayat bisa berubah, mis. kelas diganti di Kelola Siswa)
+  function bkHitungUlang(){ BK.forEach(function(p){ if(p.state==='ok') p.rows.forEach(function(r){ if(!r.doneNo) bkEvalRow(p,r); }); }); }
+  window.bkHitungUlang=function(){ bkHitungUlang(); bkRender(); };
+  document.addEventListener('visibilitychange',function(){ if(!document.hidden&&MODE==='bk'&&$('page-buktiTf')&&$('page-buktiTf').classList.contains('active')){ bkHitungUlang(); bkRender(); } });
   window.btMode=function(m){
     MODE=m; lsw('kwbt_mode',m);
     var a=$('bt-mode-tf'), b=$('bt-mode-bk'); if(a) a.style.display=m==='bk'?'none':''; if(b) b.style.display=m==='bk'?'':'none';
     document.querySelectorAll('#bt-modesw .bt-tab').forEach(function(t){ t.classList.toggle('on',t.dataset.m===m); });
-    if(m==='bk') bkRender(); else render();
+    if(m==='bk'){ bkHitungUlang(); bkRender(); } else render();
   };
   window.bkFiles=bkAdd;
   window._bkDebug={BK:function(){return BK;},addFake:function(ai,jenjang,img){ var pg={id:'bk'+Date.now().toString(36)+(++seq),jenjang:jenjang||'SD',state:'ok',rows:[],ditambah:new Date(),ai:ai,img:img||''}; bkBangun(pg); BK.unshift(pg); bkRender(); return pg; }};
@@ -11484,7 +11490,7 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
   window.showPage=function(p){
     var r=_sp.apply(this,arguments);
     document.body.classList.toggle('pg-bt',p==='buktiTf');
-    if(p==='buktiTf'){ Q.forEach(function(c){ c._drvCek=0; }); var h=document.querySelector('.navbar h1'); if(h) h.innerHTML='<span class="pt-muted">Bukti</span> Transfer'; Q.forEach(function(c){ if(c.state==='ok'){ alokasiKeep(c); } }); render(); }
+    if(p==='buktiTf'){ try{ bkHitungUlang(); bkRender(); }catch(e){} Q.forEach(function(c){ c._drvCek=0; }); var h=document.querySelector('.navbar h1'); if(h) h.innerHTML='<span class="pt-muted">Bukti</span> Transfer'; Q.forEach(function(c){ if(c.state==='ok'){ alokasiKeep(c); } }); render(); }
     if(p==='kwitansi') setTimeout(banner,120); else if($('bt-banner')&&p!=='preview') $('bt-banner').style.display='none';
     return r;
   };
@@ -11906,11 +11912,12 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
 <!-- ===================== VERSI APLIKASI ===================== -->
 <script>
 // Ubah setiap kali ada update: x.y.z  (z = perbaikan kecil, y = fitur baru, x = perubahan besar)
-window.APP_VERSION='3.10.1';
+window.APP_VERSION='3.10.2';
 window.APP_BUILD='2026-10-20';
-window.APP_NOTES='Buku Kas: setiap menempel foto aplikasi menanyakan jenjang bukunya, plus peringatan bila kelas di halaman tidak cocok dengan jenjang.';
+window.APP_NOTES='Buku Kas: otomatis dihitung ulang setelah data siswa diubah (mis. kelas jadi Plus) + peringatan bila kelas di buku beda dengan data siswa.';
 // riwayat singkat (terbaru di atas) — tampil terlipat di halaman Admin
 window.APP_RIWAYAT=[
+  ['3.10.2','2026-10-20','Buku Kas: hitung ulang otomatis saat kembali ke halaman (kelas/riwayat terbaru) + tombol ↻ Hitung ulang; peringatan kelas buku ≠ data siswa (mis. 9+ vs 9 SMP).'],
   ['3.10.1','2026-10-20','Buku Kas: pilih jenjang tiap kali menempel foto (tombol / tekan 1–4), peringatan kelas tidak cocok + Ganti ke buku X, jenjang bisa diganti di kartu.'],
   ['3.10.0','2026-10-20','BARU: ✨ Ketik AI — Pendaftaran (menu Siswa Baru): ketik bebas → dihitung (biaya, diskon, formulir, DP, sisa), AI/aplikasi bertanya bila kurang jelas, tawarkan tambah siswa baru → Buat Kuitansi. Tab Log dipisah: Bukti Transfer / Buku Kas.'],
   ['3.9.2','2026-10-20','Drive tersusun: <bulan>/Bukti Transfer/<nama siswa> dan <bulan>/Buku Kas/<jenjang> (Apps Script v4).'],
