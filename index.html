@@ -11927,6 +11927,129 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
   window._kaDebug={S:function(){return S;},hitung:hitung,setD:function(d){ S.d=d; render(); }};
 })();
 </script>
+<!-- ===================== CATATAN — DESAIN BARU (kartu 2 kolom + halaman tulis) ===================== -->
+<style>
+#note-popup{width:430px!important;max-height:min(640px,calc(100vh - 110px))!important;border-radius:20px!important;border:1px solid #e8ebe9!important;box-shadow:0 20px 50px rgba(0,0,0,.18)!important;background:#fff!important}
+#note-popup .np-header{background:#fff!important;color:#1f2a24!important;border-radius:20px 20px 0 0!important;padding:14px 16px 8px!important;gap:8px!important}
+#note-popup .np-header .nn-t{font-size:18px;font-weight:800;flex:1;color:#1f2a24}
+#note-popup .np-header button{width:34px;height:34px;border-radius:10px!important;border:1px solid #e5e7eb!important;background:#fff!important;color:#4b5563!important;opacity:1!important;font-size:14px!important;padding:0!important;display:grid;place-items:center}
+#note-popup .np-header button:hover{background:#f3f4f6!important}
+.nn-tabs{display:flex;gap:18px;padding:0 16px;border-bottom:1px solid #eef0ef;font-size:13px;font-weight:600;color:#9ca3af}
+.nn-tabs span{padding:6px 0 9px;cursor:pointer}.nn-tabs .on{color:#1f2a24;border-bottom:3px solid #5a5fd6}
+.nn-srch{margin:10px 16px 0;display:flex;align-items:center;gap:8px;background:#f3f4f6;border-radius:12px;padding:0 12px}
+.nn-srch input{flex:1;border:0;background:transparent;padding:9px 0;font-size:13px;outline:none;font-family:inherit}
+#note-popup .np-body{padding:12px 16px 70px!important;position:relative}
+.nn-grid{columns:2;column-gap:10px}
+.nn-card{break-inside:avoid;border-radius:12px;padding:11px 12px 13px;margin-bottom:10px;cursor:pointer;transition:transform .12s,box-shadow .12s;-webkit-user-select:none;user-select:none}
+.nn-card:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,0,0,.07)}
+.nn-card *{cursor:pointer!important}
+.nn-dt{font-size:10.5px;color:#8a8f98;display:flex;justify-content:space-between;align-items:center;gap:6px}
+.nn-card h4{font-size:15px;font-weight:800;color:#111;margin:5px 0 5px;line-height:1.25;word-break:break-word}
+.nn-card p{font-size:12.5px;line-height:1.5;color:#2d2f33;white-space:pre-wrap;word-break:break-word;display:-webkit-box;-webkit-line-clamp:9;-webkit-box-orient:vertical;overflow:hidden}
+.nn-pin{width:14px;height:16px;flex:none}
+.nn-empty{text-align:center;padding:30px 10px;color:#94a3b8;font-size:13px;line-height:1.6}
+.nn-fab{position:absolute;right:16px;bottom:62px;width:48px;height:48px;border-radius:50%;background:#5a5fd6;color:#fff;font-size:26px;border:0;display:grid;place-items:center;box-shadow:0 8px 20px rgba(90,95,214,.4);cursor:pointer;z-index:4;line-height:1}
+.nn-fab:hover{background:#4b50c4}
+.nn-ed{display:flex;flex-direction:column;gap:6px;border-radius:14px;padding:12px 14px;min-height:300px}
+.nn-ed .nn-top{display:flex;align-items:center;gap:8px;margin-bottom:4px}.nn-ed .nn-top b{flex:1;font-size:13px;color:#6b7280}
+.nn-ed .nn-top button{width:34px;height:34px;border-radius:10px;border:1px solid #e5e7eb;background:#fff;cursor:pointer;font-size:14px}
+.nn-ed input.nn-ti{font-size:21px;font-weight:800;border:0;background:transparent;outline:none;font-family:inherit;color:#111;width:100%}
+.nn-ed textarea{font-size:14px;line-height:1.6;color:#2d2f33;border:0;background:transparent;outline:none;font-family:inherit;resize:none;min-height:180px;width:100%}
+.nn-ed .nn-meta{font-size:11.5px;color:#8a8f98}
+.nn-ed textarea,.nn-ed input.nn-ti{border:0!important;box-shadow:none!important;outline:none!important;padding:0!important;background:transparent!important;border-radius:0!important}
+.nn-ed .nn-ro-title{font-size:21px;font-weight:800;color:#111;word-break:break-word}
+.nn-ed .nn-ro-body{font-size:14px;line-height:1.6;color:#2d2f33;white-space:pre-wrap;word-break:break-word;min-height:120px;-webkit-user-select:text;user-select:text}
+.nn-cols{display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap}
+.nn-cols i{width:24px;height:24px;border-radius:50%;display:block;border:2px solid #fff;box-shadow:0 0 0 1px #d1d5db;cursor:pointer}
+.nn-cols i.on{box-shadow:0 0 0 2px #5a5fd6}
+.nn-cols .nn-sv{margin-left:auto;background:#5a5fd6;color:#fff;font-weight:700;font-size:13px;border:0;border-radius:10px;padding:8px 16px;cursor:pointer}
+.nn-lockhint{font-size:11.5px;color:#b4581a;margin-top:8px}
+#note-popup .np-toolbar{border-top:1px solid #eef0ef!important;padding:6px 16px 10px!important}
+#note-popup .np-tb-btn{flex:0 0 auto!important;border-radius:9px!important;background:#fff!important;font-weight:600!important}
+#np-sync{padding:8px 16px 0!important;border-top:1px solid #eef0ef}
+@media(max-width:700px){#note-popup{left:10px!important;right:10px!important;width:auto!important;bottom:150px!important;max-height:calc(100vh - 220px)!important}}
+</style>
+<script>
+(function(){
+  var C={w:'#f1f2f4',y:'#fff7d6',o:'#ffeedd',g:'#e6f4ec',b:'#e8eefc',p:'#f1eafc',r:'#fdecec',t:'#e0f5f2'};
+  var URUT=['w','y','g','b','p','r','o','t'];
+  Object.keys(C).forEach(function(k){ NP_CM[k]=C[k]; });   // kartu mini ikut warna baru
+  var VIEW=null, TAB='all', Q='', _t=null;
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+  function waktu(iso){ if(!iso) return ''; var d=new Date(iso), s=(Date.now()-d)/1000;
+    if(s<60) return 'baru saja'; if(s<3600) return Math.floor(s/60)+' menit lalu'; if(s<86400) return Math.floor(s/3600)+' jam lalu';
+    if(s<172800) return 'kemarin'; return d.toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'}); }
+  var PIN_ON='<svg class="nn-pin" viewBox="0 0 14 16"><path d="M1 1h12v14l-6-4-6 4z" fill="#5a5fd6"/></svg>', PIN_OFF='<svg class="nn-pin" viewBox="0 0 14 16"><path d="M1.6 1.6h10.8v12.2L7 10.2l-5.4 3.6z" fill="none" stroke="#9ca3af" stroke-width="1.3"/></svg>';
+  function urut(){ return npNotes.map(function(n,i){return {n:n,i:i};}).sort(function(a,b){ if(!!b.n.pinned!==!!a.n.pinned) return b.n.pinned?1:-1; return String(b.n.updatedAt||'').localeCompare(String(a.n.updatedAt||'')); }); }
+  function header(){
+    var h=document.querySelector('#note-popup .np-header'); if(!h||h.dataset.nn) return; h.dataset.nn='1';
+    h.innerHTML='<span class="nn-t">📝 Catatan</span><button type="button" title="Cari" onclick="nnCari()">🔍</button><button type="button" id="np-lock-btn" title="Kunci / buka edit" onclick="npToggleLock()">🔒</button><button type="button" id="np-add-btn" style="display:none"></button><button type="button" title="Tutup" onclick="toggleNotePopup()">✕</button>';
+    var tb=document.createElement('div'); tb.className='nn-tabs'; tb.id='nn-tabs'; h.parentNode.insertBefore(tb,h.nextSibling);
+    var sr=document.createElement('div'); sr.className='nn-srch'; sr.id='nn-srch'; sr.style.display='none'; sr.innerHTML='🔍<input placeholder="Cari catatan…" oninput="nnQ(this.value)">'; tb.parentNode.insertBefore(sr,tb.nextSibling);
+    var lt=document.getElementById('np-lock-tb'); if(lt) lt.style.display='none';
+  }
+  function lockIkon(){ var b=document.getElementById('np-lock-btn'); if(b){ b.textContent=npEdit?'🔓':'🔒'; b.title=npEdit?'Kunci catatan':'Buka edit (PIN)'; } }
+  window.npSetMode=function(edit){ npEdit=edit; lockIkon(); npRender(); if(edit&&window._nnSetelahBuka){ var f=window._nnSetelahBuka; window._nnSetelahBuka=null; f(); } };
+  window.nnCari=function(){ var s=document.getElementById('nn-srch'); if(!s) return; var on=s.style.display==='none'; s.style.display=on?'flex':'none'; if(on) s.querySelector('input').focus(); else { Q=''; s.querySelector('input').value=''; npRender(); } };
+  window.nnQ=function(v){ Q=String(v||'').toLowerCase(); renderList(); };
+  window.nnTab=function(t){ TAB=t; npRender(); };
+  window.nnBuka=function(id){ VIEW=id; npRender(); };
+  window.nnKembali=function(){ simpanSekarang(); VIEW=null; npRender(); if(!npPopupOpen) npRenderMini(); };
+  window.nnBaru=function(){
+    var go=function(){ var now=new Date().toISOString(), n={id:Date.now(),title:'',body:'',color:'w',createdAt:now,updatedAt:now}; npNotes.unshift(n); npSave(); VIEW=n.id; npRender(); setTimeout(function(){ var t=document.querySelector('.nn-ti'); if(t) t.focus(); },60); };
+    if(npEdit) go(); else { window._nnSetelahBuka=go; npToggleLock(); }
+  };
+  function cari(id){ for(var i=0;i<npNotes.length;i++) if(npNotes[i].id===id) return i; return -1; }
+  function simpanSekarang(){ clearTimeout(_t); npSave(); }
+  window.nnUbah=function(id,f,v){ var i=cari(id); if(i<0||!npEdit) return; npNotes[i][f]=v; npNotes[i].updatedAt=new Date().toISOString();
+    var m=document.getElementById('nn-meta'); if(m) m.textContent='Diubah baru saja · menyimpan…';
+    clearTimeout(_t); _t=setTimeout(function(){ npSave(); var m2=document.getElementById('nn-meta'); if(m2) m2.textContent='✓ Tersimpan · diubah baru saja'; },1200); };
+  window.nnWarna=function(id,c){ var i=cari(id); if(i<0||!npEdit) return; npNotes[i].color=c; npNotes[i].updatedAt=new Date().toISOString(); npSave(); npRender(); };
+  window.nnSemat=function(id){ var i=cari(id); if(i<0) return; if(!npEdit){ window._nnSetelahBuka=function(){ nnSemat(id); }; npToggleLock(); return; } npNotes[i].pinned=!npNotes[i].pinned; npNotes[i].updatedAt=new Date().toISOString(); npSave(); npRender(); };
+  window.nnHapus=function(id){ var i=cari(id); if(i<0) return; if(!npEdit){ window._nnSetelahBuka=function(){ nnHapus(id); }; npToggleLock(); return; }
+    if(!confirm('Hapus catatan "'+(npNotes[i].title||'tanpa judul')+'"?')) return; VIEW=null; npDelNote(i); npRender(); };
+  window.nnEdit=function(id){ window._nnSetelahBuka=function(){ VIEW=id; npRender(); }; npToggleLock(); };
+  function tabs(){
+    var t=document.getElementById('nn-tabs'); if(!t) return;
+    var nP=npNotes.filter(function(n){return n.pinned;}).length;
+    t.style.display=VIEW!=null?'none':'flex';
+    t.innerHTML='<span class="'+(TAB==='all'?'on':'')+'" onclick="nnTab(\'all\')">Semua ('+npNotes.length+')</span><span class="'+(TAB==='pin'?'on':'')+'" onclick="nnTab(\'pin\')">📌 Disematkan'+(nP?' ('+nP+')':'')+'</span>';
+    var s=document.getElementById('nn-srch'); if(s&&VIEW!=null) s.style.display='none';
+  }
+  function renderList(){
+    var bd=document.getElementById('np-body'); if(!bd) return;
+    var L=urut().filter(function(x){ if(TAB==='pin'&&!x.n.pinned) return false; if(!Q) return true; return ((x.n.title||'')+' '+(x.n.body||'')).toLowerCase().indexOf(Q)>=0; });
+    var h='';
+    if(!L.length) h='<div class="nn-empty">'+(Q?'Tidak ada catatan yang cocok.':TAB==='pin'?'Belum ada catatan yang disematkan.':'Belum ada catatan.<br>Klik <b>+</b> untuk menulis.')+'</div>';
+    else h='<div class="nn-grid">'+L.map(function(x){ var n=x.n;
+      return '<div class="nn-card" style="background:'+(C[n.color]||C.w)+'" onclick="nnBuka('+n.id+')"><div class="nn-dt"><span>'+esc(waktu(n.updatedAt||n.createdAt))+'</span>'+(n.pinned?PIN_ON:PIN_OFF)+'</div>'+
+        (n.title?'<h4>'+esc(n.title)+'</h4>':'')+(n.body?'<p>'+esc(n.body)+'</p>':(n.title?'':'<p style="color:#9ca3af">(kosong)</p>'))+'</div>'; }).join('')+'</div>';
+    h+='<button type="button" class="nn-fab" title="Catatan baru" onclick="nnBaru()">+</button>';
+    bd.innerHTML=h;
+  }
+  function renderEditor(){
+    var bd=document.getElementById('np-body'); if(!bd) return; var i=cari(VIEW); if(i<0){ VIEW=null; return renderList(); }
+    var n=npNotes[i], bg=C[n.color]||C.w;
+    var top='<div class="nn-top"><button type="button" onclick="nnKembali()" title="Kembali">←</button><b>Catatan</b><button type="button" onclick="nnSemat('+n.id+')" title="Sematkan">'+(n.pinned?'📌':'📍')+'</button><button type="button" onclick="nnHapus('+n.id+')" title="Hapus">🗑</button></div>';
+    var meta='Diubah '+esc(waktu(n.updatedAt))+' · dibuat '+esc(new Date(n.createdAt||n.id).toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'}));
+    var h;
+    if(npEdit){
+      h='<div class="nn-ed" style="background:'+bg+'">'+top+'<input class="nn-ti" placeholder="Judul" value="'+esc(n.title)+'" oninput="nnUbah('+n.id+',\'title\',this.value)"><div class="nn-meta" id="nn-meta">'+meta+'</div>'+
+        '<textarea class="nn-tx" placeholder="Tulis catatan…" oninput="nnUbah('+n.id+',\'body\',this.value);this.style.height=\'auto\';this.style.height=this.scrollHeight+\'px\'">'+esc(n.body)+'</textarea>'+
+        '<div class="nn-cols">'+URUT.map(function(k){ return '<i class="'+(n.color===k||(!C[n.color]&&k==='w')?'on':'')+'" style="background:'+C[k]+'" onclick="nnWarna('+n.id+',\''+k+'\')"></i>'; }).join('')+'<button type="button" class="nn-sv" onclick="nnKembali()">Simpan</button></div></div>';
+    } else {
+      h='<div class="nn-ed" style="background:'+bg+'">'+top+'<div class="nn-ro-title">'+(n.title?esc(n.title):'<span style="color:#9ca3af">(tanpa judul)</span>')+'</div><div class="nn-meta">'+meta+'</div><div class="nn-ro-body">'+esc(n.body)+'</div>'+
+        '<div class="nn-lockhint">🔒 Terkunci — <a href="javascript:void 0" onclick="nnEdit('+n.id+')">buka edit</a> untuk mengubah.</div></div>';
+    }
+    bd.innerHTML=h;
+    var tx=bd.querySelector('.nn-tx'); if(tx){ tx.style.height='auto'; tx.style.height=Math.max(180,tx.scrollHeight)+'px'; }
+  }
+  window.npRender=function(){ header(); lockIkon(); tabs(); if(VIEW!=null) renderEditor(); else renderList(); };
+  window.npAddNote=window.nnBaru;
+  var _tg=window.toggleNotePopup; window.toggleNotePopup=function(){ if(npPopupOpen&&VIEW!=null){ simpanSekarang(); VIEW=null; } return _tg.apply(this,arguments); };
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',function(){ header(); }); else header();
+})();
+</script>
 <!-- ===================== SYNC CATATAN (laptop ⇄ HP lewat Apps Script Drive v5) ===================== -->
 <script>
 (function(){
@@ -12054,11 +12177,12 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
 <!-- ===================== VERSI APLIKASI ===================== -->
 <script>
 // Ubah setiap kali ada update: x.y.z  (z = perbaikan kecil, y = fitur baru, x = perubahan besar)
-window.APP_VERSION='3.12.1';
-window.APP_BUILD='2026-10-20';
-window.APP_NOTES='Kirim pengaturan ke HP sekali klik (Pengaturan AI, tombol Kirim ke WA saya), tidak perlu menyalin URL dan token manual.';
+window.APP_VERSION='3.13.0';
+window.APP_BUILD='2026-10-21';
+window.APP_NOTES='Tampilan Catatan baru: kartu dua kolom, sematkan, cari, halaman tulis yang lega.';
 // riwayat singkat (terbaru di atas) — tampil terlipat di halaman Admin
 window.APP_RIWAYAT=[
+  ['3.13.0','2026-10-21','Desain Catatan baru: kartu 2 kolom (tanggal, judul, isi), sematkan 📌, tab Semua/Disematkan, cari, tombol +, halaman baca/tulis dengan warna; PIN & sync tetap.'],
   ['3.12.1','2026-10-20','📲 Kirim pengaturan ke HP: link sekali klik (API key, URL & token Drive, rekening, wali kelas) lewat WA / salin.'],
   ['3.12.0','2026-10-20','Catatan (📝) tersinkron laptop ⇄ HP lewat Apps Script Drive v5 (gabung per catatan, terbaru menang, hapus ikut terhapus); status ☁ di popup Catatan.'],
   ['3.11.0','2026-10-20','BARU: 🏷 Potongan / diskon per item (Rp atau %, alasan: lebih bayar, pengembalian buku, dll.) — SPP tetap lunas, tampil di kuitansi & detail; AI Buku Kas & Bukti Transfer membaca potongan.'],
