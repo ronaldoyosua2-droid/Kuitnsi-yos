@@ -10984,7 +10984,7 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
     'Susunan: judul hari & tanggal (mis. "SENIN, 12 OKTOBER 2026"), lalu baris bernomor:',
     '"No. Nama siswa (kelas)" | keterangan pembayaran | nominal kolom tunai | centang (abaikan) | kolom kanan (nominal lain, bila ada) | centang (abaikan).',
     'Kelas ditulis dalam kurung: angka; tanda "+" artinya kelas Plus (contoh "(1+)" = 1 Plus, "(2+)" = 2 Plus). TK bisa ditulis "TK A"/"TK B"/"A"/"B".',
-    'GARIS/CORETAN MERAH pada nomor urut atau baris = baris itu SUDAH diinput → coret_merah true. Tanda centang (✓) abaikan.',
+    'GARIS/CORETAN MERAH pada nomor urut atau baris = baris itu SUDAH diinput → coret_merah true. HANYA bila jelas ada goresan tinta MERAH di baris itu; tulisan/garis tinta biru/hitam, garis tabel, bayangan, atau ragu-ragu → coret_merah false. Periksa tiap baris sendiri-sendiri. Tanda centang (✓) abaikan.',
     'Balas HANYA JSON:',
     '{"hari":[{"tanggal":"YYYY-MM-DD","baris":[{"no":1,"nama":"","kelas":"","keterangan":"","jenis":"SPP","bulan":["Oktober"],"tahun_ajaran_lalu":false,"nominal_tunai":0,"nominal_kanan":0,"catatan":"","coret_merah":false}]}]}',
     'Aturan:',
@@ -11015,7 +11015,7 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
     function cek(t){ r.note.push(t); if(st==='siap') st='cek'; }
     if(r.doneNo){ r.status='done'; r.note=[]; return; }
     if(r.jenis&&r.jenis!=='SPP'){ r.status='manual'; r.note=['Bukan SPP ('+r.jenis+') — input manual']; r.pilih=false; return; }
-    if(r.coret){ r.note.push('Coret merah: sudah diinput'); st='coret'; }
+    r.coretRagu=false; var sa=null;
     if(!r.tgl) cek('Tanggal belum ada (lanjutan halaman sebelumnya) — isi tanggal');
     if(!r.nama) cek('Siswa tidak ditemukan — pilih manual');
     else if(r.ambigu&&!r.dikonfirmasi) cek('Ada '+r.ambigu+' nama mirip — pastikan siswanya');
@@ -11023,8 +11023,8 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
     if(!r.bayar) cek('Nominal kosong');
     if(r.nama&&r.dari!=null){
       hitungRow(r);
-      var z=r.sampai!=null&&r.sampai>=r.dari?r.sampai:r.dari, sa=sudahAda(r.nama,r.dari,z);
-      if(sa.semua){ r.note.push('Sudah ada di aplikasi ('+sa.list.join(', ')+')'); if(st!=='coret') st='ada'; }
+      var z=r.sampai!=null&&r.sampai>=r.dari?r.sampai:r.dari; sa=sudahAda(r.nama,r.dari,z);
+      if(sa.semua){ r.note.push('Sudah ada di aplikasi ('+sa.list.join(', ')+')'); st='ada'; }
       else if(sa.sebagian) cek('Sebagian bulan sudah lunas: '+sa.list.join(', '));
       if(typeof sppSebelumMulai==='function'&&sppSebelumMulai(r.nama,mKey(fromIdx(r.dari)))) cek('Bulan sebelum siswa mulai sekolah ('+sppMulaiLabel(r.nama)+')');
       if(!r.tagihan&&!sa.semua) cek('Tagihan Rp 0 — tarif SPP kelas ini belum diatur?');
@@ -11035,6 +11035,12 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
       }
     }
     if(r.metode==='Transfer'&&!r.metodeOk) cek('Nominal di kolom kanan — metode diset Transfer, cek');
+    // coret merah dari AI dicocokkan dengan data aplikasi: bila bulannya belum ada → jangan langsung dilewati
+    if(r.coret){
+      var adaApp=!!(sa&&sa.semua);
+      if(adaApp||r.coretOk){ st='coret'; r.note.unshift('Coret merah: sudah diinput'+(adaApp?' (cocok dengan data aplikasi)':' (dipastikan admin)')); }
+      else{ r.coretRagu=true; r.note.unshift('Di buku terbaca coret merah, tapi '+(r.nama&&r.dari!=null?'belum ada di data siswa → dianggap BELUM diinput':'siswa/bulan belum cocok — lengkapi dulu')); }
+    }
     r.status=st;
     if(r._pilihAuto!==false) r.pilih=(st==='siap');
   }
@@ -11112,7 +11118,7 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
       h+='<td style="white-space:nowrap"><select onchange="bkBulan(\''+pg.id+'\','+i+',\'dari\',this.value)"'+(dis||r.jenis!=='SPP'?' disabled':'')+'><option value="">—</option>'+monthOpts(r.dari)+'</select> → <select onchange="bkBulan(\''+pg.id+'\','+i+',\'sampai\',this.value)"'+(dis||r.jenis!=='SPP'?' disabled':'')+'><option value="">—</option>'+monthOpts(r.sampai)+'</select>'+'<div class="bt-sub">'+(r.tagihan?'Tagihan '+rp(r.tagihan):'')+(r.taLalu?' · <span style="color:#b4581a">tahun ajaran lalu</span>':'')+'</div></td>';
       h+='<td><input type="number" value="'+(r.bayar||'')+'" onchange="bkSet(\''+pg.id+'\','+i+',\'bayar\',this.value)"'+(dis?' disabled':'')+' style="width:110px">'+(r.mode==='cicil'&&r.tagihan?'<div class="bt-sub w">cicil · sisa '+rp(r.tagihan-r.bayar)+'</div>':'')+'</td>';
       h+='<td><select onchange="bkSet(\''+pg.id+'\','+i+',\'metode\',this.value)"'+(dis?' disabled':'')+'><option'+(r.metode==='Kas'?' selected':'')+'>Kas</option><option'+(r.metode==='Transfer'?' selected':'')+'>Transfer</option></select></td>';
-      h+='<td><span class="bt-st '+stt[0]+'">'+esc(stt[1])+(r.doneNo?' '+esc(r.doneNo):'')+'</span>'+(r.status!=='done'&&r.status!=='coret'&&r.status!=='ada'?' <span class="bt-b sm'+(r.status==='manual'?'':' pri')+' bk-isi" onclick="bkIsi(\''+pg.id+'\','+i+')" title="Isi form Kwitansi untuk siswa ini (bisa tambah item lain)">Isi ke Kuitansi</span>':'')+(r.note&&r.note.length?'<div class="bt-sub'+(r.status==='cek'||r.status==='err'?' w':'')+'" style="white-space:normal">'+r.note.map(esc).join('<br>')+'</div>':'')+'</td>';
+      h+='<td><span class="bt-st '+stt[0]+'">'+esc(stt[1])+(r.doneNo?' '+esc(r.doneNo):'')+'</span>'+(r.status!=='done'&&r.status!=='coret'&&r.status!=='ada'?' <span class="bt-b sm'+(r.status==='manual'?'':' pri')+' bk-isi" onclick="bkIsi(\''+pg.id+'\','+i+')" title="Isi form Kwitansi untuk siswa ini (bisa tambah item lain)">Isi ke Kuitansi</span>':'')+(r.coretRagu&&r.status!=='done'?'<div style="margin-top:4px;display:flex;gap:4px;flex-wrap:wrap"><a href="javascript:void 0" class="bt-sub" onclick="bkCoret(\''+pg.id+'\','+i+',\'sudah\')" title="Lewati baris ini (misalnya sudah diinput dengan nama/bulan lain)">Lewati, sudah diinput</a></div>':'')+(r.status==='coret'?' <a href="javascript:void 0" class="bt-sub" onclick="bkCoret(\''+pg.id+'\','+i+',\'belum\')">Belum diinput?</a>':'')+(r.note&&r.note.length?'<div class="bt-sub'+(r.status==='cek'||r.status==='err'?' w':'')+'" style="white-space:normal">'+r.note.map(esc).join('<br>')+'</div>':'')+'</td>';
       h+='</tr>';
     });
     h+='</tbody></table></div>';
@@ -11186,6 +11192,10 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
     if(p.drive&&p.drive.length) h+='<span class="bt-sub" style="margin-left:6px">☁ Tersimpan: '+p.drive.map(function(d){ return '<a href="'+esc(d.url)+'" target="_blank" rel="noopener">'+(d.tgl==='foto'?'foto':d.tgl?esc(tglFmt(d.tgl).replace(/ \d{4}$/,'')):'tanpa tgl')+'</a>'; }).join(' · ')+'</span>';
     return h;
   }
+  window.bkCoret=function(id,i,v){ var p=bkP(id), r=p&&p.rows[i]; if(!r) return;
+    if(v==='belum'){ if(r.coret) bkKoreksi(p,r,'Coret merah','ya','tidak (belum diinput)'); r.coret=false; r.coretOk=false; r._pilihAuto=true; }
+    else { r.coretOk=true; }
+    bkEvalRow(p,r); bkRender(); };
   window.bkZoom=function(id){ var p=bkP(id); if(!p||!p.img) return; var z=$('bt-zoom'); z.querySelector('img').src=p.img; z.style.display='flex'; };
   window.bkUlang=function(id){ var p=bkP(id); if(p&&p.imgs&&p.imgs.length) bkProses(p); };
   window.bkHapus=function(id){ var p=bkP(id); if(!p) return; if(p.rows.some(function(r){return r.pilih&&r.status!=='done';})&&!confirm('Hapus halaman buku ini dari antrian?')) return; BK=BK.filter(function(x){return x!==p;}); bkRender(); };
@@ -11663,11 +11673,12 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
 <!-- ===================== VERSI APLIKASI ===================== -->
 <script>
 // Ubah setiap kali ada update: x.y.z  (z = perbaikan kecil, y = fitur baru, x = perubahan besar)
-window.APP_VERSION='3.9.0';
+window.APP_VERSION='3.9.1';
 window.APP_BUILD='2026-10-20';
-window.APP_NOTES='Buku Kas: tombol Simpan rekap ke Drive, gambar rekap per tanggal beserta foto halaman buku tersimpan di Google Drive.';
+window.APP_NOTES='Buku Kas: baris yang terbaca coret merah dicocokkan dengan data siswa, bila belum ada di aplikasi dianggap belum diinput.';
 // riwayat singkat (terbaru di atas) — tampil terlipat di halaman Admin
 window.APP_RIWAYAT=[
+  ['3.9.1','2026-10-20','Buku Kas: coret merah dicocokkan dengan data siswa — belum ada di aplikasi = belum diinput (siap dibuat); AI lebih ketat membaca coret merah; tombol Lewati / Belum diinput?.'],
   ['3.9.0','2026-10-20','Buku Kas: ☁ Simpan rekap ke Drive — gambar tabel per tanggal (tulisan buku, siswa, bulan, nominal, metode, status/no kuitansi) + foto halaman; link tampil di kartu & Log.'],
   ['3.8.4','2026-10-20','Kotak pengingat Buku Kas di atas form (tidak menutupi Total Bayar), tidak ikut tercetak.'],
   ['3.8.3','2026-10-20','Buku Kas: tombol Isi ke Kuitansi per baris/siswa — form terisi siswa, tanggal & SPP, petunjuk item lain di hari yang sama; setelah disimpan baris ditandai Dibuat.'],
