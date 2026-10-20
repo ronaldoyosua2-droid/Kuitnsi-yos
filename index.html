@@ -10188,6 +10188,7 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
 .bt-empty{text-align:center;color:var(--muted,#6b7280);font-size:13px;padding:30px 0}
 #bt-zoom{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:100000;display:none;align-items:center;justify-content:center;cursor:zoom-out}
 #bt-zoom img{max-width:94vw;max-height:94vh;border-radius:8px;background:#fff}
+#bk-banner{display:none;position:fixed;left:50%;transform:translateX(-50%);bottom:18px;z-index:950;width:min(760px,calc(100vw - 24px));background:#eef0fb;border:1px solid #b9bfe6;color:#2c3470;border-radius:14px;padding:10px 14px;font-size:13px;align-items:center;gap:10px;flex-wrap:wrap;box-shadow:0 8px 26px rgba(0,0,0,.14)}@media(max-width:700px){#bk-banner{bottom:calc(84px + env(safe-area-inset-bottom))}}.bk-isi{margin-top:4px;padding:3px 9px!important;font-size:11.5px!important}
 #bt-banner{display:none;position:relative;z-index:5;background:#fff6ee;border:1px solid #f3c9a5;color:#7a3a10;border-radius:12px;padding:10px 14px;margin:0 0 10px;font-size:13px;align-items:center;gap:10px;flex-wrap:wrap;box-shadow:0 4px 14px rgba(0,0,0,.06)}
 #bt-banner b{color:#5a2a08}
 #bt-banner .bt-bwarn{color:#b91c1c;font-weight:700}
@@ -11099,18 +11100,18 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
     h+='<div class="bk-tbl-wrap"><table class="bt-logt bk-tbl"><thead><tr><th style="width:26px"><input type="checkbox" title="Pilih semua yang siap" onchange="bkPilihSemua(\''+pg.id+'\',this.checked)"></th><th>Tanggal</th><th>Dari buku</th><th style="min-width:190px">Siswa</th><th>Bulan SPP · tagihan</th><th>Dibayar</th><th>Metode</th><th style="min-width:170px">Status</th></tr></thead><tbody>';
     var lastT=null;
     pg.rows.forEach(function(r,i){
-      var dis=(r.status==='done'||r.status==='manual'), s=r.nama?siswaByNama(r.nama):null;
+      var dis=(r.status==='done'), disCk=(r.status==='done'||r.status==='manual'), s=r.nama?siswaByNama(r.nama):null;
       if(r.tgl!==lastT){ lastT=r.tgl; h+='<tr class="bk-day"><td colspan="8">'+(r.tgl?esc(tglFmt(r.tgl)):'⚠ Tanpa tanggal (lanjutan halaman sebelumnya)')+'</td></tr>'; }
       var stt=BK_ST[r.status]||['warn',r.status];
       h+='<tr class="bk-r bk-'+r.status+'">';
-      h+='<td><input type="checkbox" '+(r.pilih&&!dis?'checked':'')+(dis?' disabled':'')+' onchange="bkPilih(\''+pg.id+'\','+i+',this.checked)"></td>';
+      h+='<td><input type="checkbox" '+(r.pilih&&!disCk?'checked':'')+(disCk?' disabled':'')+' onchange="bkPilih(\''+pg.id+'\','+i+',this.checked)"></td>';
       h+='<td><input type="date" value="'+esc(r.tgl||'')+'" onchange="bkSet(\''+pg.id+'\','+i+',\'tgl\',this.value)"'+(dis?' disabled':'')+' style="width:130px"></td>';
       h+='<td style="font-size:12px;line-height:1.35"><b>'+esc((r.no?r.no+'. ':'')+r.aiNama)+'</b> ('+esc(r.aiKelas)+')<br><span style="color:var(--muted,#6b7280)">'+esc(r.ket)+(r.catatan?' · <i>'+esc(r.catatan)+'</i>':'')+'</span></td>';
       h+='<td><input list="bt-dl" value="'+(s?esc(s.nama)+' — '+esc(s.kelas):'')+'" placeholder="Cari siswa..." onchange="bkSiswa(\''+pg.id+'\','+i+',this.value)"'+(dis?' disabled':'')+'>'+(r.cand&&r.cand.length>1&&!dis?'<div class="bt-sub"><a href="javascript:void 0" onclick="bkCand(\''+pg.id+'\','+i+')">'+r.cand.length+' kandidat</a></div>':'')+'</td>';
       h+='<td style="white-space:nowrap"><select onchange="bkBulan(\''+pg.id+'\','+i+',\'dari\',this.value)"'+(dis||r.jenis!=='SPP'?' disabled':'')+'><option value="">—</option>'+monthOpts(r.dari)+'</select> → <select onchange="bkBulan(\''+pg.id+'\','+i+',\'sampai\',this.value)"'+(dis||r.jenis!=='SPP'?' disabled':'')+'><option value="">—</option>'+monthOpts(r.sampai)+'</select>'+'<div class="bt-sub">'+(r.tagihan?'Tagihan '+rp(r.tagihan):'')+(r.taLalu?' · <span style="color:#b4581a">tahun ajaran lalu</span>':'')+'</div></td>';
       h+='<td><input type="number" value="'+(r.bayar||'')+'" onchange="bkSet(\''+pg.id+'\','+i+',\'bayar\',this.value)"'+(dis?' disabled':'')+' style="width:110px">'+(r.mode==='cicil'&&r.tagihan?'<div class="bt-sub w">cicil · sisa '+rp(r.tagihan-r.bayar)+'</div>':'')+'</td>';
       h+='<td><select onchange="bkSet(\''+pg.id+'\','+i+',\'metode\',this.value)"'+(dis?' disabled':'')+'><option'+(r.metode==='Kas'?' selected':'')+'>Kas</option><option'+(r.metode==='Transfer'?' selected':'')+'>Transfer</option></select></td>';
-      h+='<td><span class="bt-st '+stt[0]+'">'+esc(stt[1])+(r.doneNo?' '+esc(r.doneNo):'')+'</span>'+(r.note&&r.note.length?'<div class="bt-sub'+(r.status==='cek'||r.status==='err'?' w':'')+'" style="white-space:normal">'+r.note.map(esc).join('<br>')+'</div>':'')+'</td>';
+      h+='<td><span class="bt-st '+stt[0]+'">'+esc(stt[1])+(r.doneNo?' '+esc(r.doneNo):'')+'</span>'+(r.status!=='done'&&r.status!=='coret'&&r.status!=='ada'?' <span class="bt-b sm'+(r.status==='manual'?'':' pri')+' bk-isi" onclick="bkIsi(\''+pg.id+'\','+i+')" title="Isi form Kwitansi untuk siswa ini (bisa tambah item lain)">Isi ke Kuitansi</span>':'')+(r.note&&r.note.length?'<div class="bt-sub'+(r.status==='cek'||r.status==='err'?' w':'')+'" style="white-space:normal">'+r.note.map(esc).join('<br>')+'</div>':'')+'</td>';
       h+='</tr>';
     });
     h+='</tbody></table></div>';
@@ -11185,6 +11186,78 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
     showPage('buktiTf'); btMode('bk'); bkRender();
     alert('Selesai: '+ok+' kuitansi dibuat'+(gagal?', '+gagal+' gagal (lihat kolom Status)':'')+'.');
   };
+
+
+  // ---------- Isi ke Kuitansi PER SISWA (satu-satu, bisa ditambah item lain) ----------
+  function bkGrup(p,i){
+    var r=p.rows[i]; if(!r) return [];
+    return p.rows.map(function(x,k){return k;}).filter(function(k){ var x=p.rows[k];
+      return k===i||(x.nama&&x.nama===r.nama&&x.tgl===r.tgl&&!x.doneNo&&x.status!=='coret'&&x.status!=='ada'); });
+  }
+  window.bkIsi=function(id,i){
+    var p=bkP(id), r=p&&p.rows[i]; if(!r) return;
+    if(!r.nama){ alert('Pilih siswanya dulu di kolom Siswa.'); return; }
+    if(!r.tgl){ alert('Isi tanggal dulu (baris lanjutan halaman sebelumnya).'); return; }
+    var s=siswaByNama(r.nama); if(!s) return;
+    var G=bkGrup(p,i), spp=G.map(function(k){return p.rows[k];}).filter(function(x){ return (x.jenis||'SPP')==='SPP'&&x.dari!=null; })[0];
+    window._btPending=null;
+    if(spp) isiFormSPP({tanggal:r.tgl,nama:s.nama,kelas:s.kelas,dari:spp.dari,sampai:spp.sampai,mode:spp.mode,bayar:spp.bayar});
+    else{
+      showPage('kwitansi'); resetForm();
+      var tg=$('inp-tanggal'); if(tg){ tg.value=r.tgl; tg.dispatchEvent(new Event('input',{bubbles:true})); tg.dispatchEvent(new Event('change',{bubbles:true})); }
+      siswaList=[{nama:s.nama,kelas:s.kelas}]; renderSiswaForms();
+    }
+    var lain=G.map(function(k){return p.rows[k];}).filter(function(x){ return x!==spp; });
+    window._bkPending={pid:p.id,rows:G,nama:s.nama,tgl:r.tgl,metode:(spp||r).metode||'Kas',lain:lain.map(function(x){ return (x.ket||x.jenis)+' '+rp(x.bayar||0); }),total:G.reduce(function(a,k){return a+(Number(p.rows[k].bayar)||0);},0)};
+    setTimeout(function(){ document.querySelectorAll('.sf-dd').forEach(function(x){x.classList.remove('open');}); if(document.activeElement&&document.activeElement.blur) document.activeElement.blur(); },80);
+    bkBanner(); window.scrollTo(0,0);
+  };
+  function bkBanner(msg){
+    var b=$('bk-banner'); if(!b){ b=document.createElement('div'); b.id='bk-banner'; document.body.appendChild(b); }
+    var q=window._bkPending;
+    if(msg){ b.innerHTML=msg; b.style.display='flex'; return; }
+    if(!q){ b.style.display='none'; return; }
+    b.innerHTML='<span style="flex:1 1 300px;line-height:1.5">📒 Dari <b>Buku Kas</b>: <b>'+esc(q.nama)+'</b> · '+esc(tglFmt(q.tgl))+' · total di buku <b>'+rp(q.total)+'</b>'+
+      (q.lain.length?'<br>➕ Tambahkan item: <b>'+q.lain.map(esc).join('</b>, <b>')+'</b>':'')+
+      '<br>Lalu klik <b>Buat Kwitansi</b> → pilih <b>'+esc(q.metode)+'</b>.</span>'+
+      '<span class="bt-b sm" onclick="bkIsiBatal()">Batal</span><span class="bt-b sm" onclick="bkKembali()">← Buku Kas</span>';
+    b.style.display='flex';
+  }
+  window.bkIsiBatal=function(){ window._bkPending=null; bkBanner(); resetForm(); };
+  window.bkKembali=function(){ var b=$('bk-banner'); if(b&&!window._bkPending) b.style.display='none'; showPage('buktiTf'); btMode('bk'); };
+  var _bkWrap=window.buatKwitansi;
+  if(typeof _bkWrap==='function'){
+    window.buatKwitansi=function(){
+      var q=window._bkPending, before=window._lastNewRecs;
+      var ret=_bkWrap.apply(this,arguments);
+      try{
+        if(q&&window._lastNewRecs&&window._lastNewRecs!==before){
+          var recs=window._lastNewRecs, rec=recs.find(function(x){return x.nama===q.nama;})||recs[0], p=bkP(q.pid);
+          var rw=getRiwayat(), ids=recs.map(function(x){return x.id;});
+          rw.forEach(function(x){ if(ids.indexOf(x.id)>=0) x.bukuKas={jenjang:p?p.jenjang:'',tgl:q.tgl,no:q.rows.map(function(k){return p&&p.rows[k]?p.rows[k].no:'';}).join(','),tulisan:q.rows.map(function(k){var r=p&&p.rows[k]; return r?(r.aiNama+' ('+r.aiKelas+') '+r.ket):'';}).join(' | ').slice(0,200)}; }); setRiwayat(rw);
+          var dibayar=recs.filter(function(x){return x.nama===q.nama;}).reduce(function(a,x){return a+(Number(x.nominalBayar)||0);},0), semua=dibayar>=q.total;
+          if(p) q.rows.forEach(function(k){ var r=p.rows[k]; if(!r) return;
+            if(!semua&&q.rows.length>1&&(r.jenis||'SPP')!=='SPP'){ r.note=['Belum masuk kuitansi '+(rec?rec.no:'')+' (total kuitansi '+rp(dibayar)+') — klik Isi ke Kuitansi lagi bila perlu']; return; }
+            r.doneNo=rec?rec.no:'tersimpan'; r.status='done'; r.pilih=false; r.note=[]; if(r.aiNama) setAlias(r.aiNama,q.nama); });
+          btLog('Kuitansi dibuat (buku kas)',null,{no:rec?rec.no:'',siswaKw:q.nama,bayar:rec?rec.nominalBayar:q.total,ket:'Buku '+(p?p.jenjang:'')+' · per siswa'+(q.lain.length?' · + '+q.lain.join(', '):''),tglTf:q.tgl,nominal:q.total});
+          window._bkPending=null; bkRender();
+          bkBanner('<span style="flex:1 1 300px">✓ Kuitansi <b>'+esc(rec?rec.no:'')+'</b> ('+esc(q.nama)+') tersimpan & ditandai di Buku Kas.</span><span class="bt-b sm pri" onclick="bkKembali()">← Kembali ke Buku Kas</span><span class="bt-b sm" onclick="this.parentNode.style.display=\'none\'">✕</span>');
+        }
+      }catch(e){ console.warn('buku kas isi',e); }
+      return ret;
+    };
+  }
+  var _pm2=window.pilihMetodeDulu;
+  if(typeof _pm2==='function'){
+    window.pilihMetodeDulu=function(key){
+      var r=_pm2.apply(this,arguments);
+      if(!r&&key==='kw'&&window._bkPending){ var mt=window._bkPending.metode||'Kas';
+        setTimeout(function(){ var m=$('metode-modal'); if(!m) return; m.querySelectorAll('.metode-opt').forEach(function(x){x.classList.remove('bt-hl');}); var t=m.querySelector('.metode-opt[data-m="'+mt+'"]'); if(t){ t.classList.add('bt-hl'); t.focus(); } },90); }
+      return r;
+    };
+  }
+  var _sp2=window.showPage;
+  window.showPage=function(pg){ var r=_sp2.apply(this,arguments); var b=$('bk-banner'); if(b&&pg==='buktiTf'&&!window._bkPending) b.style.display='none'; return r; };
 
   // simpan antrian halaman buku (IndexedDB, store "buku")
   var _bkT=null;
@@ -11517,11 +11590,12 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
 <!-- ===================== VERSI APLIKASI ===================== -->
 <script>
 // Ubah setiap kali ada update: x.y.z  (z = perbaikan kecil, y = fitur baru, x = perubahan besar)
-window.APP_VERSION='3.8.2';
+window.APP_VERSION='3.8.3';
 window.APP_BUILD='2026-10-20';
-window.APP_NOTES='Notifikasi update: muncul pemberitahuan bila ada versi baru, klik Perbarui.';
+window.APP_NOTES='Buku Kas: tombol Isi ke Kuitansi per siswa (bisa ditambah item lain seperti Pengembangan) selain buat massal.';
 // riwayat singkat (terbaru di atas) — tampil terlipat di halaman Admin
 window.APP_RIWAYAT=[
+  ['3.8.3','2026-10-20','Buku Kas: tombol Isi ke Kuitansi per baris/siswa — form terisi siswa, tanggal & SPP, petunjuk item lain di hari yang sama; setelah disimpan baris ditandai Dibuat.'],
   ['3.8.2','2026-10-20','Notifikasi update: pemberitahuan versi baru (dicek saat dibuka, saat kembali ke aplikasi, tiap 30 menit) + tombol Perbarui; setelah diperbarui muncul info versi baru.'],
   ['3.8.1','2026-10-20','Tombol Install di HP pindah dari menu bawah ke kotak kecil yang bisa ditutup + di halaman Admin.'],
   ['3.8.0','2026-10-20','Bisa di-install sebagai aplikasi di laptop & HP (tombol 📲 Install aplikasi), tetap terbuka tanpa internet, data browser ditandai permanen. Catatan versi di Admin diringkas.'],
