@@ -11517,11 +11517,12 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
 <!-- ===================== VERSI APLIKASI ===================== -->
 <script>
 // Ubah setiap kali ada update: x.y.z  (z = perbaikan kecil, y = fitur baru, x = perubahan besar)
-window.APP_VERSION='3.8.1';
+window.APP_VERSION='3.8.2';
 window.APP_BUILD='2026-10-20';
-window.APP_NOTES='Tombol Install di HP tidak lagi menyempitkan menu bawah (jadi kotak kecil yang bisa ditutup; juga ada di halaman Admin).';
+window.APP_NOTES='Notifikasi update: muncul pemberitahuan bila ada versi baru, klik Perbarui.';
 // riwayat singkat (terbaru di atas) — tampil terlipat di halaman Admin
 window.APP_RIWAYAT=[
+  ['3.8.2','2026-10-20','Notifikasi update: pemberitahuan versi baru (dicek saat dibuka, saat kembali ke aplikasi, tiap 30 menit) + tombol Perbarui; setelah diperbarui muncul info versi baru.'],
   ['3.8.1','2026-10-20','Tombol Install di HP pindah dari menu bawah ke kotak kecil yang bisa ditutup + di halaman Admin.'],
   ['3.8.0','2026-10-20','Bisa di-install sebagai aplikasi di laptop & HP (tombol 📲 Install aplikasi), tetap terbuka tanpa internet, data browser ditandai permanen. Catatan versi di Admin diringkas.'],
   ['3.7.3','2026-10-19','Log Bukti Transfer per halaman (25 catatan).'],
@@ -11558,6 +11559,45 @@ window.APP_RIWAYAT=[
 <style>.app-riw{flex-basis:100%}.app-riw summary{cursor:pointer;color:#2f7a55;font-weight:600;width:max-content}.app-riw ul{margin:6px 0 0 18px;line-height:1.6}.app-riw li span{opacity:.7}
 .app-ver-sb{order:100;font-size:10.5px;color:var(--muted,#9ca3af);text-align:center;padding:6px 0 0;cursor:help;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}body.sn-collapsed .app-ver-sb{font-size:9px}@media(max-width:700px){.app-ver-sb{display:none}}</style>
 
+
+<!-- ===================== NOTIF UPDATE ===================== -->
+<script>
+(function(){
+  var web=/^https?:$/.test(location.protocol), SEEN='app_ver_seen', baru=null;
+  function cmp(a,b){ a=String(a).split('.').map(Number); b=String(b).split('.').map(Number); for(var i=0;i<3;i++){ var d=(a[i]||0)-(b[i]||0); if(d) return d; } return 0; }
+  function bar(html,cls){
+    var b=document.getElementById('upd-bar'); if(!b){ b=document.createElement('div'); b.id='upd-bar'; document.body.appendChild(b); }
+    b.className=cls||''; b.innerHTML=html; b.style.display='flex';
+    var x=b.querySelector('.upd-x'); if(x) x.onclick=function(){ b.style.display='none'; };
+    return b;
+  }
+  // 1) cek apakah ada versi lebih baru di GitHub (saat dibuka, kembali ke aplikasi, & tiap 30 menit)
+  var _last=0;
+  function cek(){
+    if(!web||Date.now()-_last<60000) return; _last=Date.now();
+    fetch('index.html?cek='+Date.now(),{cache:'no-store'}).then(function(r){ return r.ok?r.text():''; }).then(function(tx){
+      var m=tx.match(/APP_VERSION='([\d.]+)'/), n=tx.match(/APP_NOTES='((?:[^'\\]|\\.)*)'/);
+      if(!m||cmp(m[1],window.APP_VERSION)<=0) return;
+      baru=m[1];
+      var b=bar('<span>🔔 <b>Update tersedia: v'+baru+'</b>'+(n?' — '+n[1].replace(/\\'/g,"'").replace(/</g,'&lt;'):'')+'<br><small>Selesaikan/simpan kuitansi yang sedang diisi dulu, lalu klik Perbarui.</small></span><button type="button" class="upd-go">Perbarui</button><button type="button" class="upd-x" title="Nanti">✕</button>','new');
+      b.querySelector('.upd-go').onclick=function(){ location.reload(); };
+    }).catch(function(){});
+  }
+  // 2) setelah diperbarui: tampilkan sekali "sudah diperbarui ke vX"
+  function sudah(){
+    var s=''; try{ s=localStorage.getItem(SEEN)||''; localStorage.setItem(SEEN,window.APP_VERSION); }catch(e){}
+    if(s&&cmp(window.APP_VERSION,s)>0){
+      bar('<span>✓ <b>Aplikasi diperbarui ke v'+window.APP_VERSION+'</b> — '+String(window.APP_NOTES||'').replace(/</g,'&lt;')+'</span><button type="button" class="upd-x" title="Tutup">✕</button>','ok');
+      setTimeout(function(){ var b=document.getElementById('upd-bar'); if(b&&b.className==='ok') b.style.display='none'; },15000);
+    }
+  }
+  var st=document.createElement('style');
+  st.textContent='#upd-bar{position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:9999;display:none;align-items:center;gap:10px;max-width:min(640px,calc(100vw - 24px));background:var(--surface,#fff);border:1px solid #a9cbb8;border-radius:14px;padding:10px 10px 10px 14px;box-shadow:0 8px 28px rgba(0,0,0,.16);font-size:13px;line-height:1.4;color:var(--ink,#1f2a24)}#upd-bar.new{border-color:#4b55a0}#upd-bar span{flex:1}#upd-bar small{color:var(--muted,#6b7280)}#upd-bar .upd-go{border:0;background:#4b55a0;color:#fff;font-weight:700;border-radius:10px;padding:8px 14px;cursor:pointer;white-space:nowrap}#upd-bar .upd-x{border:0;background:transparent;color:var(--muted,#6b7280);font-size:16px;cursor:pointer;padding:4px 6px}';
+  document.head.appendChild(st);
+  function mulai(){ sudah(); setTimeout(cek,3000); setInterval(cek,30*60000); document.addEventListener('visibilitychange',function(){ if(!document.hidden) cek(); }); }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',function(){ setTimeout(mulai,600); }); else setTimeout(mulai,600);
+})();
+</script>
 <!-- ===================== CATATAN MINI: tidak menghalangi klik + Tandai dibaca ===================== -->
 <script>
 (function(){
