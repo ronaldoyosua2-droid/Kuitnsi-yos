@@ -1475,6 +1475,11 @@ function quickSelectSiswaByName(nama, kelas){
   }
 }
 
+// ===== CALON SISWA (mendaftar sekarang, masuk tahun ajaran berikutnya) =====
+function taBerikutnya(){ var y=parseInt(getTAAktif()); return (y+1)+'/'+(y+2); }
+function isCalonSiswa(s){ return !!(s&&s.calonTA&&parseInt(s.calonTA)>parseInt(getTAAktif())); }   // belum masuk
+function calonLewatiNaik(s){ return !!(s&&s.calonTA&&parseInt(s.calonTA)>=parseInt(getTAAktif())); } // jangan ikut naik kelas di TA masuknya
+function calonLabel(s){ return 'Calon · masuk Juli '+parseInt(s.calonTA)+' ('+s.calonTA+')'; }
 function renderSidebarSiswa(){
   const kelas = document.getElementById('sidebar-filter-kelas')?.value||'';
   const q = (document.getElementById('sidebar-search-siswa')?.value||'').toLowerCase();
@@ -1484,7 +1489,7 @@ function renderSidebarSiswa(){
   let siswa = getSiswa().filter(s=>s.kelas&&s.kelas!=='LULUS');
   if(kelas){
     // Tampilkan kelas reguler + Plus sekaligus (misal "1 SD" → tampilkan "1 SD" dan "1 SD Plus")
-    siswa = siswa.filter(s=>s.kelas===kelas||s.kelas===kelas+' Plus');
+    siswa = siswa.filter(s=>(s.kelas===kelas||s.kelas===kelas+' Plus')&&!isCalonSiswa(s));
   }
   if(q) siswa = siswa.filter(s=>s.nama.toLowerCase().includes(q));
   siswa = siswa.sort((a,b)=>a.nama.localeCompare(b.nama));
@@ -1492,7 +1497,7 @@ function renderSidebarSiswa(){
   if(!kelas&&!q){ wrap.innerHTML='<div style="color:var(--text2);font-size:12px;text-align:center;padding:16px 0">Pilih kelas atau cari nama</div>'; return; }
   if(!siswa.length){ wrap.innerHTML='<div style="color:var(--text2);font-size:12px;text-align:center;padding:16px 0">Tidak ada siswa</div>'; return; }
   
-  wrap.innerHTML = siswa.map(s=>`<div class="siswa-quick-item" onclick="quickSelectSiswa('${s.nama.replace(/'/g,"\'")}','${s.kelas}')" style="${s.kelas.includes('Plus')?'background:#fffbeb;':''}"><span style="display:flex;align-items:center;gap:4px;overflow:hidden;justify-content:space-between;width:100%"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:${s.kelas.includes('Plus')?'#92400e':'inherit'};font-weight:${s.kelas.includes('Plus')?'600':'400'}">${s.nama}</span><span style="flex-shrink:0;font-size:10px;white-space:nowrap;margin-left:4px;color:${s.kelas.includes('Plus')?'#b45309':'var(--text2)'}">${s.kelas.replace(' Plus','')}${s.kelas.includes('Plus')?'★':''}</span></span></div>`).join('');
+  wrap.innerHTML = siswa.map(s=>`<div class="siswa-quick-item" onclick="quickSelectSiswa('${s.nama.replace(/'/g,"\'")}','${s.kelas}')" style="${s.kelas.includes('Plus')?'background:#fffbeb;':''}"><span style="display:flex;align-items:center;gap:4px;overflow:hidden;justify-content:space-between;width:100%"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:${s.kelas.includes('Plus')?'#92400e':'inherit'};font-weight:${s.kelas.includes('Plus')?'600':'400'}">${s.nama}</span><span style="flex-shrink:0;font-size:10px;white-space:nowrap;margin-left:4px;color:${s.kelas.includes('Plus')?'#b45309':'var(--text2)'}">${s.kelas.replace(' Plus','')}${s.kelas.includes('Plus')?'★':''}${isCalonSiswa(s)?' · calon':''}</span></span></div>`).join('');
 }
 
 function quickSelectSiswa(nama, kelas){
@@ -2067,6 +2072,10 @@ function doConfirmLoadCloud(){ if(typeof confirmLoadCloud==='function') confirmL
       <div class="field">
         <label>Tanggal Daftar</label>
         <input type="date" id="sb-tanggal" onchange="onSbTanggalChange()">
+      </div>
+      <div class="field">
+        <label>Masuk Tahun Ajaran <span style="font-size:10px;color:var(--text2)">calon siswa TA depan tidak ditagih SPP & tidak ikut naik kelas</span></label>
+        <select id="sb-masuk-ta"></select>
       </div>
     </div>
 
@@ -8319,7 +8328,7 @@ function renderAdminSiswa(){
         const tglUpd=s.updatedAt&&s.updatedAt!==s.createdAt?'<br><span style="color:var(--orange);font-size:10px">Edit: '+new Date(s.updatedAt).toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'2-digit'})+'</span>':'';
         return `<tr><td style="color:var(--text2);font-size:12px">${realIdx+1}</td>
           <td>${s.nama}</td>
-          <td><span class="badge ${s.kelas.includes('Plus')?'badge-orange':'badge-blue'}">${s.kelas}</span></td>
+          <td><span class="badge ${s.kelas.includes('Plus')?'badge-orange':'badge-blue'}">${s.kelas}</span>${isCalonSiswa(s)?'<div style="font-size:10.5px;color:#7c3aed;font-weight:600;margin-top:3px">'+calonLabel(s)+'</div>':''}</td>
           <td style="font-size:11px;color:var(--text2)">${tglAdd}${tglUpd}</td>
           <td style="display:flex;gap:6px">
             <button class="btn" style="font-size:11px;padding:3px 8px" onclick="editSiswa(${realIdx})">&#9998; Edit</button>
@@ -8416,10 +8425,11 @@ function buildNaikKelasList(){
   if(!siswa.length){wrap.innerHTML='<div class="hist-empty">Tidak ada siswa ditemukan</div>';return;}
   wrap.innerHTML=siswa.map((s,i)=>{
     const realIdx=allSiswa.indexOf(s);
-    const to=NAIK_MAP[s.kelas]||'?';
+    const calon=calonLewatiNaik(s);
+    const to=calon?'tetap (calon, masuk TA '+s.calonTA+')':(NAIK_MAP[s.kelas]||'?');
     const isLulus=to==='LULUS';
-    return `<div class="naik-kelas-item">
-      <input type="checkbox" checked data-idx="${realIdx}">
+    return `<div class="naik-kelas-item"${calon?' style="opacity:.65"':''}>
+      <input type="checkbox" ${calon?'disabled':'checked'} data-idx="${realIdx}">
       <span style="flex:1">${s.nama}</span>
       <span class="naik-from">${s.kelas}</span>
       <span class="naik-arrow">→</span>
@@ -8436,7 +8446,7 @@ function prosesNaikKelasSemua(){
   // lalu 7 SMP yang lama belum diproses jadi tercampur dengan yg baru naik.
   const al=document.getElementById('naik-alert');
   const allSiswa=getSiswa();
-  const aktif=allSiswa.filter(s=>NAIK_MAP[s.kelas]); // hanya yg kelasnya dikenal sistem
+  const aktif=allSiswa.filter(s=>NAIK_MAP[s.kelas]&&!calonLewatiNaik(s)); // hanya yg kelasnya dikenal sistem (calon siswa tidak ikut naik)
 
   if(aktif.length===0){
     al.textContent='Tidak ada siswa untuk diproses.';al.classList.add('show');
@@ -8468,6 +8478,7 @@ function prosesNaikKelasSemua(){
   const lulusList=[];
   const updated=allSiswa.map(s=>{
     const to=NAIK_MAP[s.kelas];
+    if(calonLewatiNaik(s)) return s; // calon siswa: baru masuk di TA ini, tidak naik
     if(!to) return s; // kelas tidak dikenal / sudah LULUS, biarkan
     if(to==='LULUS'){
       lulusList.push(Object.assign({},s,{kelas:'LULUS',_lulus:true,_lulusDari:s.kelas,_lulusTahun:new Date().getFullYear()}));
@@ -8516,6 +8527,7 @@ function prosesNaikKelas(){
   const updated=siswa.map(s=>{
     const match=dicentang.find(d=>d===s);
     if(!match) return s;
+    if(calonLewatiNaik(s)) return s;
     const to=NAIK_MAP[s.kelas];
     if(!to) return s; // kelas tidak dikenal, biarkan
     if(to==='LULUS') return Object.assign({},s,{kelas:'LULUS',_lulus:true,_lulusDari:s.kelas});
@@ -11784,6 +11796,51 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
 })();
 </script>
 
+<!-- ===================== CALON SISWA: form Siswa Baru & Kelola Siswa ===================== -->
+<script>
+(function(){
+  var $=function(i){return document.getElementById(i);};
+  function isiOpsi(){ var s=$('sb-masuk-ta'); if(!s) return; var v=s.value, a=getTAAktif(), b=taBerikutnya();
+    s.innerHTML='<option value="">Tahun ini ('+a+') — langsung jadi siswa</option><option value="'+b+'">Tahun depan ('+b+') — calon siswa, masuk Juli '+parseInt(b)+'</option>'; if(v===b) s.value=b; }
+  var _rs=window.resetSiswaBaru; if(typeof _rs==='function') window.resetSiswaBaru=function(){ var r=_rs.apply(this,arguments); isiOpsi(); var s=$('sb-masuk-ta'); if(s) s.value=''; return r; };
+  var _bk=window.buatKwitansiSiswaBaru;
+  window.buatKwitansiSiswaBaru=function(){
+    var ta=($('sb-masuk-ta')||{}).value||'', before=window._sbLastRecs, nama=(($('sb-nama')||{}).value||'').trim();
+    var r=_bk.apply(this,arguments);
+    try{
+      if(ta&&window._sbLastRecs&&window._sbLastRecs!==before&&window._sbLastRecs.length){
+        var recs=window._sbLastRecs, ids=recs.map(function(x){return x.id;});
+        var sd=getSiswa(), s=sd.find(function(x){return x.nama.toLowerCase()===nama.toLowerCase();});
+        if(s){ s.calonTA=ta; s.mulaiPendidikan=parseInt(ta)+'-07'; s.updatedAt=new Date().toISOString(); setSiswa(sd); }
+        var rw=getRiwayat(); rw.forEach(function(x){ if(ids.indexOf(x.id)>=0){ x.calonTA=ta; if(x.tipe==='Pendaftaran'&&!/TA \d{4}/.test(x.bayarLabel||'')) x.bayarLabel=(x.bayarLabel||'')+' (masuk TA '+ta+')'; } }); setRiwayat(rw);
+        recs.forEach(function(x){ x.calonTA=ta; });
+        var al=$('sb-alert'); if(al){ al.className='alert alert-success show'; al.textContent='✓ '+nama+' dicatat sebagai CALON SISWA masuk TA '+ta+' — tidak ditagih SPP sebelum Juli '+parseInt(ta)+' dan tidak ikut naik kelas.'; }
+        if(typeof renderSidebarSiswa==='function') renderSidebarSiswa();
+      }
+    }catch(e){ console.warn('calon',e); }
+    return r;
+  };
+  // Kelola Siswa: centang calon
+  function pasangFs(){
+    var m=$('fs-mulai'); if(!m||$('fs-calon')) return;
+    var d=document.createElement('label'); d.style.cssText='display:flex;gap:6px;align-items:center;font-size:12.5px;margin-top:6px;color:#7c3aed;font-weight:600';
+    d.innerHTML='<input type="checkbox" id="fs-calon"> <span id="fs-calon-lbl"></span>';
+    m.parentNode.appendChild(d);
+    $('fs-calon').onchange=function(){ if(this.checked) m.value=parseInt(taBerikutnya())+'-07'; };
+  }
+  function lblFs(cur){ var l=$('fs-calon-lbl'); if(l) l.textContent='Calon siswa — masuk TA '+(cur||taBerikutnya())+' (belum ditagih, tidak ikut naik kelas)'; }
+  var _es=window.editSiswa; if(typeof _es==='function') window.editSiswa=function(idx){ var r=_es.apply(this,arguments); pasangFs(); var s=getSiswa()[idx]; var cb=$('fs-calon'); if(cb){ cb.checked=isCalonSiswa(s); lblFs(isCalonSiswa(s)?s.calonTA:''); } return r; };
+  var _ss=window.saveSiswa; if(typeof _ss==='function') window.saveSiswa=function(){
+    var cb=$('fs-calon'), on=cb&&cb.checked, nama=(($('fs-nama')||{}).value||'').trim();
+    var r=_ss.apply(this,arguments);
+    try{ var sd=getSiswa(), s=sd.find(function(x){return x.nama===nama;}); if(s&&cb){ var was=s.calonTA||null;
+      if(on){ if(!isCalonSiswa(s)) s.calonTA=taBerikutnya(); } else if(isCalonSiswa(s)) s.calonTA=null;
+      if(was!==s.calonTA){ setSiswa(sd); if(typeof renderAdminSiswa==='function') renderAdminSiswa(); } } }catch(e){}
+    if(cb) cb.checked=false; return r; };
+  function init(){ isiOpsi(); pasangFs(); lblFs(''); }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',function(){ setTimeout(init,300); }); else setTimeout(init,300);
+})();
+</script>
 <!-- ===================== KETIK AI: PENDAFTARAN (siswa baru) ===================== -->
 <script>
 (function(){
@@ -11793,7 +11850,7 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
   var PROMPT=[
     'Kamu asisten admin TU sekolah (Bahasa Indonesia). Admin mengetik pembayaran PENDAFTARAN siswa (siswa baru) dengan bahasa bebas.',
     'Ambil datanya dari SELURUH percakapan (jawaban admin yang terbaru menimpa yang lama). Balas HANYA JSON:',
-    '{"nama":"","kelas":"","jenjang":"","plus":false,"tanggal":"YYYY-MM-DD","biaya_pendaftaran":null,"diskon_persen":null,"diskon_nominal":null,"bayar":null,"formulir":"tidak_disebut","catatan_formulir":"","metode":"","spp_bulan":"","catatan":"","pertanyaan":[]}',
+    '{"nama":"","kelas":"","jenjang":"","plus":false,"tanggal":"YYYY-MM-DD","biaya_pendaftaran":null,"diskon_persen":null,"diskon_nominal":null,"bayar":null,"formulir":"tidak_disebut","catatan_formulir":"","metode":"","spp_bulan":"","tahun_ajaran_masuk":"","catatan":"","pertanyaan":[]}',
     'Aturan:',
     '- Nominal angka bulat: 1jt/1 juta=1000000, 1,5jt=1500000, 500rb/500k=500000, 950.000=950000.',
     '- kelas: angka kelas yang disebut ("kelas 7" → "7"), TK → "TK". jenjang: TK; 1–6 = SD; 7–9 = SMP; 10–12 = SMK. "plus"/"+" → plus true.',
@@ -11802,6 +11859,8 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
     '- diskon: persen ke diskon_persen (40% → 40); potongan rupiah ke diskon_nominal. Tidak disebut → null.',
     '- metode: "Kas" (tunai/cash) atau "Transfer" (tf/transfer/bank) bila disebut, selain itu "".',
     '- spp_bulan: bila sekalian bayar SPP bulan tertentu (mis. "sekalian spp juli" → "Juli").',
+    '- tahun_ajaran_masuk: bila disebut siswa masuk/mendaftar untuk tahun ajaran tertentu (mis. "untuk tahun ajaran 2027" / "TA 2027/2028" / "masuk tahun depan") → "2027/2028" (tahun mulai/tahun berikutnya). Tidak disebut → "".',
+    '- JANGAN masukkan ke pertanyaan hal yang sudah dijawab di percakapan (mis. nama sudah disebut).',
     '- Jangan menebak. Field yang tidak disebut biarkan kosong/null.',
     '- pertanyaan: daftar pertanyaan singkat HANYA bila nama, kelas/jenjang, atau jumlah bayar tidak jelas / bertentangan. Jangan bertanya soal hal lain.'
   ].join('\n');
@@ -11843,12 +11902,16 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
     c.catForm=o.catForm!=null?o.catForm:(d.catatan_formulir||'');
     c.metode=o.metode||(d.metode==='Transfer'?'Transfer':d.metode==='Kas'?'Kas':'');
     c.spp=o.spp!=null?o.spp:(d.spp_bulan||'');
+    var taA=parseInt(getTAAktif()), taD=parseInt(String(d.tahun_ajaran_masuk||''))||0;
+    c.masukTA=o.masukTA!=null?o.masukTA:(taD>taA?taBerikutnya():'');
     // siswa di data
     c.cand=[]; c.ada=null;
     if(c.nama&&window._btDebug&&_btDebug.cariSiswa){ c.cand=_btDebug.cariSiswa(c.nama,c.kelasStr||'').slice(0,4); }
     if(o.siswaAda) c.ada=o.siswaAda; else if(o.baru) c.ada=null;
     c.tanya=[];
-    (d.pertanyaan||[]).forEach(function(q){ c.tanya.push({t:q}); });
+    (d.pertanyaan||[]).forEach(function(q){ var s=String(q||'');
+      if(c.nama&&/nama/i.test(s)) return; if(c.jenjang&&/kelas|jenjang/i.test(s)) return; if(c.bayar&&/bayar|jumlah|nominal|uang/i.test(s)) return;
+      if(s) c.tanya.push({t:s}); });
     if(!c.nama) c.tanya.push({t:'Siapa nama siswanya?'});
     if(!c.jenjang) c.tanya.push({t:'Masuk kelas berapa / jenjang apa?',btn:[['TK','jenjang','TK'],['SD','jenjang','SD'],['SMP','jenjang','SMP'],['SMK','jenjang','SMK']]});
     if(!c.bayar) c.tanya.push({t:'Berapa jumlah uang yang dibayar?'});
@@ -11887,6 +11950,7 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
         fld('Formulir ('+rp(c.form)+')','<select onchange="kaSet(\'formulir\',this.value)"><option value="">— pilih —</option><option value="termasuk"'+(c.formulir==='termasuk'?' selected':'')+'>Termasuk di uang diterima</option><option value="terpisah"'+(c.formulir==='terpisah'?' selected':'')+'>Dibayar terpisah (tambahan)</option><option value="sudah_dibayar"'+(c.formulir==='sudah_dibayar'?' selected':'')+'>Sudah dibayar sebelumnya</option></select>'+(c.formulir==='sudah_dibayar'?'<input placeholder="Catatan: kapan/bagaimana formulir dibayar" value="'+esc(c.catForm)+'" onchange="kaSet(\'catForm\',this.value)" style="margin-top:4px">':''))+
         fld('DP pendaftaran','<b>'+rp(c.dp)+'</b><small>sisa '+rp(c.sisa)+(c.sisa?' (belum lunas)':' · lunas')+'</small>')+
         fld('Metode','<select onchange="kaSet(\'metode\',this.value)"><option value="">pilih saat buat</option><option'+(c.metode==='Kas'?' selected':'')+'>Kas</option><option'+(c.metode==='Transfer'?' selected':'')+'>Transfer</option></select>')+
+        fld('Masuk tahun ajaran','<select onchange="kaSet(\'masukTA\',this.value)"><option value="">Tahun ini ('+esc(getTAAktif())+')</option><option value="'+esc(taBerikutnya())+'"'+(c.masukTA?' selected':'')+'>Tahun depan ('+esc(taBerikutnya())+') — calon</option></select>'+(c.masukTA?'<small style="color:#7c3aed;font-weight:600">calon siswa: SPP mulai Juli '+parseInt(c.masukTA)+', tidak ikut naik kelas</small>':''))+
         fld('Sekalian SPP','<select onchange="kaSet(\'spp\',this.value)"><option value="">— tidak —</option>'+BULAN.map(function(b){return '<option'+(b===c.spp?' selected':'')+'>'+b+'</option>';}).join('')+'</select>')+
         '</div>'+
         '<div class="ka-tot">Total uang masuk kuitansi: <b>'+rp(c.totalUang)+'</b>'+(c.formulir==='termasuk'?' (DP '+rp(c.dp)+' + formulir '+rp(c.form)+')':c.formulir==='terpisah'?' (DP '+rp(c.dp)+' + formulir '+rp(c.form)+')':'')+'</div>'+
@@ -11927,6 +11991,7 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
     if(st==='sudah'&&$('sb-catatan')) $('sb-catatan').value=c.catForm||'Formulir sudah dibayar sebelumnya';
     $('sb-dp').value=c.dp; onSbDpInput();
     if(c.spp){ $('sb-spp-check').checked=true; onSbSppCheck(); $('sb-spp-bulan').value=c.spp; }
+    var mt=$('sb-masuk-ta'); if(mt) mt.value=c.masukTA||'';
     if(c.metode){ document.querySelectorAll('input[name="sb-metode"]').forEach(function(r){ r.checked=r.value===c.metode; }); onSbMetodeChange(); }
     updateSbBuatBtn();
   }
@@ -11958,7 +12023,7 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
         }
         recs.forEach(function(x){ x.ketikAI=S.msgs.filter(function(m){return m.role==='user';}).map(function(m){return m.text;}).join(' | ').slice(0,300); });
         var rw2=getRiwayat(); rw2.forEach(function(x){ var y=recs.find(function(z){return z.id===x.id;}); if(y){ x.ketikAI=y.ketikAI; x.kelas=y.kelas; } }); setRiwayat(rw2);
-        S.msgs.push({role:'ai',text:'✓ Kuitansi '+recs.map(function(x){return x.no;}).join(', ')+' dibuat untuk '+c.nama+' ('+(c.kelasStr||'')+'). Lihat pratinjau di bawah.'});
+        S.msgs.push({role:'ai',text:'✓ Kuitansi '+recs.map(function(x){return x.no;}).join(', ')+' dibuat untuk '+c.nama+' ('+(c.kelasStr||'')+')'+(c.masukTA?' sebagai CALON SISWA masuk TA '+c.masukTA:'')+'. Lihat pratinjau di bawah.'});
         window._kaPending=null; S.d=null; S.ov={}; render();
       }
     }catch(e){ console.warn('ketik ai',e); }
@@ -12236,11 +12301,12 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
 <!-- ===================== VERSI APLIKASI ===================== -->
 <script>
 // Ubah setiap kali ada update: x.y.z  (z = perbaikan kecil, y = fitur baru, x = perubahan besar)
-window.APP_VERSION='3.14.1';
+window.APP_VERSION='3.15.0';
 window.APP_BUILD='2026-10-21';
-window.APP_NOTES='Bukti Transfer: satu siswa tampil dalam satu kotak berisi beberapa item (SPP, baju, dll.), tombol tambah item, satu klik Isi ke Kuitansi.';
+window.APP_NOTES='BARU: Calon siswa untuk tahun ajaran depan, tidak ditagih SPP sebelum masuk, tidak ikut naik kelas, otomatis aktif saat tahun ajarannya mulai.';
 // riwayat singkat (terbaru di atas) — tampil terlipat di halaman Admin
 window.APP_RIWAYAT=[
+  ['3.15.0','2026-10-21','BARU: Calon siswa (daftar sekarang, masuk TA depan) — pilihan Masuk Tahun Ajaran di Siswa Baru & Ketik AI, centang Calon di Kelola Siswa; tidak tampil di daftar kelas sekarang, SPP mulai Juli TA masuk, dilewati Naik Kelas.'],
   ['3.14.1','2026-10-21','Bukti Transfer: 1 siswa = 1 kotak (Item 1 SPP, Item 2 baju, …) + tombol + Item; Isi ke Kuitansi sekali untuk semua item.'],
   ['3.14.0','2026-10-21','Bukti Transfer: jenis pembayaran per baris (SPP / Seragam / Buku / Pengembangan / Pendaftaran / Lainnya) — SPP dihitung dulu, sisa transfer untuk baju/buku; Isi ke Kuitansi menggabungkan semua item siswa yang sama dalam 1 kuitansi.'],
   ['3.13.0','2026-10-21','Desain Catatan baru: kartu 2 kolom (tanggal, judul, isi), sematkan 📌, tab Semua/Disematkan, cari, tombol +, halaman baca/tulis dengan warna; PIN & sync tetap.'],
