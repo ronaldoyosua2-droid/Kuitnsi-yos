@@ -1487,7 +1487,8 @@ function renderSidebarSiswa(){
   if(!wrap) return;
   
   let siswa = getSiswa().filter(s=>s.kelas&&s.kelas!=='LULUS');
-  if(kelas){
+  if(kelas==='__calon') siswa = siswa.filter(s=>isCalonSiswa(s));
+  else if(kelas){
     // Tampilkan kelas reguler + Plus sekaligus (misal "1 SD" → tampilkan "1 SD" dan "1 SD Plus")
     siswa = siswa.filter(s=>(s.kelas===kelas||s.kelas===kelas+' Plus')&&!isCalonSiswa(s));
   }
@@ -1887,6 +1888,7 @@ function doConfirmLoadCloud(){ if(typeof confirmLoadCloud==='function') confirmL
     <div style="margin-bottom:8px">
       <select id="sidebar-filter-kelas" onchange="renderSidebarSiswa()" style="width:100%;padding:6px 8px;font-size:12px;border:1px solid var(--border);border-radius:6px;outline:none">
         <option value="">— Pilih Kelas —</option>
+        <option value="__calon">🎓 Calon siswa (TA depan)</option>
         <option value="TK">TK</option>
         <option value="1 SD">1 SD (+ Plus)</option>
         <option value="2 SD">2 SD (+ Plus)</option>
@@ -2468,6 +2470,7 @@ function doConfirmLoadCloud(){ if(typeof confirmLoadCloud==='function') confirmL
           <input class="search-bar" id="admin-siswa-search" placeholder="Cari nama siswa..." oninput="renderAdminSiswa()" style="margin-bottom:0;flex:1;min-width:150px">
           <select id="admin-siswa-filter-kelas" onchange="renderAdminSiswa()" style="padding:8px;font-size:13px;border:1px solid var(--border);border-radius:7px;outline:none">
             <option value="">Semua Kelas</option>
+            <option value="__calon">🎓 Calon siswa (TA depan)</option>
             <option value="TK">TK</option>
             <option value="SD">SD (semua)</option>
             <option value="1 SD">1 SD</option><option value="1 SD Plus">1 SD Plus</option>
@@ -8311,7 +8314,8 @@ function renderAdminSiswa(){
   let filtered=siswa;
   if(q) filtered=filtered.filter(s=>s.nama.toLowerCase().includes(q));
   if(fk){
-    if(fk==='SD') filtered=filtered.filter(s=>s.kelas&&s.kelas.includes('SD'));
+    if(fk==='__calon') filtered=filtered.filter(s=>isCalonSiswa(s));
+    else if(fk==='SD') filtered=filtered.filter(s=>s.kelas&&s.kelas.includes('SD'));
     else if(fk==='SMP') filtered=filtered.filter(s=>s.kelas&&s.kelas.includes('SMP'));
     else if(fk==='SMK') filtered=filtered.filter(s=>s.kelas&&s.kelas.includes('SMK'));
     else filtered=filtered.filter(s=>s.kelas===fk);
@@ -9216,7 +9220,12 @@ function _metodeIsiRingkasan(key){
     var jj=(document.getElementById('sb-jenjang')||{}).value||'';
     detail='Siswa baru'+(jj?' · '+jj:'');
     var dp=parseInt((document.getElementById('sb-dp')||{}).value)||0;
-    total=dp?fmt(dp)+'<small>DP pendaftaran (+ item lain bila dicentang)</small>':'';
+    var fst=(document.querySelector('input[name="sb-formulir-status"]:checked')||{}).value||'sekarang';
+    var fm=(typeof FORMULIR_TARIF!=='undefined'&&jj&&fst==='sekarang')?(FORMULIR_TARIF[jj]||0):0;
+    var sppOn=(document.getElementById('sb-spp-check')||{}).checked, sppB=(document.getElementById('sb-spp-bulan')||{}).value||'', sppN=0;
+    if(sppOn&&sppB){ try{ var pl=(document.getElementById('sb-plus')||{}).value==='plus'; var ks=jj==='TK'?'TK':jj==='SD'?(pl?'1 SD Plus':'1 SD'):jj==='SMP'?(pl?'7 SMP Plus':'7 SMP'):'10 SMK'; sppN=getSppNominal(ks,getSPP())||0; }catch(e){} }
+    var rinci=['DP pendaftaran '+fmt(dp)]; if(fm) rinci.push('formulir '+fmt(fm)); if(sppN) rinci.push('SPP '+sppB+' '+fmt(sppN));
+    total=(dp||fm)?fmt(dp+fm+sppN)+'<small>'+rinci.join(' + ')+'</small>':'';
   } else {
     var nm=(typeof siswaList!=='undefined'?siswaList:[]).map(function(x){return x.nama+(x.kelas&&x.kelas!=='Umum'?' ('+x.kelas+')':'');});
     nama=nm.length?nm.map(_mtEsc).join('<br>'):'—';
@@ -12301,11 +12310,13 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
 <!-- ===================== VERSI APLIKASI ===================== -->
 <script>
 // Ubah setiap kali ada update: x.y.z  (z = perbaikan kecil, y = fitur baru, x = perubahan besar)
-window.APP_VERSION='3.15.0';
+window.APP_VERSION='3.15.2';
 window.APP_BUILD='2026-10-21';
 window.APP_NOTES='BARU: Calon siswa untuk tahun ajaran depan, tidak ditagih SPP sebelum masuk, tidak ikut naik kelas, otomatis aktif saat tahun ajarannya mulai.';
 // riwayat singkat (terbaru di atas) — tampil terlipat di halaman Admin
 window.APP_RIWAYAT=[
+  ['3.15.2','2026-10-21','Pilihan 🎓 Calon siswa (TA depan) di Daftar Siswa (Kwitansi) dan filter Kelola Siswa.'],
+  ['3.15.1','2026-10-21','Popup Kas/Transfer Siswa Baru: Total bayar kini termasuk formulir (dan SPP bila dicentang) dengan rinciannya.'],
   ['3.15.0','2026-10-21','BARU: Calon siswa (daftar sekarang, masuk TA depan) — pilihan Masuk Tahun Ajaran di Siswa Baru & Ketik AI, centang Calon di Kelola Siswa; tidak tampil di daftar kelas sekarang, SPP mulai Juli TA masuk, dilewati Naik Kelas.'],
   ['3.14.1','2026-10-21','Bukti Transfer: 1 siswa = 1 kotak (Item 1 SPP, Item 2 baju, …) + tombol + Item; Isi ke Kuitansi sekali untuk semua item.'],
   ['3.14.0','2026-10-21','Bukti Transfer: jenis pembayaran per baris (SPP / Seragam / Buku / Pengembangan / Pendaftaran / Lainnya) — SPP dihitung dulu, sisa transfer untuk baju/buku; Isi ke Kuitansi menggabungkan semua item siswa yang sama dalam 1 kuitansi.'],
