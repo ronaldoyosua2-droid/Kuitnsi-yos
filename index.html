@@ -380,13 +380,17 @@ function generateTagihan(){
       // Filter reguler + plus untuk kelas yang dipilih
       semua = semua.filter(s=>s.kelas===filterKelas||s.kelas===filterKelas+' Plus');
     }
+    const calonList = (typeof isCalonSiswa==='function')?semua.filter(isCalonSiswa):[];
+    semua = semua.filter(s=>!(typeof isCalonSiswa==='function'&&isCalonSiswa(s)));
     const hasil = [];
     semua.forEach(s=>{
       const items = getTunggakanSiswa(s.nama, s.kelas);
       if(items.length) hasil.push({siswa:s, items});
     });
-    if(!hasil.length){ preview.innerHTML='<div style="color:var(--green);padding:16px">✅ Tidak ada siswa yang memiliki tunggakan.</div>'; return; }
+    const calonNote = calonList.length?'<div class="calon-info" style="margin:0 0 10px;border-radius:10px">🎓 '+calonList.length+' calon siswa TA '+calonList[0].calonTA+' tidak dimasukkan ('+calonList.slice(0,4).map(s=>s.nama).join(', ')+(calonList.length>4?', …':'')+') — belum ditagih SPP sampai Juli '+parseInt(calonList[0].calonTA)+'.</div>':'';
+    if(!hasil.length){ preview.innerHTML=calonNote+'<div style="color:var(--green);padding:16px">✅ Tidak ada siswa yang memiliki tunggakan.</div>'; return; }
     renderTagihanPreview(hasil);
+    if(calonNote) preview.insertAdjacentHTML('afterbegin',calonNote);
   }
 }
 
@@ -8610,6 +8614,11 @@ function bukaRekordModal(encNama, encKelas){
   const siswaData=getSiswa().find(s=>s.nama===nama)||{};
   document.getElementById('srm-nama').textContent=nama;
   document.getElementById('srm-kelas').textContent=kelas+(siswaData.sppKhusus?' · SPP Khusus: Rp'+siswaData.sppKhusus.toLocaleString('id-ID'):'');
+  (function(){ var hd=document.getElementById('srm-nama'); if(!hd) return; var old=document.getElementById('srm-calon'); if(old) old.remove(); var oi=document.getElementById('srm-calon-info'); if(oi) oi.remove();
+    if(typeof isCalonSiswa==='function'&&isCalonSiswa(siswaData)){ var y=parseInt(siswaData.calonTA);
+      var b=document.createElement('span'); b.id='srm-calon'; b.className='calon-badge'; b.textContent='🎓 CALON SISWA · masuk Juli '+y+' (TA '+siswaData.calonTA+')'; hd.appendChild(b);
+      var sm=document.getElementById('srm-summary'), box=sm&&sm.parentNode; if(box){ var inf=document.createElement('div'); inf.id='srm-calon-info'; inf.className='calon-info';
+        inf.innerHTML='Belum termasuk siswa '+kelas+' tahun ini — <b>tidak ikut Tagihan SPP</b> sebelum Juli '+y+', <b>tidak ikut Naik Kelas</b>, otomatis jadi siswa aktif '+kelas+' saat TA '+siswaData.calonTA+' mulai.'; box.parentNode.insertBefore(inf,box); } } })();
   document.getElementById('srm-filter').value='';
   document.getElementById('siswa-rekord-modal').style.display='flex';
   document.body.style.overflow='hidden';
@@ -8842,6 +8851,7 @@ function openTrxModal(id){
     <div style="font-size:12px;color:var(--text2);margin-bottom:4px">Diterima dari</div>
     <div style="font-size:15px;font-weight:700">${r.nama}</div>
     <div style="font-size:12px;color:var(--text2)">${r.kelas||''}</div>
+    ${(function(){ var s=getSiswa().find(x=>x.nama===r.nama); return (typeof isCalonSiswa==='function'&&isCalonSiswa(s))?'<span class="calon-badge" style="margin:6px 0 0">🎓 Calon siswa · masuk Juli '+parseInt(s.calonTA)+' (TA '+s.calonTA+')</span>':''; })()}
   </div>`;
 
   html += `<table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:14px">
@@ -10153,7 +10163,8 @@ body.ui-dark .navbar.scrolled{background:rgba(15,23,42,.85)!important}
 (function(){ var inn=document.querySelector('.kw-sidebar-inner'), hd=inn&&inn.querySelector('.sb-head'); if(!inn||!hd) return;
   inn.addEventListener('scroll',function(){ hd.classList.toggle('sb-shadow', inn.scrollTop>2); },{passive:true}); })();
 </script>
-<style>.pot-box{margin-bottom:8px;border:1px dashed #e9c79a;border-radius:9px;padding:7px 10px;background:#fffaf2}.pot-box.on{border-style:solid}.pot-tg{display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;color:#92400e;cursor:pointer}.pot-tg span{font-weight:400;color:var(--text2);font-size:11.5px}.pot-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}.pot-row label{display:flex;flex-direction:column;gap:3px;font-size:11px;color:var(--text2);flex:1 1 110px}.pot-row input{padding:7px 8px;font-size:13px;border:1px solid var(--border);border-radius:7px;width:100%}.pot-info{font-size:11.5px;color:#92400e;margin-top:5px}</style>
+<style>.calon-badge{display:inline-block;background:#f1eafc;color:#6d28d9;font-weight:800;font-size:12px;border-radius:20px;padding:4px 11px;border:1.5px solid #c4b5fd;margin-left:10px;vertical-align:middle}.calon-info{background:#f6f0ff;border-bottom:1px solid #e9ddff;color:#5b21b6;font-size:13px;padding:9px 20px;line-height:1.5}
+.pot-box{margin-bottom:8px;border:1px dashed #e9c79a;border-radius:9px;padding:7px 10px;background:#fffaf2}.pot-box.on{border-style:solid}.pot-tg{display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;color:#92400e;cursor:pointer}.pot-tg span{font-weight:400;color:var(--text2);font-size:11.5px}.pot-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}.pot-row label{display:flex;flex-direction:column;gap:3px;font-size:11px;color:var(--text2);flex:1 1 110px}.pot-row input{padding:7px 8px;font-size:13px;border:1px solid var(--border);border-radius:7px;width:100%}.pot-info{font-size:11.5px;color:#92400e;margin-top:5px}</style>
 <datalist id="pot-alasan-dl"><option>Lebih bayar bulan lalu</option><option>Pengembalian buku</option><option>Diskon saudara</option><option>Beasiswa</option><option>Kebijakan sekolah</option></datalist>
 <!-- ===================== BUKTI TRANSFER (AI) — early test ===================== -->
 <style id="bt-css">
@@ -10169,7 +10180,6 @@ body.ui-dark .navbar.scrolled{background:rgba(15,23,42,.85)!important}
 .bt-prog-wrap{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px;margin-bottom:12px}.bt-prog{background:var(--surface,#fff);border:1px solid var(--line,#e5e7eb);border-radius:14px;padding:12px 14px}.bt-prog-h{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:14px}.bt-prog-n{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin:10px 0 8px}.bt-prog-n span{font-size:11px;color:var(--muted,#6b7280);line-height:1.3}.bt-prog-n b{display:block;font-size:17px;color:var(--ink,#1f2a24)}.bt-prog-bar{height:7px;border-radius:9px;background:var(--soft,#eef1ef);overflow:hidden}.bt-prog-bar i{display:block;height:100%;background:#5a9a78;border-radius:9px}.bt-prog-c{list-style:none;margin:8px 0 0;padding:0;font-size:12px;color:var(--muted,#6b7280);display:flex;flex-wrap:wrap;gap:4px 14px}.bt-prog-c li.ok{color:#2f7a55;font-weight:600}
 #bk-jpick{position:fixed;inset:0;z-index:9990;background:rgba(15,20,18,.45);display:none;align-items:center;justify-content:center;padding:16px}.bk-jp-box{background:var(--surface,#fff);border-radius:18px;padding:18px;width:min(440px,100%);box-shadow:0 20px 50px rgba(0,0,0,.25)}.bk-jp-box img{width:90px;height:70px;object-fit:cover;border-radius:10px}.bk-jp-btns{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:14px}.bk-jp-btns button{border:1.5px solid var(--line,#d6dbd8);background:var(--surface,#fff);border-radius:12px;padding:14px 4px 8px;font-size:18px;font-weight:800;cursor:pointer;color:inherit;display:flex;flex-direction:column;align-items:center;gap:2px}.bk-jp-btns button small{font-size:10px;font-weight:500;color:var(--muted,#6b7280)}.bk-jp-btns button:hover{border-color:#4b55a0;background:#eef0fb}.bk-jp-btns button.last{border-style:dashed}.bk-jsel{font-size:12px!important;padding:1px 4px!important;border-radius:6px!important;margin-left:4px;width:auto!important;display:inline-block!important;min-width:0!important;height:auto!important}
 .bk-src{font-weight:500;color:var(--muted,#6b7280);font-size:11.5px;margin-left:6px}.bk-lanj td{background:#f6f0ff;color:#6d4bc2;font-size:12px;font-weight:600;padding:6px 8px}.bk-sum td{background:#fbfcfb;border-bottom:2px solid #d9e2dc!important;padding:8px}.bk-sumbox{display:flex;gap:16px;align-items:center;flex-wrap:wrap;font-size:12.5px}.bk-sumbox .bk-tot{font-size:15px;font-weight:800}.bk-jcek{font-weight:700;border-radius:10px;padding:4px 10px;font-size:12px}.bk-jcek.ok{background:#e3f1e8;color:#2f7a55}.bk-jcek.bad{background:#fdeaea;color:#b33a3a}.bk-jcek.none{color:var(--muted,#9ca3af);font-weight:500}.bk-sum .bk-sumbox{position:sticky;left:8px;max-width:calc(100vw - 120px)}
-.bk-manual .bk-man{opacity:1!important}.bk-man{white-space:nowrap}
 .bk-card{display:block!important}.bk-head{display:flex;gap:14px;align-items:center;margin-bottom:10px}.bk-thumb{width:120px;height:90px;object-fit:cover;border-radius:10px;cursor:zoom-in;background:var(--soft,#eef1ef);flex:none}
 .bk-tbl-wrap{overflow-x:auto;margin-top:8px;max-width:100%}
 .bk-tbl select{width:auto!important;min-width:0}.bk-tbl input[type=number]{width:96px!important}.bk-tbl input[type=date]{width:126px!important}.bk-tbl td:nth-child(3){min-width:140px}.bk-tbl .bt-sub{margin-top:3px}
@@ -10177,7 +10187,7 @@ body.ui-dark .navbar.scrolled{background:rgba(15,23,42,.85)!important}
 .bk-tbl input,.bk-tbl select{font-size:12.5px;padding:4px 6px;border:1px solid var(--line,#dfe3e0);border-radius:7px;background:var(--surface,#fff);color:inherit;max-width:100%}
 .bk-tbl input[list]{width:100%}
 .bk-day td{background:var(--soft,#eef1ef);font-weight:700;font-size:12.5px;padding:6px 8px}
-.bk-coret,.bk-ada{opacity:.55}.bk-manual td:not(:last-child){opacity:.55}.bk-done{background:rgba(90,154,120,.08)}.bk-err{background:rgba(185,28,28,.06)}
+.bk-coret,.bk-ada,.bk-manual{opacity:.55}.bk-done{background:rgba(90,154,120,.08)}.bk-err{background:rgba(185,28,28,.06)}
 .bt-drop{border:2px dashed #a9cbb8;background:rgba(90,154,120,.07);border-radius:16px;padding:20px 22px;display:flex;align-items:center;gap:18px;margin-bottom:14px;transition:.15s}
 .bt-drop.over{background:rgba(90,154,120,.18);border-color:#5a9a78}
 .bt-drop .bt-ic{width:50px;height:50px;border-radius:14px;background:#5a9a78;display:grid;place-items:center;flex:none}
@@ -11320,7 +11330,6 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
       h+='<td style="white-space:nowrap"><select onchange="bkBulan(\''+pg.id+'\','+i+',\'dari\',this.value)"'+(dis||r.jenis!=='SPP'?' disabled':'')+'><option value="">—</option>'+monthOpts(r.dari)+'</select> → <select onchange="bkBulan(\''+pg.id+'\','+i+',\'sampai\',this.value)"'+(dis||r.jenis!=='SPP'?' disabled':'')+'><option value="">—</option>'+monthOpts(r.sampai)+'</select>'+'<div class="bt-sub">'+(r.tagihan?'Tagihan '+rp(r.tagihan):'')+(r.taLalu?' · <span style="color:#b4581a">tahun ajaran lalu</span>':'')+'</div></td>';
       h+='<td><input type="number" value="'+(r.bayar||'')+'" onchange="bkSet(\''+pg.id+'\','+i+',\'bayar\',this.value)"'+(dis?' disabled':'')+' style="width:110px">'+(r.mode==='cicil'&&r.tagihan?'<div class="bt-sub w">cicil · sisa '+rp(r.tagihan-r.bayar-(Number(r.potongan)||0))+'</div>':'')+(r.jenis==='SPP'||!r.jenis?'<div class="bt-sub" style="margin-top:3px">potongan <input type="number" min="0" value="'+(r.potongan||'')+'" placeholder="0" onchange="bkSet(\''+pg.id+'\','+i+',\'pot\',this.value)"'+(dis?' disabled':'')+' style="width:86px!important;padding:2px 5px!important;font-size:11.5px!important"></div>':'')+'</td>';
       h+='<td><select onchange="bkSet(\''+pg.id+'\','+i+',\'metode\',this.value)"'+(dis?' disabled':'')+'><option value="Kas"'+(r.metode==='Kas'?' selected':'')+'>Kas (tunai)</option><option value="Transfer"'+(r.metode==='Transfer'?' selected':'')+'>Transfer</option></select></td>';
-      if(r.status==='manual'){ h+='<td><span class="bt-b sm pri bk-man" onclick="bkManual(\''+pg.id+'\','+i+')" title="Buat kuitansi manual: siswa & tanggal terisi, item diisi sendiri">✋ Manual · '+esc((typeof JENIS_LBL!=='undefined'&&JENIS_LBL[r.jenis])||r.jenis||'Lainnya')+' →</span><div class="bt-sub" style="white-space:normal">Bukan SPP — klik untuk buat kuitansi manual</div></td></tr>'; return; }
       h+='<td><span class="bt-st '+stt[0]+'">'+esc(stt[1])+(r.doneNo?' '+esc(r.doneNo):'')+'</span>'+(r.status!=='done'&&r.status!=='coret'&&r.status!=='ada'?' <span class="bt-b sm'+(r.status==='manual'?'':' pri')+' bk-isi" onclick="bkIsi(\''+pg.id+'\','+i+')" title="Isi form Kwitansi untuk siswa ini (bisa tambah item lain)">Isi ke Kuitansi</span>':'')+(r.coretRagu&&r.status!=='done'?'<div style="margin-top:4px;display:flex;gap:4px;flex-wrap:wrap"><a href="javascript:void 0" class="bt-sub" onclick="bkCoret(\''+pg.id+'\','+i+',\'sudah\')" title="Lewati baris ini (misalnya sudah diinput dengan nama/bulan lain)">Lewati, sudah diinput</a></div>':'')+(r.kelasBeda&&r.status!=='done'?'<div style="margin-top:4px"><span class="bt-b sm bk-isi" onclick="bkKelasOk(\''+pg.id+'\','+i+')" title="AI salah baca kelas di buku — pakai kelas di data siswa">✓ Kelas data benar ('+esc(r.kelasBeda)+')</span></div>':'')+(r.status==='coret'?' <a href="javascript:void 0" class="bt-sub" onclick="bkCoret(\''+pg.id+'\','+i+',\'belum\')">Belum diinput?</a>':'')+(r.note&&r.note.length?'<div class="bt-sub'+(r.status==='cek'||r.status==='err'?' w':'')+'" style="white-space:normal">'+r.note.map(esc).join('<br>')+'</div>':'')+'</td>';
       h+='</tr>';
     });
@@ -11492,20 +11501,8 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
   function bkGrup(p,i){
     var r=p.rows[i]; if(!r) return [];
     return p.rows.map(function(x,k){return k;}).filter(function(k){ var x=p.rows[k];
-      return k===i||(x.nama&&x.nama===r.nama&&x.tgl===r.tgl&&!x.doneNo&&x.status!=='coret'&&x.status!=='ada'&&x.status!=='manual'&&(x.jenis||'SPP')==='SPP'); });
+      return k===i||(x.nama&&x.nama===r.nama&&x.tgl===r.tgl&&!x.doneNo&&x.status!=='coret'&&x.status!=='ada'); });
   }
-  // baris bukan SPP: tombol Manual → halaman Kwitansi dengan siswa & tanggal terisi, item diisi admin
-  window.bkManual=function(id,i){
-    var p=bkP(id), r=p&&p.rows[i]; if(!r) return;
-    var s=r.nama?siswaByNama(r.nama):null;
-    window._btPending=null;
-    showPage('kwitansi'); resetForm();
-    var tg=$('inp-tanggal'); if(tg&&r.tgl){ tg.value=r.tgl; tg.dispatchEvent(new Event('input',{bubbles:true})); tg.dispatchEvent(new Event('change',{bubbles:true})); }
-    if(s){ siswaList=[{nama:s.nama,kelas:s.kelas}]; renderSiswaForms(); if(typeof renderItemForms==='function') renderItemForms(); }
-    window._bkPending={pid:p.id,rows:[i],nama:s?s.nama:(r.aiNama||''),tgl:r.tgl,metode:r.metode||'Kas',lain:[],total:Number(r.bayar)||0,manual:true,ket:(r.ket||r.jenis||'')};
-    setTimeout(function(){ document.querySelectorAll('.sf-dd').forEach(function(x){x.classList.remove('open');}); if(document.activeElement&&document.activeElement.blur) document.activeElement.blur(); },80);
-    bkBanner(); window.scrollTo(0,0);
-  };
   window.bkIsi=function(id,i){
     var p=bkP(id), r=p&&p.rows[i]; if(!r) return;
     if(!r.nama){ alert('Pilih siswanya dulu di kolom Siswa.'); return; }
@@ -11530,7 +11527,6 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
     var q=window._bkPending;
     if(msg){ b.innerHTML=msg; b.style.display='flex'; return; }
     if(!q){ b.style.display='none'; return; }
-    if(q.manual){ b.innerHTML='<span style="flex:1 1 300px;line-height:1.5">📒 Dari <b>Buku Kas (manual)</b>: <b>'+esc(q.nama)+'</b> · '+esc(tglFmt(q.tgl))+' · di buku: <b>“'+esc(q.ket)+'” '+rp(q.total)+'</b> — isi item sendiri lalu klik <b>Buat Kwitansi</b> → <b>'+esc(q.metode==='Transfer'?'Transfer':'Kas')+'</b>.</span><span class="bt-b sm" onclick="bkIsiBatal()">Batal</span><span class="bt-b sm" onclick="bkKembali()">← Buku Kas</span>'; b.style.display='flex'; return; }
     b.innerHTML='<span style="flex:1 1 300px;line-height:1.5">📒 Dari <b>Buku Kas</b>: <b>'+esc(q.nama)+'</b> · '+esc(tglFmt(q.tgl))+' · total di buku <b>'+rp(q.total)+'</b>'+
       (q.lain.length?'<br>➕ Tambahkan item: <b>'+q.lain.map(esc).join('</b>, <b>')+'</b>':'')+
       '<br>Lalu klik <b>Buat Kwitansi</b> → pilih <b>'+esc(q.metode)+'</b>.</span>'+
@@ -12380,12 +12376,12 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
 <!-- ===================== VERSI APLIKASI ===================== -->
 <script>
 // Ubah setiap kali ada update: x.y.z  (z = perbaikan kecil, y = fitur baru, x = perubahan besar)
-window.APP_VERSION='3.16.1';
+window.APP_VERSION='3.17.0';
 window.APP_BUILD='2026-10-21';
-window.APP_NOTES='Buku Kas: baris bukan SPP punya tombol hijau Manual yang langsung membuka Kwitansi (siswa dan tanggal terisi).';
+window.APP_NOTES='Calon siswa diberi label ungu di detail siswa dan detail transaksi, halaman Tagihan menyebut calon siswa yang tidak dimasukkan.';
 // riwayat singkat (terbaru di atas) — tampil terlipat di halaman Admin
 window.APP_RIWAYAT=[
-  ['3.16.1','2026-10-21','Buku Kas: baris bukan SPP tetap abu-abu dengan satu tombol hijau ✋ Manual → Kwitansi (siswa & tanggal terisi, item diisi sendiri, baris jadi Dibuat setelah disimpan); Isi ke Kuitansi SPP tidak lagi menyertakan baris bukan SPP.'],
+  ['3.17.0','2026-10-21','Calon siswa: label 🎓 di popup detail siswa (+ keterangan) dan detail transaksi; Tagihan per kelas menyebut calon siswa yang tidak dimasukkan.'],
   ['3.16.0','2026-10-21','Buku Kas: jumlah per tanggal (Kas tunai / Transfer / total) + cek dengan jumlah tulisan di buku; beberapa foto = lembar berurutan, lembar lanjutan digabung ke tanggal sebelumnya; baris Transfer: sudah lewat Bukti Transfer / ada di antrian / belum ada (tidak dicentang).'],
   ['3.15.2','2026-10-21','Pilihan 🎓 Calon siswa (TA depan) di Daftar Siswa (Kwitansi) dan filter Kelola Siswa.'],
   ['3.15.1','2026-10-21','Popup Kas/Transfer Siswa Baru: Total bayar kini termasuk formulir (dan SPP bila dicentang) dengan rinciannya.'],
