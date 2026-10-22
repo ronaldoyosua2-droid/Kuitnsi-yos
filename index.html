@@ -10782,8 +10782,7 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
     var list=Q.filter(function(c){ var s=cardStatus(c); return TAB==='all'||(TAB==='ok'&&s==='ok')||(TAB==='done'&&s==='done')||(TAB==='warn'&&s!=='ok'&&s!=='done'); });
     if(!list.length){ wrap.innerHTML='<div class="bt-empty">'+(Q.length?'Tidak ada di tab ini.':'Belum ada bukti. Tempel screenshot (Ctrl+V) atau seret gambar ke kotak di atas.')+'</div>'; return; }
     wrap.innerHTML=list.map(cardHtml).join('');
-    var dl=$('bt-dl');
-    if(dl&&!dl.dataset.n){ dl.innerHTML=(getSiswa()||[]).map(function(s){return '<option value="'+esc(s.nama)+' — '+esc(s.kelas)+'">';}).join(''); dl.dataset.n='1'; }
+    btDl();
     var rdl=$('bt-rek-dl'); if(rdl){ var rk=rekSekolah().join(','); if(rdl.dataset.v!==rk){ rdl.innerHTML=rekSekolah().map(function(x){return '<option value="'+x+'">rekening sekolah</option>';}).join(''); rdl.dataset.v=rk; } }
     var nb=document.querySelector('.nav-btn[onclick*="buktiTf"] .bt-badge'); if(nb){ nb.textContent=n.warn+n.ok; nb.style.display=(n.warn+n.ok)?'':'none'; }
   }
@@ -11291,7 +11290,16 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
   }
   function bkP(id){ return BK.find(function(p){return p.id===id;}); }
   var BK_ST={siap:['ok','Siap'],cek:['warn','Perlu dicek'],coret:['done','Sudah diinput (coret)'],ada:['done','Sudah ada di aplikasi'],manual:['done','Manual'],done:['ok','✓ Dibuat'],err:['bad','Gagal']};
-  function bkRender(){
+  // daftar ketikan nama siswa: selalu sama dengan data siswa sekarang (nama lama/terhapus tidak muncul)
+  function btDl(){
+    var dl=$('bt-dl'); if(!dl) return;
+    var v=(getSiswa()||[]).map(function(s){return s.nama+' — '+s.kelas;}), k=v.join('|');
+    if(dl.dataset.k===k) return;
+    dl.innerHTML=v.map(function(x){return '<option value="'+esc(x)+'">';}).join(''); dl.dataset.k=k;
+  }
+  window.btDl=btDl;
+  document.addEventListener('focusin',function(e){ var t=e.target; if(t&&t.getAttribute&&t.getAttribute('list')==='bt-dl') btDl(); },true);
+  function bkRender(){ btDl();
     simpanBK();
     var w=$('bk-list'); if(!w) return;
     var j=ls(BK_JENJANG_LS);
@@ -12391,11 +12399,12 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
 <!-- ===================== VERSI APLIKASI ===================== -->
 <script>
 // Ubah setiap kali ada update: x.y.z  (z = perbaikan kecil, y = fitur baru, x = perubahan besar)
-window.APP_VERSION='3.18.0';
-window.APP_BUILD='2026-10-21';
-window.APP_NOTES='Buku Kas: baris bukan SPP punya tombol hijau ✋ Manual yang langsung membuka Kwitansi, dan nomor baris dirapikan.';
+window.APP_VERSION='3.18.1';
+window.APP_BUILD='2026-10-22';
+window.APP_NOTES='Daftar ketikan nama siswa selalu sesuai data siswa terbaru (nama lama tidak muncul lagi).';
 // riwayat singkat (terbaru di atas) — tampil terlipat di halaman Admin
 window.APP_RIWAYAT=[
+  ['3.18.1','2026-10-22','Daftar ketikan nama siswa (Bukti Transfer & Buku Kas) diperbarui otomatis saat data siswa berubah.'],
   ['3.18.0','2026-10-21','Buku Kas: tombol hijau ✋ Manual untuk baris bukan SPP (langsung ke Kwitansi, siswa & tanggal terisi); nomor baris urut per tanggal.'],
   ['3.17.0','2026-10-21','Calon siswa: label 🎓 di popup detail siswa (+ keterangan) dan detail transaksi; Tagihan per kelas menyebut calon siswa yang tidak dimasukkan.'],
   ['3.16.0','2026-10-21','Buku Kas: jumlah per tanggal (Kas tunai / Transfer / total) + cek dengan jumlah tulisan di buku; beberapa foto = lembar berurutan, lembar lanjutan digabung ke tanggal sebelumnya; baris Transfer: sudah lewat Bukti Transfer / ada di antrian / belum ada (tidak dicentang).'],
