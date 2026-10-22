@@ -11386,11 +11386,10 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
   function bkJumlahRow(pg,tgl){
     var j=bkJumlah(pg,tgl), b=(pg.jml||{})[tgl]||null, cek='';
     var lembar={}; pg.rows.forEach(function(r){ if(r.tgl===tgl) lembar[r.lembar||1]=1; }); var nl=Object.keys(lembar).length;
-    if(b){
-      var parts=[], ok=true;
-      if(b.tunai){ var d1=b.tunai-j.kas; parts.push('tunai '+rp(b.tunai)+(d1?' (selisih '+rp(Math.abs(d1))+')':' ✓')); if(d1) ok=false; }
-      if(b.transfer){ var d2=b.transfer-j.tf; parts.push('transfer '+rp(b.transfer)+(d2?' (selisih '+rp(Math.abs(d2))+')':' ✓')); if(d2) ok=false; }
-      if(!b.tunai&&!b.transfer&&b.total){ var d3=b.total-j.tot; parts.push('total '+rp(b.total)+(d3?' (selisih '+rp(Math.abs(d3))+')':' ✓')); if(d3) ok=false; }
+    if(b&&(b.tunai||b.total||b.transfer)){
+      // jumlah di buku = jumlah TUNAI (Ronald). Ambil angka dari kolom mana pun AI menaruhnya, bandingkan dengan Kas saja.
+      var bt=b.tunai||b.total||b.transfer||0, parts=[], ok=true;
+      if(bt){ var d1=bt-j.kas; parts.push('tunai '+rp(bt)+(d1?' (selisih '+rp(Math.abs(d1))+')':'')); if(d1) ok=false; }
       cek='<span class="bk-jcek '+(ok?'ok':'bad')+'">'+(ok?'✓ Sama dengan jumlah di buku: ':'⚠ Di buku: ')+parts.join(' · ')+(ok?'':' — cek baris')+'</span>';
     } else cek='<span class="bk-jcek none">jumlah di buku tidak terbaca</span>';
     return '<tr class="bk-sum"><td colspan="8"><div class="bk-sumbox"><span>Jumlah <b>'+(tgl?esc(tglFmt(tgl).replace(/ \d{4}$/,'')):'tanpa tanggal')+'</b>'+(nl>1?' <span class="bk-src">(lembar '+Object.keys(lembar).join(' + ')+')</span>':'')+'</span><span>Kas <b>'+rp(j.kas)+'</b></span><span>Transfer <b>'+rp(j.tf)+'</b></span><span class="bk-tot">'+rp(j.tot)+'</span>'+cek+'</div></td></tr>';
@@ -12432,11 +12431,12 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
 <!-- ===================== VERSI APLIKASI ===================== -->
 <script>
 // Ubah setiap kali ada update: x.y.z  (z = perbaikan kecil, y = fitur baru, x = perubahan besar)
-window.APP_VERSION='3.19.0';
+window.APP_VERSION='3.19.1';
 window.APP_BUILD='2026-10-22';
-window.APP_NOTES='Rekord Pembayaran: siswa bisa dihapus lewat tombol 🗑 dengan password admin.';
+window.APP_NOTES='Buku Kas: jumlah di buku dicocokkan dengan Kas (tunai) saja.';
 // riwayat singkat (terbaru di atas) — tampil terlipat di halaman Admin
 window.APP_RIWAYAT=[
+  ['3.19.1','2026-10-22','Buku Kas: jumlah per tanggal di buku dibandingkan dengan Kas (tunai) saja, bukan tunai + transfer.'],
   ['3.19.0','2026-10-22','Rekord Pembayaran: tombol 🗑 hapus siswa (password admin, peringatan bila punya kwitansi, dicatat di Aktivitas).'],
   ['3.18.1','2026-10-22','Daftar ketikan nama siswa (Bukti Transfer & Buku Kas) diperbarui otomatis saat data siswa berubah.'],
   ['3.18.0','2026-10-21','Buku Kas: tombol hijau ✋ Manual untuk baris bukan SPP (langsung ke Kwitansi, siswa & tanggal terisi); nomor baris urut per tanggal.'],
