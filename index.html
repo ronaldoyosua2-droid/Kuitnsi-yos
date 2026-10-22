@@ -7089,7 +7089,7 @@ function renderRekordSiswa(){
         <td style="color:var(--green);font-weight:500">${sr.length?fmt(totBayar):'—'}</td>
         <td>${hasTung?`<span style="color:var(--danger);font-weight:600">${fmt(totSisa)}</span>`:'<span style="color:var(--green)">Lunas</span>'}</td>
         <td>${(()=>{const sr2=((rwByNamaKelas[(s.nama+'|'+(s.kelas||'')).toLowerCase()]||rwByNama[s.nama.toLowerCase()])||[]).sort((a,b)=>(b.tanggal||'').localeCompare(a.tanggal||''));const lt=sr2[0];return lt?`<div style="font-size:11px;font-weight:600">${lt.tanggal?new Date(lt.tanggal).toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'2-digit'}):'—'}</div><div style="font-size:10px;color:var(--text2)">${lt.tipe||''}</div>`:'<span style="color:var(--text2);font-size:11px">—</span>';})()} </td>
-        <td><button class="btn" style="font-size:11px;padding:3px 10px" onclick="bukaRekordModal('${encodeURIComponent(s.nama)}','${encodeURIComponent(s.kelas)}')">&#128203; Lihat</button></td>
+        <td><button class="btn" style="font-size:11px;padding:3px 10px" onclick="bukaRekordModal('${encodeURIComponent(s.nama)}','${encodeURIComponent(s.kelas)}')">&#128203; Lihat</button> <button class="btn rk-del" title="Hapus siswa (password admin)" onclick="rekordHapusSiswa('${encodeURIComponent(s.nama)}','${encodeURIComponent(s.kelas)}')">&#128465;</button></td>
       </tr>`;
     }).join('')+`</tbody></table>
     <p style="font-size:12px;color:var(--text2);margin-top:8px">Menampilkan ${siswa.length} siswa</p>`;
@@ -7109,6 +7109,38 @@ function bukaRekordSiswa(encNama,encKelas){
   setTimeout(function(){renderTunggakanEditor(nama);},100);
 }
 
+// ===== HAPUS SISWA DARI REKORD (password admin) — v3.19.0 =====
+function rekordHapusSiswa(encNama,encKelas){
+  const nama=decodeURIComponent(encNama), kelas=decodeURIComponent(encKelas);
+  const esc=v=>String(v==null?'':v).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const sr=getRiwayat().filter(r=>(r.nama||'').toLowerCase()===nama.toLowerCase());
+  const tot=sr.reduce((a,r)=>a+(Number(r.nominalBayar)||0),0);
+  let m=document.getElementById('rk-del-modal'); if(m) m.remove();
+  m=document.createElement('div'); m.id='rk-del-modal'; m.className='rk-del-bg';
+  m.innerHTML=`<div class="rk-del-box"><div style="font-weight:700;font-size:17px">&#128465; Hapus siswa?</div>
+    <div style="margin:8px 0 12px;font-size:14px"><b>${esc(nama)}</b> · ${esc(kelas)}<br>${sr.length
+      ?`<div class="rk-del-warn">⚠ Siswa ini punya <b>${sr.length} kwitansi (${fmt(tot)})</b>. Riwayat kwitansi tetap disimpan, hanya nama siswa yang dihapus dari daftar.</div>`
+      :'<span style="color:var(--green)">Belum ada transaksi — aman dihapus.</span>'}</div>
+    <label style="font-size:13px;color:var(--text2)">Password Admin</label>
+    <input type="password" id="rk-del-pw" placeholder="Masukkan password" style="width:100%;margin:4px 0 6px">
+    <div id="rk-del-err" style="color:var(--danger);font-size:12.5px;min-height:18px"></div>
+    <div style="text-align:right;display:flex;gap:8px;justify-content:flex-end"><button class="btn" onclick="document.getElementById('rk-del-modal').remove()">Batal</button><button class="btn rk-del-go" id="rk-del-go">Hapus</button></div></div>`;
+  document.body.appendChild(m);
+  const pw=m.querySelector('#rk-del-pw'); setTimeout(()=>pw.focus(),50);
+  m.addEventListener('click',e=>{ if(e.target===m) m.remove(); });
+  const go=()=>{
+    if(pw.value!==PASSWORD){ m.querySelector('#rk-del-err').textContent='Password salah — siswa tidak dihapus.'; pw.select(); return; }
+    const all=getSiswa(); let idx=all.findIndex(x=>x.nama===nama&&(x.kelas||'')===kelas);
+    if(idx<0) idx=all.findIndex(x=>x.nama===nama);
+    if(idx<0){ m.remove(); alert('Siswa tidak ditemukan (mungkin sudah dihapus).'); renderRekordSiswa(); return; }
+    all.splice(idx,1); setSiswa(all);
+    addLog('hapus', nama, 'Kelas: '+(kelas||'—')+' · dari Rekord'+(sr.length?' · '+sr.length+' kwitansi tetap disimpan':''));
+    m.remove();
+    renderRekordSiswa(); try{ renderAdminSiswa(); }catch(e){} try{ if(window.btDl) window.btDl(); }catch(e){}
+  };
+  m.querySelector('#rk-del-go').onclick=go;
+  pw.addEventListener('keydown',e=>{ if(e.key==='Enter') go(); if(e.key==='Escape') m.remove(); });
+}
 function renderRekordDetail(){
   if(!rekordCurrentSiswa)return;
   const filterTipe=document.getElementById('rekord-detail-filter').value;
@@ -10163,7 +10195,8 @@ body.ui-dark .navbar.scrolled{background:rgba(15,23,42,.85)!important}
 (function(){ var inn=document.querySelector('.kw-sidebar-inner'), hd=inn&&inn.querySelector('.sb-head'); if(!inn||!hd) return;
   inn.addEventListener('scroll',function(){ hd.classList.toggle('sb-shadow', inn.scrollTop>2); },{passive:true}); })();
 </script>
-<style>.calon-badge{display:inline-block;background:#f1eafc;color:#6d28d9;font-weight:800;font-size:12px;border-radius:20px;padding:4px 11px;border:1.5px solid #c4b5fd;margin-left:10px;vertical-align:middle}.calon-info{background:#f6f0ff;border-bottom:1px solid #e9ddff;color:#5b21b6;font-size:13px;padding:9px 20px;line-height:1.5}
+<style>.rk-del{font-size:11px!important;padding:3px 8px!important;color:#b33a3a!important;border-color:#f1c4c4!important}.rk-del:hover{background:#fdeaea!important}.rk-del-bg{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px}.rk-del-box{background:var(--card,#fff);border-radius:16px;padding:20px;width:min(460px,100%);box-shadow:0 10px 40px rgba(0,0,0,.2)}.rk-del-warn{background:#fdeaea;color:#b33a3a;border-radius:8px;padding:8px 10px;margin-top:6px}.rk-del-go{background:#c0392b!important;color:#fff!important;border-color:#c0392b!important;font-weight:600}
+.calon-badge{display:inline-block;background:#f1eafc;color:#6d28d9;font-weight:800;font-size:12px;border-radius:20px;padding:4px 11px;border:1.5px solid #c4b5fd;margin-left:10px;vertical-align:middle}.calon-info{background:#f6f0ff;border-bottom:1px solid #e9ddff;color:#5b21b6;font-size:13px;padding:9px 20px;line-height:1.5}
 .pot-box{margin-bottom:8px;border:1px dashed #e9c79a;border-radius:9px;padding:7px 10px;background:#fffaf2}.pot-box.on{border-style:solid}.pot-tg{display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;color:#92400e;cursor:pointer}.pot-tg span{font-weight:400;color:var(--text2);font-size:11.5px}.pot-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}.pot-row label{display:flex;flex-direction:column;gap:3px;font-size:11px;color:var(--text2);flex:1 1 110px}.pot-row input{padding:7px 8px;font-size:13px;border:1px solid var(--border);border-radius:7px;width:100%}.pot-info{font-size:11.5px;color:#92400e;margin-top:5px}</style>
 <datalist id="pot-alasan-dl"><option>Lebih bayar bulan lalu</option><option>Pengembalian buku</option><option>Diskon saudara</option><option>Beasiswa</option><option>Kebijakan sekolah</option></datalist>
 <!-- ===================== BUKTI TRANSFER (AI) — early test ===================== -->
@@ -12399,11 +12432,12 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
 <!-- ===================== VERSI APLIKASI ===================== -->
 <script>
 // Ubah setiap kali ada update: x.y.z  (z = perbaikan kecil, y = fitur baru, x = perubahan besar)
-window.APP_VERSION='3.18.1';
+window.APP_VERSION='3.19.0';
 window.APP_BUILD='2026-10-22';
-window.APP_NOTES='Daftar ketikan nama siswa selalu sesuai data siswa terbaru (nama lama tidak muncul lagi).';
+window.APP_NOTES='Rekord Pembayaran: siswa bisa dihapus lewat tombol 🗑 dengan password admin.';
 // riwayat singkat (terbaru di atas) — tampil terlipat di halaman Admin
 window.APP_RIWAYAT=[
+  ['3.19.0','2026-10-22','Rekord Pembayaran: tombol 🗑 hapus siswa (password admin, peringatan bila punya kwitansi, dicatat di Aktivitas).'],
   ['3.18.1','2026-10-22','Daftar ketikan nama siswa (Bukti Transfer & Buku Kas) diperbarui otomatis saat data siswa berubah.'],
   ['3.18.0','2026-10-21','Buku Kas: tombol hijau ✋ Manual untuk baris bukan SPP (langsung ke Kwitansi, siswa & tanggal terisi); nomor baris urut per tanggal.'],
   ['3.17.0','2026-10-21','Calon siswa: label 🎓 di popup detail siswa (+ keterangan) dan detail transaksi; Tagihan per kelas menyebut calon siswa yang tidak dimasukkan.'],
