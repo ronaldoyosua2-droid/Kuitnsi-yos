@@ -3529,7 +3529,7 @@ function renderItemForms(){
           </select>
         </div>
         <div style="margin-bottom:8px">${keteranganField}</div>
-        ${it.sppCicilan?`
+        ${cicMulti(it)?cicMultiHtml(i):it.sppCicilan?`
         <div style="background:#eff6ff;border:1.5px solid #93c5fd;border-radius:8px;padding:12px;margin-top:8px;margin-bottom:8px">
           <div style="font-size:12px;font-weight:700;color:var(--blue);margin-bottom:8px">📅 Mode Cicilan — Ketik nominal, sistem hitung otomatis</div>
           <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
@@ -3569,7 +3569,7 @@ function renderItemForms(){
             style="width:100%;padding:8px;font-size:13px;border:1px solid var(--border);border-radius:7px;outline:none;box-sizing:border-box">
         </div>
       </div>
-      ${isSPP&&siswaList.length>1&&!isSPPKustom?`
+      ${isSPP&&siswaList.length>1&&!isSPPKustom&&!it.sppCicilan?`
       <div class="row2" style="margin-bottom:8px">
         <div class="field" style="margin-bottom:0">
           <label>Qty (Bulan)</label>
@@ -4043,8 +4043,8 @@ function sppBulanBerikutnya(nama){
 }
 
 // Rentang bulan yang DIPILIH user (Dari–Sampai). null = Sampai belum dipilih (cicilan bebas memanjang)
-function sppCicilanTarget(i){
-  const it=itemList[i]; const siswa=siswaList[0];
+function sppCicilanTarget(i, _siswa){
+  const it=itemList[i]; const siswa=_siswa||siswaList[0];
   if(!it||it.sppDari===undefined||!siswa) return null;
   const thnD=it.sppTahun||new Date().getFullYear();
   const manual = it.sppSampai!==undefined && !it.sppSampaiAuto;
@@ -4070,6 +4070,7 @@ function onSppCicilanNominal(i, val){
 
 function updateCicilanResultDiv(i){
   const it = itemList[i];
+  if(cicMulti(it)){ cicMultiRenderRes(i); return; }
   const resultDiv = document.getElementById('cicilan-result-'+i);
   const totalDiv = document.getElementById('cicilan-total-'+i);
   if(!resultDiv) return;
@@ -4098,8 +4099,95 @@ function updateCicilanResultDiv(i){
   }
 }
 
+// ===== CICILAN SPP UNTUK BEBERAPA SISWA (v3.21) — tiap siswa nominal & tarif kelasnya sendiri =====
+function cicMulti(it){ return !!(it&&it.tipe==='SPP'&&it.sppCicilan&&siswaList.length>1); }
+function cicSiswaIdx(it){ return siswaList.map((s,si)=>si).filter(si=>!it.selectedSiswa||it.selectedSiswa.includes(si)); }
+// hitung rincian bulan untuk 1 siswa: mulai Dari, sampai Sampai (bila dipilih) atau maks 24 bulan
+function cicHitungSiswa(i, siswa, nominal){
+  const it=itemList[i], spp=getSPP(), sisamap=getSppSisaPerBulan(siswa.nama), thn=it.sppTahun||new Date().getFullYear();
+  const tg=sppCicilanTarget(i, siswa), maxBulan=tg?tg.months.length:24, result=[];
+  let sisa=nominal, b=it.sppDari, iter=0;
+  while(sisa>0&&iter<maxBulan){
+    const bln=b%12, th=thn+Math.floor(b/12), key=BULAN[bln]+' '+th, tgl=th+'-'+String(bln+1).padStart(2,'0')+'-01';
+    const kel=getKelasEfektif(siswa.kelas,tgl)||siswa.kelas, sb=sisamap[key]||0;
+    const nomB=sb>0?sb:getSppNominalSiswa(siswa.nama,kel,spp,tgl);
+    if(nomB<=0){ b++; iter++; continue; }
+    if(sisa>=nomB){ result.push({label:key,bayar:nomB,sisa:0,sisaCarryover:sb>0}); sisa-=nomB; }
+    else { result.push({label:key,bayar:sisa,sisa:nomB-sisa,sisaCarryover:sb>0}); sisa=0; }
+    b++; iter++;
+  }
+  return {result, lebih:sisa>0?sisa:0, tg};
+}
+function cicLabel(result, thn){
+  if(!result||!result.length) return 'SPP';
+  const d=result[0].label, z=result[result.length-1].label;
+  return d===z?'SPP '+d:'SPP '+d.split(' ')[0]+' - '+z.split(' ')[0]+' '+thn+' ('+result.length+'x)';
+}
+function hitungCicilanMulti(i){
+  const it=itemList[i]; if(it.sppDari===undefined) return;
+  if(!it.sppCicilanPer) it.sppCicilanPer={};
+  const thn=it.sppTahun||new Date().getFullYear(), resPer={}, labelPer={}; let lebih=0, sum=0;
+  cicSiswaIdx(it).forEach(si=>{ const n=parseInt(it.sppCicilanPer[si])||0; if(!n) return;
+    const r=cicHitungSiswa(i,siswaList[si],n); resPer[si]=r.result; labelPer[si]=cicLabel(r.result,thn); lebih+=r.lebih; sum+=n; });
+  it.sppCicilanResPer=resPer; it.sppCicilanLabelPer=labelPer; it.sppCicilanNominal=sum; it.sppCicilanLebih=lebih; it.sppCicilanResult=null;
+  const first=Object.keys(labelPer)[0]; if(first!==undefined) it.label=labelPer[first];
+  const spp=getSPP(), s0=siswaList[0], tgl=document.getElementById('inp-tanggal')?.value||today();
+  it.nominal=getSppNominalSiswa(s0.nama,getKelasEfektif(s0.kelas,tgl)||s0.kelas,spp,tgl);
+  it.qty=1;
+}
+function cicMultiTotals(i){
+  const it=itemList[i]; let bayar=0, tagihan=0;
+  cicSiswaIdx(it).forEach(si=>{ const r=(it.sppCicilanResPer||{})[si]||[], tg=sppCicilanTarget(i,siswaList[si]);
+    const b=r.reduce((a,x)=>a+x.bayar,0); bayar+=b; tagihan+=tg?tg.total:r.reduce((a,x)=>a+x.bayar+(x.sisa||0),0); });
+  return {bayar, tagihan};
+}
+function onCicPer(i, si, val){ const it=itemList[i]; if(!it.sppCicilanPer) it.sppCicilanPer={}; it.sppCicilanPer[si]=parseInt(val)||0; it.cicTotalBagi=0; hitungCicilanSPP(i); cicMultiRenderRes(i); }
+// ketik TOTAL → dibagi otomatis: bulan terlama dulu, bergantian antar siswa
+function cicBagiTotal(i, val){
+  const it=itemList[i], total=parseInt(val)||0; it.cicTotalBagi=total; it.sppCicilanPer={};
+  if(it.sppDari===undefined||!total){ hitungCicilanSPP(i); cicMultiRenderRes(i); return; }
+  const idx=cicSiswaIdx(it), bulanan={}; let maxK=0;
+  idx.forEach(si=>{ bulanan[si]=cicHitungSiswa(i,siswaList[si],1e12).result.map(r=>r.bayar); maxK=Math.max(maxK,bulanan[si].length); it.sppCicilanPer[si]=0; });
+  let sisa=total;
+  for(let k=0;k<maxK&&sisa>0;k++) idx.forEach(si=>{ const n=bulanan[si][k]; if(!n||sisa<=0) return; const p=Math.min(n,sisa); it.sppCicilanPer[si]+=p; sisa-=p; });
+  it.cicSisaBagi=sisa;
+  hitungCicilanSPP(i); renderItemForms();
+}
+function cicMultiRenderRes(i){
+  const it=itemList[i];
+  for(const si of cicSiswaIdx(it)){
+    const d=document.getElementById('cic-res-'+i+'-'+si); if(!d) continue;
+    const r=(it.sppCicilanResPer||{})[si]||[], tg=sppCicilanTarget(i,siswaList[si]);
+    const top=tg?'<div style="font-size:11.5px;color:var(--text2);margin-bottom:4px">Tagihan '+tg.months.length+' bulan: <b style="color:var(--text)">'+fmt(tg.total)+'</b></div>':'';
+    d.innerHTML=top+(r.length?r.map(x=>`<div style="display:flex;justify-content:space-between;padding:3px 9px;background:#f8fbff;border-radius:5px;font-size:12px;border:1px solid #dbeafe;margin-bottom:3px"><span>${x.label}</span><span style="font-weight:700;color:${x.sisa>0?'#dc2626':'var(--green)'}">${fmt(x.bayar)}${x.sisa>0?` <span style="color:#dc2626">(sisa ${fmt(x.sisa)})</span>`:' ✅'}</span></div>`).join(''):'<div style="font-size:11px;color:var(--text2)">Nominal kosong → siswa ini tidak ikut item SPP ini.</div>');
+  }
+  const t=document.getElementById('cic-tot-'+i); if(t) t.textContent=fmt(it.sppCicilanNominal||0);
+  const w=document.getElementById('cic-warn-'+i);
+  if(w) w.innerHTML=(it.sppCicilanLebih>0?'⚠️ Nominal melebihi tagihan bulan dipilih sebesar '+fmt(it.sppCicilanLebih)+'. Kurangi nominal atau tambah bulan Sampai.':'')+(it.cicTotalBagi&&it.cicSisaBagi>0?'⚠️ Rp '+fmt(it.cicSisaBagi).replace(/^Rp\s?/,'')+' tidak terbagi (melebihi tagihan bulan dipilih) — tambah bulan Sampai.':'');
+}
+function cicMultiHtml(i){
+  const it=itemList[i]; if(!it.sppCicilanPer) it.sppCicilanPer={};
+  setTimeout(()=>cicMultiRenderRes(i),0);
+  return `<div style="background:#eff6ff;border:1.5px solid #93c5fd;border-radius:8px;padding:12px;margin-top:8px;margin-bottom:8px">
+    <div style="font-size:12px;font-weight:700;color:var(--blue);margin-bottom:8px">📅 Mode Cicilan — ${cicSiswaIdx(it).length} siswa · ketik nominal per siswa (tarif kelas masing-masing)</div>
+    ${it.sppDari===undefined?'<div style="font-size:12px;color:#b45309;margin-bottom:6px">Pilih bulan <b>Dari</b> (dan <b>Sampai</b> bila perlu) di atas dulu.</div>':''}
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:#fff;border:1px dashed #93c5fd;border-radius:8px;padding:8px 10px;margin-bottom:8px">
+      <span style="font-size:12px;color:var(--text2)">Atau ketik <b>total</b> dari orang tua:</span>
+      <input type="number" placeholder="mis. 800000" value="${it.cicTotalBagi||''}" onchange="cicBagiTotal(${i},this.value)" style="width:140px;padding:6px 8px;font-size:13px;border:1.5px solid #93c5fd;border-radius:7px">
+      <span style="font-size:11px;color:var(--text2)">→ dibagi otomatis: bulan terlama dulu, bergantian antar siswa (tetap bisa diubah)</span>
+    </div>
+    ${cicSiswaIdx(it).map(si=>{ const sw=siswaList[si]; return `<div style="background:#fff;border:1px solid #dbeafe;border-radius:8px;padding:9px 10px;margin-bottom:7px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:5px"><b style="font-size:13px">${sw.nama||'Siswa '+(si+1)}${sw.kelas?' · '+sw.kelas:''}</b>
+      <label style="font-size:12px;color:var(--text2);display:flex;align-items:center;gap:6px">Nominal <input type="number" value="${it.sppCicilanPer[si]||''}" placeholder="0" oninput="onCicPer(${i},${si},this.value)" style="width:120px;padding:5px 8px;font-size:13.5px;font-weight:700;color:var(--blue);border:1.5px solid #93c5fd;border-radius:7px"></label></div>
+      <div id="cic-res-${i}-${si}"></div></div>`; }).join('')}
+    <div id="cic-warn-${i}" style="font-size:12px;color:#dc2626;font-weight:600;margin-bottom:4px"></div>
+    <div style="padding:6px 10px;background:var(--blue);color:#fff;border-radius:5px;font-size:13px;font-weight:700;display:flex;justify-content:space-between"><span>Total diterima (${cicSiswaIdx(it).length} siswa)</span><span id="cic-tot-${i}">${fmt(it.sppCicilanNominal||0)}</span></div>
+  </div>`;
+}
+
 function hitungCicilanSPP(i){
   const it = itemList[i];
+  if(cicMulti(it)){ hitungCicilanMulti(i); return; }
   if(!it.sppCicilan || !it.sppCicilanNominal || it.sppDari===undefined) return;
   const siswa = siswaList[0];
   if(!siswa) return;
@@ -6159,7 +6247,11 @@ function buatKwitansi(){
       if(!it.isCustom){
         const spp=getSPP(), pgm=getPGM(), daftar=getDaftar(), diskon=getDiskon();
         if(it.tipe==='SPP'){
-          if(it.sppCicilan && it.sppCicilanNominal){
+          if(cicMulti(it)){
+            // Cicilan beberapa siswa: nominal & rincian per siswa
+            nom = parseInt((it.sppCicilanPer||{})[si])||0;
+            if(!nom) return null;   // siswa ini tidak ikut item cicilan ini
+          } else if(it.sppCicilan && it.sppCicilanNominal){
             // Cicilan mode - nom = sppCicilanNominal (already total)
             nom = it.sppCicilanNominal;
             // Force kas = nominal (cicilan always pays exactly what's entered)
@@ -6248,22 +6340,24 @@ function buatKwitansi(){
       // In cicilan mode: nom is already total paid, don't multiply by qty
       const subtotal=it.sppCicilan&&it.sppCicilanNominal ? nom : (it.sppDari!==undefined ? nom : nom*qty);
       const pot=potNominal(it,subtotal);
-      const kas=it.kasInput>0?Math.min(it.kasInput,subtotal-pot):subtotal-pot;
+      const _cm=cicMulti(it), _cres=_cm?((it.sppCicilanResPer||{})[si]||[]):it.sppCicilanResult;
+      const kas=_cm?subtotal:(it.kasInput>0?Math.min(it.kasInput,subtotal-pot):subtotal-pot);
       let sisa=subtotal-pot-kas;
       // Cicilan SPP: tagihan = total semua bulan, sisa = dari cicilanResult (partial bulan terakhir)
       let tagihanCicilan=subtotal;
-      if(it.sppCicilan&&it.sppCicilanResult&&it.sppCicilanResult.length){
+      if(it.sppCicilan&&_cres&&_cres.length){
         // Total tagihan = sum nominal semua bulan dalam range
-        tagihanCicilan=it.sppCicilanResult.reduce((a,r)=>a+(r.bayar+(r.sisa||0)),0);
+        tagihanCicilan=_cres.reduce((a,r)=>a+(r.bayar+(r.sisa||0)),0);
         // Sisa = sisa dari bulan partial terakhir (jika ada)
-        const lastPartial=it.sppCicilanResult.find(r=>r.sisa>0);
+        const lastPartial=_cres.find(r=>r.sisa>0);
         sisa=lastPartial?lastPartial.sisa:0;
       }
-      const labelWithQty=it.sppCicilan?it.label:(qty>1?`${it.label} (${qty}x)`:it.label);
+      const labelWithQty=_cm?((it.sppCicilanLabelPer||{})[si]||it.label):it.sppCicilan?it.label:(qty>1?`${it.label} (${qty}x)`:it.label);
       return {tipe:it.tipe,label:labelWithQty,tagihan:tagihanCicilan,dibayar:kas,sisa,diskonPct:dPct,diskonAmt:dAmt,qty,catatan:it.catatan||null,
         potongan:pot||0,potonganPct:pot&&it.potonganPct>0?it.potonganPct:0,potonganKet:pot?(it.potonganKet||''):'',
-        cicilanResult:it.sppCicilan&&it.sppCicilanResult?it.sppCicilanResult:null};
-    });
+        cicilanResult:it.sppCicilan&&_cres?_cres:null};
+    }).filter(x=>x);
+    if(!recItems.length) return;
 
     const totalDibayar = recItems.reduce((a,it)=>a+it.dibayar,0);
     const totalSisa    = recItems.reduce((a,it)=>a+it.sisa,0);
@@ -10154,7 +10248,9 @@ body.ui-dark .navbar.scrolled{background:rgba(15,23,42,.85)!important}
     itemList.forEach(function(it,i){
       if(!it||!it.tipe) return;
       var t=itemTagihan(i), b=t;
-      if(it.tipe==='SPP'&&it.sppCicilan){
+      if(typeof cicMulti==='function'&&cicMulti(it)){
+        var ct=cicMultiTotals(i); b=ct.bayar; t=ct.tagihan; uang+=b;
+      } else if(it.tipe==='SPP'&&it.sppCicilan){
         var r=it.sppCicilanResult||[];
         b=r.reduce(function(a,x){return a+(x.bayar||0);},0);
         var tg=(typeof sppCicilanTarget==='function')?sppCicilanTarget(i):null;
@@ -10203,6 +10299,7 @@ body.ui-dark .navbar.scrolled{background:rgba(15,23,42,.85)!important}
 <style id="bt-css">
 #page-buktiTf{padding-top:4px;padding-bottom:160px!important}.nav-btns .nav-btn[onclick*="'buktiTf'"]{order:2}
 #page-buktiTf .bt-wrap{max-width:1180px;margin:0 auto}
+.ai-tag{display:inline-block;background:#6d28d9;color:#fff;border-radius:5px;font-size:9.5px;font-weight:700;padding:0 5px;line-height:15px;margin-left:5px;letter-spacing:.3px}
 .bt-setup{background:var(--surface,#fff);border:1px solid var(--line,#e5e7eb);border-radius:16px;padding:16px 18px;margin-bottom:14px}
 .bt-setup h3{font-size:15px;margin:0 0 6px}
 .bt-setup p{font-size:12.5px;color:var(--muted,#6b7280);margin:0 0 10px;line-height:1.5}
@@ -11081,7 +11178,7 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
   window.btCatatLagi=function(id){ var c=C(id); if(c&&c.drive&&c.drive.length){ catatDrive(c); render(); } };
   window.btSimpanDrive=function(id){
     var c=C(id); if(!c||!c.imgs||!c.imgs.length) return;
-    if(!ls(DRV_URL)){ alert('Isi dulu URL penyimpanan Google Drive di ⚙ Pengaturan AI (lihat panduan Apps Script).'); var s=$('bt-set'); if(s) s.style.display='block'; return; }
+    if(!ls(DRV_URL)){ alert('Isi dulu URL penyimpanan Google Drive di ⚙ Pengaturan AI (lihat panduan Apps Script).'); var s=$('bt-set'); if(s&&s.style.display==='none') btToggleSet(); return; }
     if(c.drvState==='up') return;
     c.drvState='up'; c.drvErr=''; render();
     var n=c.imgs.length, bulan=(c.tanggal||today()).slice(0,7), d=c.ai||{}, P=infoPengirim(c);
@@ -11716,7 +11813,26 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
   window.btSimpanKey=function(){ var v=($('bt-key').value||'').trim(); if(v.indexOf('•')>=0) return; lsw(KEY_LS,v); lsw(MODEL_LS,''); setupUi(); if(v) btTesKey(); };
   window.btHapusKey=function(){ if(!confirm('Hapus API key dari browser ini?')) return; lsw(KEY_LS,''); setupUi(); };
   window.btSimpanRek=function(){ lsw(REK_LS,($('bt-rek').value||'').trim()); var i=$('bt-rek-info'); if(i) i.textContent='✓ Tersimpan'; Q.forEach(function(c){}); render(); };
-  window.btToggleSet=function(){ var s=$('bt-set'); s.style.display=s.style.display==='none'?'block':'none'; };
+  function btSetBuka(){ var s=$('bt-set'); if(s) s.style.display='block'; }
+  window.btToggleSet=function(){ var s=$('bt-set'); if(!s) return;
+    if(s.style.display!=='none'){ s.style.display='none'; return; }
+    var ok=false; try{ ok=sessionStorage.getItem('ya_admin')==='1'; }catch(e){}
+    if(ok){ btSetBuka(); return; }
+    var m=$('bt-pw-modal'); if(m) m.remove();
+    m=document.createElement('div'); m.id='bt-pw-modal'; m.className='rk-del-bg';
+    m.innerHTML='<div class="rk-del-box"><div style="font-weight:700;font-size:17px">🔒 Pengaturan AI</div>'+
+      '<div style="font-size:13px;color:var(--text2,#6b7280);margin:4px 0 12px">Berisi API key, URL &amp; token Drive. Masukkan password admin.</div>'+
+      '<input type="password" id="bt-pw-in" placeholder="Password admin" style="width:100%">'+
+      '<div id="bt-pw-err" style="color:var(--danger,#c0392b);font-size:12.5px;min-height:18px;margin-top:4px"></div>'+
+      '<div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" id="bt-pw-no">Batal</button><button class="btn btn-primary" id="bt-pw-ok">Buka</button></div></div>';
+    document.body.appendChild(m);
+    var inp=m.querySelector('#bt-pw-in'); setTimeout(function(){ inp.focus(); },50);
+    var go=function(){ if(inp.value===PASSWORD){ try{ sessionStorage.setItem('ya_admin','1'); }catch(e){} m.remove(); btSetBuka(); }
+      else { m.querySelector('#bt-pw-err').textContent='Password salah.'; inp.select(); } };
+    m.querySelector('#bt-pw-ok').onclick=go; m.querySelector('#bt-pw-no').onclick=function(){ m.remove(); };
+    m.addEventListener('click',function(e){ if(e.target===m) m.remove(); });
+    inp.addEventListener('keydown',function(e){ if(e.key==='Enter') go(); if(e.key==='Escape') m.remove(); });
+  };
   function setupUi(){
     var has=!!ls(KEY_LS), k=$('bt-key'); if(!k) return;
     k.value=has?'••••••••••••'+ls(KEY_LS).slice(-4):'';
@@ -11731,14 +11847,14 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
     var nav=document.querySelector('.nav-btns'), kwBtn=nav&&nav.querySelector('.nav-btn[onclick*="\'kwitansi\'"]');
     if(nav&&!nav.querySelector('.nav-btn[onclick*="buktiTf"]')){
       var b=document.createElement('button'); b.className='nav-btn'; b.setAttribute('onclick',"showPage('buktiTf')");
-      b.innerHTML='📷 <span class="nb-t" data-s="Bukti">Bukti Transfer</span><span class="bt-badge" style="display:none;margin-left:auto;background:#e8833a;color:#fff;font-size:10.5px;font-weight:700;border-radius:9px;padding:0 6px;line-height:17px">0</span>';
+      b.innerHTML='📷 <span class="nb-t" data-s="Otomatis">Kuitansi Otomatis</span><span class="ai-tag">AI</span><span class="bt-badge" style="display:none;margin-left:auto;background:#e8833a;color:#fff;font-size:10.5px;font-weight:700;border-radius:9px;padding:0 6px;line-height:17px">0</span>';
       if(kwBtn&&kwBtn.nextSibling) nav.insertBefore(b,kwBtn.nextSibling); else nav.appendChild(b);
     }
     var ref=$('page-tagihan')||document.querySelector('.page');
     if(!$('page-buktiTf')&&ref){
       var pg=document.createElement('div'); pg.className='page'; pg.id='page-buktiTf';
       pg.innerHTML='<div class="bt-wrap">'+
-        '<div class="bt-setup"><div style="display:flex;align-items:center;gap:10px"><h3 style="margin:0">Bukti Transfer <span style="font-size:11px;font-weight:700;background:#e6e9f5;color:#4b55a0;border-radius:8px;padding:2px 8px;vertical-align:middle">EARLY TEST</span></h3>'+
+        '<div class="bt-setup"><div style="display:flex;align-items:center;gap:10px"><h3 style="margin:0">✨ Kuitansi Otomatis <span class="ai-tag" style="vertical-align:middle">AI</span> <span style="font-size:11px;font-weight:700;background:#e6e9f5;color:#4b55a0;border-radius:8px;padding:2px 8px;vertical-align:middle">EARLY TEST</span><div style="font-size:12px;font-weight:400;color:var(--text2,#6b7280);margin-top:2px">AI membaca bukti transfer &amp; buku kas → kuitansi</div></h3>'+
         '<span class="bt-b sm" style="margin-left:auto" onclick="btToggleSet()">⚙ Pengaturan AI</span></div>'+
         '<div id="bt-set" style="display:none;margin-top:10px">'+
           '<div id="bt-key-hint"><p><b>Langkah awal (sekali saja):</b> buka <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> dengan akun Google sekolah → <b>Create API key</b> → salin, lalu tempel di bawah. Key hanya tersimpan di browser ini (tidak ikut ke GitHub / cloud).</p></div>'+
@@ -11793,7 +11909,7 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
   window.showPage=function(p){
     var r=_sp.apply(this,arguments);
     document.body.classList.toggle('pg-bt',p==='buktiTf');
-    if(p==='buktiTf'){ try{ bkHitungUlang(); bkRender(); }catch(e){} Q.forEach(function(c){ c._drvCek=0; }); var h=document.querySelector('.navbar h1'); if(h) h.innerHTML='<span class="pt-muted">Bukti</span> Transfer'; Q.forEach(function(c){ if(c.state==='ok'){ alokasiKeep(c); } }); render(); }
+    if(p==='buktiTf'){ try{ bkHitungUlang(); bkRender(); }catch(e){} Q.forEach(function(c){ c._drvCek=0; }); var h=document.querySelector('.navbar h1'); if(h) h.innerHTML='<span class="pt-muted">Kuitansi</span> Otomatis'; Q.forEach(function(c){ if(c.state==='ok'){ alokasiKeep(c); } }); render(); }
     if(p==='kwitansi') setTimeout(banner,120); else if($('bt-banner')&&p!=='preview') $('bt-banner').style.display='none';
     return r;
   };
@@ -12144,7 +12260,7 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
   window.kaReset=function(){ S={msgs:[],d:null,ov:{},busy:false}; render(); var t=$('ka-in'); if(t){ t.value=''; t.focus(); } };
   window.kaKirim=function(){
     var t=$('ka-in'), v=(t&&t.value||'').trim(); if(!v||S.busy) return;
-    if(typeof window.kwAI!=='function'){ alert('Fitur AI belum siap — buka menu Bukti Transfer → ⚙ Pengaturan AI dan isi API key Gemini.'); return; }
+    if(typeof window.kwAI!=='function'){ alert('Fitur AI belum siap — buka menu Kuitansi Otomatis → ⚙ Pengaturan AI dan isi API key Gemini.'); return; }
     S.msgs.push({role:'user',text:v}); t.value=''; S.busy=true; render();
     var conv=S.msgs.map(function(m){ return (m.role==='user'?'ADMIN: ':'ASISTEN: ')+m.text; }).join('\n');
     var info='Tarif pendaftaran (Rp): '+JSON.stringify(getDaftar())+' · Formulir (Rp): '+JSON.stringify(FORMULIR_TARIF)+'\nPERCAKAPAN:\n'+conv;
@@ -12369,7 +12485,7 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
   function sig(a){ return JSON.stringify((a||[]).map(function(n){return [n.id,n.updatedAt];})); }
   function sedangKetik(){ var p=document.getElementById('note-popup'), a=document.activeElement; return !!(p&&a&&p.contains(a)&&/INPUT|TEXTAREA/.test(a.tagName)); }
   function sync(){
-    if(!siap()){ status('☁ Belum tersinkron — atur Simpan ke Drive di Bukti Transfer → ⚙ Pengaturan AI (laptop & HP)','#b4581a'); return Promise.resolve(); }
+    if(!siap()){ status('☁ Belum tersinkron — atur Simpan ke Drive di Kuitansi Otomatis → ⚙ Pengaturan AI (laptop & HP)','#b4581a'); return Promise.resolve(); }
     if(_busy) return Promise.resolve(); _busy=true; status('☁ Menyinkronkan...');
     return window.kwDrv({action:'kv_get',key:KEY}).then(function(j){
       if(!j.v||j.v<5) throw new Error('Apps Script Drive perlu diperbarui ke v5');
@@ -12476,11 +12592,12 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
 <!-- ===================== VERSI APLIKASI ===================== -->
 <script>
 // Ubah setiap kali ada update: x.y.z  (z = perbaikan kecil, y = fitur baru, x = perubahan besar)
-window.APP_VERSION='3.20.0';
-window.APP_BUILD='2026-10-22';
-window.APP_NOTES='Bukti transfer tersimpan di Drive per Tahun / Bulan / Tanggal, dan tab Last Entry menyimpan 2 entry terakhir.';
+window.APP_VERSION='3.21.0';
+window.APP_BUILD='2026-10-26';
+window.APP_NOTES='Menu Bukti Transfer jadi Kuitansi Otomatis, Mode Cicilan bisa untuk beberapa siswa beda kelas, dan Pengaturan AI pakai password admin.';
 // riwayat singkat (terbaru di atas) — tampil terlipat di halaman Admin
 window.APP_RIWAYAT=[
+  ['3.21.0','2026-10-26','Nama menu: ✨ Kuitansi Otomatis (AI); Mode Cicilan untuk 2+ siswa beda kelas (nominal per siswa atau total dibagi otomatis); ⚙ Pengaturan AI pakai password admin.'],
   ['3.20.0','2026-10-22','Drive: bukti TF ke Tahun 2026 / Oktober / 22 Oktober 2026 (butuh Apps Script v6); tab 🕘 Last Entry (2 entry terakhir).'],
   ['3.19.1','2026-10-22','Buku Kas: jumlah per tanggal di buku dibandingkan dengan Kas (tunai) saja, bukan tunai + transfer.'],
   ['3.19.0','2026-10-22','Rekord Pembayaran: tombol 🗑 hapus siswa (password admin, peringatan bila punya kwitansi, dicatat di Aktivitas).'],
