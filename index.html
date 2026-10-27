@@ -11139,11 +11139,12 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
   }
   // ---------- 🕘 LAST ENTRY: 2 bukti transfer terakhir yang sudah jadi kuitansi ----------
   var LAST=[];
-  function leSimpanDB(){ if(!IDB) return; try{ var tx=IDB.transaction('last','readwrite'), st=tx.objectStore('last'), ada={};
+  var LE_SIAP=false;
+  function leSimpanDB(){ if(!IDB||!LE_SIAP) return; try{ var tx=IDB.transaction('last','readwrite'), st=tx.objectStore('last'), ada={};
       LAST.concat(typeof LASTBK!=='undefined'?LASTBK:[]).forEach(function(e){ ada[e.id]=1; st.put(e); });
       var rq=st.getAllKeys(); rq.onsuccess=function(){ (rq.result||[]).forEach(function(k){ if(!ada[k]) st.delete(k); }); }; }catch(e){ console.warn('last entry',e); } }
-  function lePulih(){ idbBuka().then(function(db){ if(!db) return; try{ var rq=db.transaction('last','readonly').objectStore('last').getAll();
-      rq.onsuccess=function(){ var A=(rq.result||[]).sort(function(a,b){ return (b.waktu||'').localeCompare(a.waktu||''); }); LAST=A.filter(function(e){return e.kind!=='bk';}).slice(0,2); LASTBK=A.filter(function(e){return e.kind==='bk';}).slice(0,2); render(); bkRender(); }; }catch(e){} }); }
+  function lePulih(){ idbBuka().then(function(db){ if(!db){ LE_SIAP=true; return; } try{ var rq=db.transaction('last','readonly').objectStore('last').getAll();
+      rq.onsuccess=function(){ var ada={}, A=(rq.result||[]).concat(LAST,LASTBK).filter(function(e){ if(!e||ada[e.id]) return false; ada[e.id]=1; return true; }).sort(function(a,b){ return (b.waktu||'').localeCompare(a.waktu||''); }); LAST=A.filter(function(e){return e.kind!=='bk';}).slice(0,2); LASTBK=A.filter(function(e){return e.kind==='bk';}).slice(0,2); LE_SIAP=true; leSimpanDB(); render(); bkRender(); }; rq.onerror=function(){ LE_SIAP=true; }; }catch(e){ LE_SIAP=true; } }); }
   function leCatat(c,recs){
     if(!c) return; var d=c.ai||{}, e=LAST.filter(function(x){return x.id===c.id;})[0];
     if(!e){ e={id:c.id,imgs:(c.imgs||[]).map(function(im){return im.url;}).slice(0,3),recIds:[],no:[]}; LAST.unshift(e); }
@@ -11974,7 +11975,7 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
   // ---------- (2) LAST ENTRY BUKU KAS: 2 halaman terakhir yang sudah dibuat kuitansinya ----------
   var LASTBK=[], BKTAB='q';
   function bkLeCatat(){
-    var ubah=false;
+    if(!LE_SIAP) return; var ubah=false;
     BK.forEach(function(p){ if(p.state!=='ok') return;
       var done=p.rows.filter(function(r){return r.doneNo;}); if(!done.length) return;
       var sig=done.map(function(r){return r.doneNo;}).join(',')+'|'+((p.drive&&p.drive[0]&&p.drive[0].url)||'');
@@ -12104,7 +12105,8 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
       Q=Q.filter(function(c){ return c.id!==id||c.state==='reading'&&!c._fb; }); BK=BK.filter(function(p){ return p.id!==id; });
       LAST=LAST.filter(function(e){ return 'last_'+e.id!==id; }); LASTBK=LASTBK.filter(function(e){ return 'last_'+e.id!==id; });
       if(nq!==Q.length||nb!==BK.length||nl!==LAST.length+LASTBK.length){ simpanQ(); render(); bkRender(); leSimpanDB(); } return; }
-    if(d.dev===FB.dev||FB.sent[id]===d.j) return;
+    if(FB.sent[id]===d.j) return;
+    if(d.dev===FB.dev&&!(d.k==='last'&&!LAST.concat(LASTBK).some(function(e){ return 'last_'+e.id===id; }))) return;
     var o; try{ o=JSON.parse(d.j); }catch(e){ return; }
     FB.sent[id]=d.j;
     if(d.k==='last'){ var L=o.kind==='bk'?LASTBK:LAST, e=L.filter(function(x){return 'last_'+x.id===id;})[0];
@@ -12166,7 +12168,21 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
   window.btSimpanKey=function(){ var v=($('bt-key').value||'').trim(); if(v.indexOf('•')>=0) return; lsw(KEY_LS,v); lsw(MODEL_LS,''); setupUi(); if(v) btTesKey(); };
   window.btHapusKey=function(){ if(!confirm('Hapus API key dari browser ini?')) return; lsw(KEY_LS,''); setupUi(); };
   window.btSimpanRek=function(){ lsw(REK_LS,($('bt-rek').value||'').trim()); var i=$('bt-rek-info'); if(i) i.textContent='✓ Tersimpan'; Q.forEach(function(c){}); render(); };
-  function btSetBuka(){ var s=$('bt-set'); if(s) s.style.display='block'; try{ fbStatus(); }catch(e){} }
+  function btSetBukaLangsung(){ var s=$('bt-set'); if(s) s.style.display='block'; try{ fbStatus(); }catch(e){} }
+  function btSetBuka(){
+    var m=$('bt-warn-modal'); if(m) m.remove();
+    m=document.createElement('div'); m.id='bt-warn-modal'; m.className='rk-del-bg';
+    m.innerHTML='<div class="rk-del-box"><div style="font-weight:700;font-size:17px;color:#b4581a">⚠ Buka Pengaturan AI?</div>'+
+      '<div style="margin:10px 0 12px;line-height:1.6;font-size:13.5px">Pengaturan ini berisi <b>API key AI, URL &amp; token Google Drive, dan kunci sync Firebase</b>.'+
+      '<ul style="margin:8px 0 0 18px;padding:0;color:var(--text2,#444)"><li>Salah ubah → AI, simpan ke Drive, atau sync HP ↔ laptop bisa berhenti.</li><li>Jangan tunjukkan layar ini / kirim link pengaturan ke orang lain.</li></ul></div>'+
+      '<div style="background:#f6f7f8;border-radius:8px;padding:6px 10px;font-size:12px;color:#666;margin-bottom:14px">✓ Sudah login admin di sesi ini.</div>'+
+      '<div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" id="bt-warn-no">Batal</button><button class="btn" id="bt-warn-ok" style="background:#b4581a;color:#fff;border-color:#b4581a;font-weight:600">Saya mengerti, buka</button></div></div>';
+    document.body.appendChild(m);
+    m.querySelector('#bt-warn-no').onclick=function(){ m.remove(); };
+    m.querySelector('#bt-warn-ok').onclick=function(){ m.remove(); btSetBukaLangsung(); };
+    m.addEventListener('click',function(e){ if(e.target===m) m.remove(); });
+    setTimeout(function(){ var b=m.querySelector('#bt-warn-ok'); if(b) b.focus(); },50);
+  }
   window.btToggleSet=function(){ var s=$('bt-set'); if(!s) return;
     if(s.style.display!=='none'){ s.style.display='none'; return; }
     var ok=false; try{ ok=sessionStorage.getItem('ya_admin')==='1'; }catch(e){}
@@ -12959,11 +12975,12 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
 <!-- ===================== VERSI APLIKASI ===================== -->
 <script>
 // Ubah setiap kali ada update: x.y.z  (z = perbaikan kecil, y = fitur baru, x = perubahan besar)
-window.APP_VERSION='3.24.0';
+window.APP_VERSION='3.25.0';
 window.APP_BUILD='2026-10-27';
-window.APP_NOTES='Buku Kas: kepala kartu dan judul kolom menempel di atas saat tabel di-scroll.';
+window.APP_NOTES='Menu Admin pindah ke sidebar kiri dengan Kelola Siswa dan Rekord Siswa di atas, peringatan saat membuka Pengaturan AI, dan Last Entry tidak hilang lagi.';
 // riwayat singkat (terbaru di atas) — tampil terlipat di halaman Admin
 window.APP_RIWAYAT=[
+  ['3.25.0','2026-10-27','Menu Admin di sidebar kiri (Kelola & Rekord Siswa ditonjolkan, Riwayat update tab sendiri); peringatan sebelum membuka Pengaturan AI; perbaikan Last Entry hilang saat aplikasi dibuka (+ dipulihkan dari Firebase).'],
   ['3.24.0','2026-10-27','Buku Kas: kepala kartu (foto, ringkasan) + judul kolom menempel (freeze) saat di-scroll; di HP lebih ringkas.'],
   ['3.23.0','2026-10-27','Pencarian nama mengabaikan spasi/titik/tanda hubung (leonardus = Leo Nardus) di semua kolom cari + daftar pilihan siswa baru di Kuitansi Otomatis.'],
   ['3.22.1','2026-10-26','Status baca AI + ⏱ lama baca tersinkron; tombol ↻ Baca di laptop ini bila kartu dari HP > 1 menit; pratinjau edit foto tajam (layar HP).'],
@@ -13118,5 +13135,79 @@ window.APP_RIWAYAT=[
   else setTimeout(siap,260);
 })();
 </script>
+<!-- ===================== v3.25: MENU ADMIN DI SIDEBAR KIRI + RIWAYAT UPDATE ===================== -->
+<style>
+.sn-admin{display:none;flex-direction:column;gap:1px;margin:2px 0 6px 10px;padding-left:8px;border-left:1px solid var(--line,#e5e5e5)}
+body.adm-sb .sn-admin{display:flex}body.adm-sb.adm-fold .sn-admin{display:none}
+body.adm-sb #admin-panel>.tab-bar{display:none!important}
+.sn-admin .sa-i{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:9px;font-size:12.5px;color:var(--muted,#7a7a7a);cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.25}
+.sn-admin .sa-i svg{width:15px;height:15px;flex:none}
+.sn-admin .sa-i:hover{background:var(--hover,#efefef);color:var(--ink,#1d1d1f)}
+.sn-admin .sa-i.on{background:var(--sel,#ebebeb);color:var(--ink,#1d1d1f);font-weight:600}
+.sn-admin .sa-u{font-size:13.5px;font-weight:700;color:#2f6b4c;background:#e6efe9;padding:8px 10px;margin-bottom:3px}
+.sn-admin .sa-u svg{width:17px;height:17px}
+.sn-admin .sa-u.on{background:#5a9a78;color:#fff}.sn-admin .sa-u:hover{background:#d8e8de;color:#2f6b4c}.sn-admin .sa-u.on:hover{background:#4f8b6b;color:#fff}
+.sn-admin .sa-sep{border-top:1px dashed var(--line,#e2e2e2);margin:5px 4px}
+.sn-admin .sa-r{font-size:11.5px;color:#a3a3a3}.sn-admin .sa-r.on{color:var(--ink,#1d1d1f)}
+.adm-caret{margin-left:auto;padding:0 4px;font-size:11px;opacity:.6;cursor:pointer}
+body:not(.adm-sb) .adm-caret{display:none}
+body.adm-sb .nav-btns{overflow-y:auto}
+#admin-panel>.tab-bar .tab[onclick*="'siswa'"]{order:-3}#admin-panel>.tab-bar .tab[onclick*="'rekordSiswa'"]{order:-2}
+#admin-panel>.tab-bar .tab[onclick*="'riwayatUpdate'"]{order:99;font-size:12px!important;opacity:.6}
+.pt-sub{color:var(--muted,#9a9a9a);font-weight:400}
+#tab-riwayatUpdate #app-ver-admin{font-size:13px!important}
+#tab-riwayatUpdate .app-riw{flex-basis:100%}#tab-riwayatUpdate .app-riw ul{max-height:none}
+</style>
+<script>
+(function(){
+  var NAMA={siswa:'Kelola Siswa',rekordSiswa:'Rekord Siswa',tarif:'Tarif & Diskon',naikKelas:'Naik Kelas',tunggakan:'Tunggakan',laporanHarian:'Transaksi Harian',laporanJenjang:'Per Jenjang',tema:'Tema',modalAwal:'Kas Awal Harian',pengeluaran:'Pengeluaran',pinjaman:'Pinjaman',kasTunai:'Kas Tunai',riwayatUpdate:'Riwayat update'};
+  var UTAMA=['siswa','rekordSiswa'], AKTIF='tarif';
+  function $(i){ return document.getElementById(i); }
+  function tabKey(el){ var m=(el.getAttribute('onclick')||'').match(/switchTab\('(\w+)'\)/); return m?m[1]:''; }
+  // tab Riwayat update (isi: kotak versi + daftar update)
+  function pasangRiwayat(){
+    var ap=$('admin-panel'), bar=ap&&ap.querySelector('.tab-bar'); if(!bar) return;
+    if(!bar.querySelector('.tab[onclick*="riwayatUpdate"]')){ var t=document.createElement('div'); t.className='tab'; t.setAttribute('onclick',"switchTab('riwayatUpdate')"); t.innerHTML='ⓘ Riwayat update'; bar.appendChild(t); }
+    if(!$('tab-riwayatUpdate')){ var c=document.createElement('div'); c.className='tab-content'; c.id='tab-riwayatUpdate'; c.innerHTML='<div class="card"><div class="card-title">Riwayat update</div><div id="ru-isi"></div></div>'; var tc=ap.querySelectorAll(':scope>.tab-content'), last=tc[tc.length-1]; if(last&&last.nextSibling) ap.insertBefore(c,last.nextSibling); else ap.appendChild(c); }
+    var v=$('app-ver-admin'), isi=$('ru-isi'); if(v&&isi&&v.parentNode!==isi){ isi.appendChild(v); var d=v.querySelector('details'); if(d) d.open=true; }
+  }
+  function ikon(k){ var t=document.querySelector('#admin-panel>.tab-bar .tab[onclick*="switchTab(\''+k+'\')"]'), s=t&&t.querySelector('svg'); return s?s.outerHTML:''; }
+  function bangun(){
+    var nav=document.querySelector('.nav-btns'), ab=nav&&nav.querySelector('.nav-btn[onclick*="\'admin\'"]'); if(!ab) return null;
+    var sm=nav.querySelector('.sn-admin'); if(sm) return sm;
+    sm=document.createElement('div'); sm.className='sn-admin';
+    var tabs=[].slice.call(document.querySelectorAll('#admin-panel>.tab-bar .tab')).map(tabKey).filter(Boolean);
+    var lain=tabs.filter(function(k){ return UTAMA.indexOf(k)<0&&k!=='riwayatUpdate'; });
+    var item=function(k,cls){ return '<div class="sa-i '+cls+'" data-t="'+k+'" title="'+NAMA[k]+'">'+(k==='riwayatUpdate'?'':ikon(k))+'<span>'+(NAMA[k]||k)+(k==='riwayatUpdate'?' · v'+(window.APP_VERSION||''):'')+'</span></div>'; };
+    sm.innerHTML=UTAMA.map(function(k){ return item(k,'sa-u'); }).join('')+'<div class="sa-sep"></div>'+lain.map(function(k){ return item(k,''); }).join('')+'<div class="sa-sep"></div>'+item('riwayatUpdate','sa-r');
+    sm.style.order=getComputedStyle(ab).order;
+    ab.parentNode.insertBefore(sm,ab.nextSibling);
+    sm.addEventListener('click',function(e){ var it=e.target.closest('.sa-i'); if(!it) return; var pa=$('page-admin'); if(pa&&!pa.classList.contains('active')) showPage('admin'); switchTab(it.dataset.t); window.scrollTo(0,0); });
+    if(!ab.querySelector('.adm-caret')){ var c=document.createElement('span'); c.className='adm-caret'; c.textContent='▾'; c.title='Lipat / buka menu Admin';
+      c.addEventListener('click',function(e){ e.stopPropagation(); e.preventDefault(); document.body.classList.toggle('adm-fold'); c.textContent=document.body.classList.contains('adm-fold')?'▸':'▾'; }); ab.appendChild(c); }
+    return sm;
+  }
+  function judul(){ var pa=$('page-admin'), h1=document.querySelector('.navbar h1'); if(!h1||!pa||!pa.classList.contains('active')) return;
+    var masuk=$('admin-panel')&&$('admin-panel').style.display!=='none'; h1.innerHTML='Admin'+(masuk&&NAMA[AKTIF]?' <span class="pt-sub">· '+NAMA[AKTIF]+'</span>':''); }
+  function segar(){
+    pasangRiwayat();
+    var pa=$('page-admin'), ap=$('admin-panel'), on=!!(pa&&pa.classList.contains('active')&&ap&&ap.style.display!=='none'&&window.innerWidth>700&&!document.body.classList.contains('sn-collapsed'));
+    var sm=bangun(); document.body.classList.toggle('adm-sb',on&&!!sm);
+    if(sm) sm.querySelectorAll('.sa-i').forEach(function(x){ x.classList.toggle('on',x.dataset.t===AKTIF); });
+    judul();
+  }
+  var _st=window.switchTab;
+  if(typeof _st==='function') window.switchTab=function(t){ AKTIF=t; var r=_st.apply(this,arguments); segar(); return r; };
+  var _sp=window.showPage;
+  if(typeof _sp==='function') window.showPage=function(p){ var r=_sp.apply(this,arguments); setTimeout(segar,0); return r; };
+  var _la=window.loginAdmin;
+  if(typeof _la==='function') window.loginAdmin=function(){ var r=_la.apply(this,arguments); setTimeout(segar,0); return r; };
+  window.addEventListener('resize',function(){ segar(); });
+  function mulai(){ var a=document.querySelector('#admin-panel>.tab-bar .tab.active'); if(a) AKTIF=tabKey(a)||AKTIF; segar(); }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',function(){ setTimeout(mulai,700); }); else setTimeout(mulai,700);
+  window._admSb={segar:segar};
+})();
+</script>
+
 </body>
 </html>
