@@ -10407,6 +10407,14 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
 .fe-sls{padding:0 16px;max-width:720px;width:100%;margin:0 auto;box-sizing:border-box}.fe-sl{margin-bottom:6px}.fe-sl div{display:flex;justify-content:space-between;font-size:12px;opacity:.9}.fe-sl input{width:100%;accent-color:#7dd3a8}
 .fe-ok{margin:8px 16px 14px;background:#5a9a78;border-radius:12px;padding:13px;text-align:center;font-weight:700;font-size:15px;cursor:pointer;max-width:690px;align-self:center;width:calc(100% - 32px);box-sizing:border-box}
 .sdd{position:absolute;z-index:100002;background:var(--card,#fff);border:1px solid var(--border,#e2e2e2);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.14);padding:4px;max-height:280px;overflow:auto;font-size:13px}.sdd-i{padding:7px 10px;border-radius:7px;cursor:pointer;white-space:nowrap}.sdd-i span{color:var(--text2,#6b7280)}.sdd-i:hover,.sdd-i.on{background:#eef6f1}
+.bk-stick{position:sticky;top:var(--bk-top,0px);z-index:6;background:var(--surface,#fff);margin:-16px -18px 0;padding:16px 18px 0;border-radius:16px 16px 0 0}
+.bk-frz .bk-stick{box-shadow:0 1px 0 var(--line,#e5e7eb)}
+.bk-sth{overflow:hidden;margin:0 -18px;padding:0 18px;background:#fafafa}.bk-sth-in{display:flex;will-change:transform}
+.bk-sth-c{flex:none;box-sizing:border-box;padding:10px 8px;font-size:11.5px;font-weight:600;letter-spacing:.4px;color:var(--muted,#6b7280);text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bk-frz .bk-tbl thead th{height:0!important;padding-top:0!important;padding-bottom:0!important;line-height:0!important;font-size:0!important;border:0!important;overflow:hidden}
+.bk-frz .bk-tbl thead th *{display:none}
+.bk-frz .bk-tbl-wrap{margin-top:0}
+@media(max-width:700px){.bk-stick{padding:10px 12px 0;margin:-16px -18px 0}.bk-stick .bk-head{gap:8px;margin-bottom:4px}.bk-stick .bk-thumb{width:52px!important;height:40px!important;min-width:0}.bk-stick .bk-head span[style*="11.5px"],.bk-stick .bk-head br{display:none}.bk-stick .bt-meta{margin-bottom:4px;font-size:11px}.bk-sth-c{padding:6px 6px;font-size:10px}}
 .le-card{display:flex;gap:12px;border:1px solid var(--border,#e6e6e6);border-radius:12px;padding:10px;margin-bottom:10px;background:var(--card,#fff)}.le-img{width:74px;height:96px;object-fit:cover;border-radius:8px;background:#e5e9ee;cursor:zoom-in;flex:none}.le-new{background:#5a9a78;color:#fff;border-radius:6px;padding:1px 6px;font-size:11px}
 #bt-zoom{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:100000;display:none;align-items:center;justify-content:center;cursor:zoom-out}
 #bt-zoom img{max-width:94vw;max-height:94vh;border-radius:8px;background:#fff}
@@ -11526,8 +11534,11 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
     if(pg.state==='error') return h+'<ul class="bt-reasons"><li class="b">✗ '+esc(pg.err)+'</li></ul><div class="bt-acts"><span class="bt-b pri" onclick="bkUlang(\''+pg.id+'\')">Baca ulang</span><span class="bt-b red" onclick="bkHapus(\''+pg.id+'\')">Hapus</span></div></div></div>';
     var n={siap:0,cek:0,coret:0,ada:0,manual:0,done:0,err:0}, pil=0, tot=0;
     pg.rows.forEach(function(r){ n[r.status]=(n[r.status]||0)+1; if(r.pilih&&r.status!=='done'&&r.status!=='manual'){ pil++; tot+=Number(r.bayar)||0; } });
+    h=h.replace('<div class="bt-card bk-card" id="'+pg.id+'">','<div class="bt-card bk-card" id="'+pg.id+'"><div class="bk-stick">');
+    if(h.slice(-5)==='<div>') h=h.slice(0,-5);
     if(pg.jSaran) h+='<div class="bt-q" style="background:#fdeaea;border:1px solid #f5c2c2;color:#b33a3a;border-radius:10px;padding:8px 12px;margin-bottom:8px;font-size:13px">⚠ Kelas di halaman ini kebanyakan <b>'+esc(pg.jSaran)+'</b>, tapi dimasukkan sebagai buku <b>'+esc(pg.jenjang)+'</b>. <span class="bt-b sm pri" onclick="bkGantiJenjang(\''+pg.id+'\',\''+pg.jSaran+'\')">Ganti ke buku '+esc(pg.jSaran)+'</span> <span class="bt-b sm" onclick="bkGantiJenjang(\''+pg.id+'\',\''+pg.jenjang+'\')">Tetap '+esc(pg.jenjang)+'</span></div>';
     h+='<div class="bt-meta">'+pg.rows.length+' baris terbaca · <span class="bt-st ok">'+n.siap+' siap</span> <span class="bt-st warn">'+n.cek+' perlu dicek</span> <span class="bt-st done">'+(n.coret+n.ada)+' sudah diinput</span> <span class="bt-st done">'+n.manual+' manual</span>'+(n.done?' <span class="bt-st ok">'+n.done+' dibuat</span>':'')+'</div>';
+    h+='<div class="bk-sth"><div class="bk-sth-in"></div></div></div><div>';
     h+='<div class="bk-tbl-wrap"><table class="bt-logt bk-tbl"><thead><tr><th style="width:26px"><input type="checkbox" title="Pilih semua yang siap" onchange="bkPilihSemua(\''+pg.id+'\',this.checked)"></th><th>Tanggal</th><th>Dari buku</th><th style="min-width:190px">Siswa</th><th>Bulan SPP · tagihan</th><th>Dibayar</th><th>Metode</th><th style="min-width:170px">Status</th></tr></thead><tbody>';
     var lastT=null, lastL=1, nUrut=0;
     pg.rows.forEach(function(r,i){
@@ -12003,12 +12014,34 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
     document.body.appendChild(m); m.addEventListener('click',function(ev){ if(ev.target===m) m.remove(); });
   };
   window.bkTab=function(t){ BKTAB=t; bkRender(); };
+  // ---------- v3.24: kepala kartu Buku Kas menempel (freeze) saat di-scroll ----------
+  function bkStickTop(){ // tinggi bar judul atas yang tetap di layar
+    var c=[document.querySelector('.navbar'),document.querySelector('.ui-topbar'),document.querySelector('.topbar')].filter(Boolean), t=0;
+    c.forEach(function(e){ var cs=getComputedStyle(e); if(cs.position==='fixed'||cs.position==='sticky'){ var r=e.getBoundingClientRect(); if(r.height&&r.top<=1&&cs.display!=='none'&&cs.visibility!=='hidden') t=Math.max(t,r.bottom); } });
+    document.documentElement.style.setProperty('--bk-top',Math.round(t)+'px');
+  }
+  function bkStickSync(){
+    bkStickTop();
+    document.querySelectorAll('#bk-list .bk-card').forEach(function(card){
+      var th=card.querySelector('.bk-tbl thead'), sth=card.querySelector('.bk-sth-in'), wrap=card.querySelector('.bk-tbl-wrap'); if(!th||!sth||!wrap) return;
+      var tbl=card.querySelector('.bk-tbl'), cells=[].slice.call(th.querySelectorAll('th'));
+      if(!tbl.offsetWidth){ card.classList.remove('bk-frz'); return; }
+      sth.style.width=tbl.offsetWidth+'px';
+      sth.innerHTML=cells.map(function(c){ return '<div class="bk-sth-c" style="width:'+c.offsetWidth+'px">'+c.innerHTML+'</div>'; }).join('');
+      card.classList.add('bk-frz');
+      var cb=sth.querySelector('input[type=checkbox]'), cbAsli=th.querySelector('input[type=checkbox]'); if(cb&&cbAsli) cb.checked=cbAsli.checked;
+      sth.style.transform='translateX('+(-wrap.scrollLeft)+'px)';
+      if(!wrap._frz){ wrap._frz=1; wrap.addEventListener('scroll',function(){ var s2=card.querySelector('.bk-sth-in'); if(s2) s2.style.transform='translateX('+(-wrap.scrollLeft)+'px)'; },{passive:true}); }
+    });
+  }
+  var _frzT=null; window.addEventListener('resize',function(){ clearTimeout(_frzT); _frzT=setTimeout(function(){ try{ bkStickSync(); }catch(e){} },150); });
+  window._bkStickSync=function(){ bkStickSync(); };
   var _bkR0=bkRender;
   bkRender=function(){
     try{ bkLeCatat(); }catch(e){ console.warn('last bk',e); }
     var tb=$('bk-tabs'); if(tb) tb.innerHTML='<span class="bt-tab'+(BKTAB!=='last'?' on':'')+'" onclick="bkTab(\'q\')">📒 Antrian<i>'+BK.length+'</i></span><span class="bt-tab'+(BKTAB==='last'?' on':'')+'" onclick="bkTab(\'last\')">🕘 Last Entry<i>'+LASTBK.length+'</i></span>';
     if(BKTAB==='last'){ btDl(); simpanBK(); var w=$('bk-list'); if(w) w.innerHTML=lastBkHtml(); return; }
-    return _bkR0.apply(this,arguments);
+    var rr=_bkR0.apply(this,arguments); try{ bkStickSync(); }catch(e){ console.warn('freeze',e); } return rr;
   };
 
   // ---------- (3) SYNC REAL-TIME (Firebase Firestore): antrian Bukti TF + Buku Kas + Last Entry ----------
@@ -12926,11 +12959,12 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
 <!-- ===================== VERSI APLIKASI ===================== -->
 <script>
 // Ubah setiap kali ada update: x.y.z  (z = perbaikan kecil, y = fitur baru, x = perubahan besar)
-window.APP_VERSION='3.23.0';
+window.APP_VERSION='3.24.0';
 window.APP_BUILD='2026-10-27';
-window.APP_NOTES='Pencarian nama tidak peduli spasi, titik dan tanda hubung, misalnya leonardus menemukan Leo Nardus.';
+window.APP_NOTES='Buku Kas: kepala kartu dan judul kolom menempel di atas saat tabel di-scroll.';
 // riwayat singkat (terbaru di atas) — tampil terlipat di halaman Admin
 window.APP_RIWAYAT=[
+  ['3.24.0','2026-10-27','Buku Kas: kepala kartu (foto, ringkasan) + judul kolom menempel (freeze) saat di-scroll; di HP lebih ringkas.'],
   ['3.23.0','2026-10-27','Pencarian nama mengabaikan spasi/titik/tanda hubung (leonardus = Leo Nardus) di semua kolom cari + daftar pilihan siswa baru di Kuitansi Otomatis.'],
   ['3.22.1','2026-10-26','Status baca AI + ⏱ lama baca tersinkron; tombol ↻ Baca di laptop ini bila kartu dari HP > 1 menit; pratinjau edit foto tajam (layar HP).'],
   ['3.22.0','2026-10-26','Buku Kas: 📷 kamera HP + edit foto (crop, putar, kemiringan, perspektif, terang/kontras); tab 🕘 Last Entry; ⚡ sync real-time laptop ↔ HP (Firebase) untuk antrian & Last Entry.'],
