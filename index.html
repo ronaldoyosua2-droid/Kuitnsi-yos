@@ -251,6 +251,9 @@ input[readonly]{background:var(--gray-light);color:var(--gray)}
 <body>
 
 <script>
+// v3.23: pencarian nama tanpa peduli spasi / titik / tanda hubung (leonardus = Leo Nardus)
+function normNama(s){ return String(s==null?'':s).toLowerCase().replace(/[\s.,\-'’`_]+/g,''); }
+function cocokNama(nama,q){ if(!q) return true; var n=String(nama==null?'':nama).toLowerCase(), qq=String(q).toLowerCase().trim(); if(!qq||n.indexOf(qq)>=0) return true; var a=normNama(qq); return !!a&&normNama(n).indexOf(a)>=0; }
 // Safe wrappers defined early to avoid "not defined" errors
 function doManualSync(){ if(typeof manualSync==='function') manualSync(); }
 
@@ -269,7 +272,7 @@ function filterTgSiswa(){
   const q = (document.getElementById('tg-siswa-input')?.value||'').toLowerCase();
   const dd = document.getElementById('tg-siswa-dropdown');
   if(!q){ dd.style.display='none'; return; }
-  const siswa = getSiswa().filter(s=>s.nama.toLowerCase().includes(q)).slice(0,10);
+  const siswa = getSiswa().filter(s=>cocokNama(s.nama,q)).slice(0,10);
   if(!siswa.length){ dd.style.display='none'; return; }
   dd.innerHTML = siswa.map(s=>`
     <div onclick="selectTgSiswa('${s.nama.replace(/'/g,"\'")}','${s.kelas}')"
@@ -1220,7 +1223,7 @@ function renderLogAktivitas(){
   if(sampai) logs = logs.filter(l=>l.waktu&&l.waktu.slice(0,10)<=sampai);
   if(jenis) logs = logs.filter(l=>l.jenis===jenis);
   if(fMetode) logs = logs.filter(l=>logMetode(l)===fMetode);
-  if(nama) logs = logs.filter(l=>(l.nama||'').toLowerCase().includes(nama)||(l.detail||'').toLowerCase().includes(nama)||String(l.noKwitansi||'').toLowerCase().includes(nama));
+  if(nama) logs = logs.filter(l=>cocokNama(l.nama,nama)||(l.detail||'').toLowerCase().includes(nama)||String(l.noKwitansi||'').toLowerCase().includes(nama));
 
   if(!logs.length){
     wrap.innerHTML='<div class="hist-empty">Tidak ada log aktivitas ditemukan</div>';
@@ -1496,7 +1499,7 @@ function renderSidebarSiswa(){
     // Tampilkan kelas reguler + Plus sekaligus (misal "1 SD" → tampilkan "1 SD" dan "1 SD Plus")
     siswa = siswa.filter(s=>(s.kelas===kelas||s.kelas===kelas+' Plus')&&!isCalonSiswa(s));
   }
-  if(q) siswa = siswa.filter(s=>s.nama.toLowerCase().includes(q));
+  if(q) siswa = siswa.filter(s=>cocokNama(s.nama,q));
   siswa = siswa.sort((a,b)=>a.nama.localeCompare(b.nama));
   
   if(!kelas&&!q){ wrap.innerHTML='<div style="color:var(--text2);font-size:12px;text-align:center;padding:16px 0">Pilih kelas atau cari nama</div>'; return; }
@@ -3218,7 +3221,7 @@ function onSfNamaInput(i, val){
   if(!dd) return;
   document.querySelectorAll('.sf-dd').forEach(d=>{ if(d!==dd) d.classList.remove('open'); });
   if(q.length < 1){ dd.classList.remove('open'); return; }
-  const found = getSiswa().filter(s=>s.nama.toLowerCase().includes(q)).slice(0,10);
+  const found = getSiswa().filter(s=>cocokNama(s.nama,q)).slice(0,10);
   if(!found.length){ dd.classList.remove('open'); return; }
   dd.innerHTML = found.map(s=>{
     const isPlus = s.kelas.includes('Plus');
@@ -4490,7 +4493,7 @@ function onSpNamaInput(){
   const dd = document.getElementById('sp-dd-nama');
   spSiswaData = null;
   if(q.length<1){dd.classList.remove('open');return;}
-  const found = getSiswa().filter(s=>s.nama.toLowerCase().includes(q)).slice(0,10);
+  const found = getSiswa().filter(s=>cocokNama(s.nama,q)).slice(0,10);
   if(!found.length){dd.classList.remove('open');return;}
   dd.innerHTML = found.map(s=>`<div class="dd-item" onmousedown="selectSpSiswa('${encodeURIComponent(s.nama)}','${encodeURIComponent(s.kelas)}')">
     <span>${s.nama}</span><span class="dd-badge">${s.kelas}</span>
@@ -4770,7 +4773,7 @@ function onSbNamaInput(){
   const dd = document.getElementById('sb-dd-nama');
   sbSiswaData = null;
   if(q.length<1){dd.classList.remove('open');return;}
-  const found = getSiswa().filter(s=>s.nama.toLowerCase().includes(q)).slice(0,8);
+  const found = getSiswa().filter(s=>cocokNama(s.nama,q)).slice(0,8);
   if(!found.length){dd.classList.remove('open');return;}
   dd.innerHTML = found.map(s=>`<div class="dd-item" onmousedown="selectSbSiswa('${encodeURIComponent(s.nama)}','${encodeURIComponent(s.kelas)}')">
     <span>${s.nama}</span><span class="dd-badge">${s.kelas}</span>
@@ -5078,7 +5081,7 @@ function searchNama(){
   document.getElementById('inp-kelas').value='';
   resetPaymentFields();
   if(q.length<1){dd.classList.remove('open');return}
-  const found=getSiswa().filter(s=>s.nama.toLowerCase().includes(q)).slice(0,12);
+  const found=getSiswa().filter(s=>cocokNama(s.nama,q)).slice(0,12);
   if(!found.length){dd.classList.remove('open');return}
   dd.innerHTML=found.map(s=>{
     const isPlus=s.kelas.includes('Plus');
@@ -6530,7 +6533,7 @@ function filterRiwayat(){
     infoDiv.style.display='none';filterBar.style.display='none';
     currentRvSiswa=null;return;
   }
-  const siswaList=getSiswa().filter(s=>s.nama.toLowerCase().includes(q));
+  const siswaList=getSiswa().filter(s=>cocokNama(s.nama,q));
   if(siswaList.length===0){
     wrap.innerHTML='<div class="hist-empty">Siswa tidak ditemukan</div>';
     infoDiv.style.display='none';filterBar.style.display='none';return;
@@ -6599,7 +6602,7 @@ function filterAllRiwayat(){
   let rw=getRiwayat();
   if(dari)rw=rw.filter(r=>r.tanggal&&r.tanggal>=dari);
   if(sampai)rw=rw.filter(r=>r.tanggal&&r.tanggal<=sampai);
-  if(q)rw=rw.filter(r=>r.nama.toLowerCase().includes(q));
+  if(q)rw=rw.filter(r=>cocokNama(r.nama,q));
   if(tipe)rw=rw.filter(r=>r.tipe===tipe);
   if(kelas)rw=rw.filter(r=>r.kelas===kelas);
   if(metode)rw=rw.filter(r=>(r.metode||'Kas')===metode);
@@ -6745,7 +6748,7 @@ function downloadDaftarSiswaPrint(){
   const fk=(document.getElementById('admin-siswa-filter-kelas')?.value||'');
   const q=(document.getElementById('admin-siswa-search').value||'').toLowerCase();
   let siswa=getSiswa();
-  if(q) siswa=siswa.filter(s=>s.nama.toLowerCase().includes(q));
+  if(q) siswa=siswa.filter(s=>cocokNama(s.nama,q));
   if(fk){
     if(fk==='SD') siswa=siswa.filter(s=>s.kelas&&s.kelas.includes('SD'));
     else if(fk==='SMP') siswa=siswa.filter(s=>s.kelas&&s.kelas.includes('SMP'));
@@ -7029,7 +7032,7 @@ function hapusSemuaRiwayat(){
   const kelas=document.getElementById('all-filter-kelas').value;
   let rw=getRiwayat();
   let filtered=rw;
-  if(q)filtered=filtered.filter(r=>r.nama.toLowerCase().includes(q.toLowerCase()));
+  if(q)filtered=filtered.filter(r=>cocokNama(r.nama,q.toLowerCase()));
   if(tipe)filtered=filtered.filter(r=>r.tipe===tipe);
   if(kelas)filtered=filtered.filter(r=>r.kelas===kelas);
   const isAll=!q&&!tipe&&!kelas;
@@ -7137,7 +7140,7 @@ function renderRekordSiswa(){
   let siswa=[...getSiswa()];
   const hasFilter=q||filterKelas||sortMode==='tunggakan';
 
-  if(q)siswa=siswa.filter(s=>s.nama.toLowerCase().includes(q));
+  if(q)siswa=siswa.filter(s=>cocokNama(s.nama,q));
   if(filterKelas)siswa=siswa.filter(s=>s.kelas===filterKelas);
 
   // Sort
@@ -7466,7 +7469,7 @@ function applyHarianFilter(){
   let filtered=_harianData;
   if(kopOnly){filtered=filtered.filter(r=>r.tipe==='Koperasi');}
   else {
-    if(q)filtered=filtered.filter(r=>r.nama.toLowerCase().includes(q));
+    if(q)filtered=filtered.filter(r=>cocokNama(r.nama,q));
     if(tipe)filtered=filtered.filter(r=>r.tipe===tipe);
     if(metode)filtered=filtered.filter(r=>(r.metode||'Kas')===metode);
     if(kelas)filtered=filtered.filter(r=>r.kelas===kelas);
@@ -7524,7 +7527,7 @@ function downloadHarianExcel(){
   const kelas=document.getElementById('harian-filter-kelas').value;
   const hasFilter=q||tipe||metode||kelas;
   const data=hasFilter?_harianData.filter(r=>{
-    if(q&&!r.nama.toLowerCase().includes(q.toLowerCase()))return false;
+    if(q&&!cocokNama(r.nama,q.toLowerCase()))return false;
     if(tipe&&r.tipe!==tipe)return false;
     if(metode&&(r.metode||'Kas')!==metode)return false;
     if(kelas&&r.kelas!==kelas)return false;
@@ -8442,7 +8445,7 @@ function renderAdminSiswa(){
   const fk=(document.getElementById('admin-siswa-filter-kelas')?.value||'');
   const siswa=getSiswa();
   let filtered=siswa;
-  if(q) filtered=filtered.filter(s=>s.nama.toLowerCase().includes(q));
+  if(q) filtered=filtered.filter(s=>cocokNama(s.nama,q));
   if(fk){
     if(fk==='__calon') filtered=filtered.filter(s=>isCalonSiswa(s));
     else if(fk==='SD') filtered=filtered.filter(s=>s.kelas&&s.kelas.includes('SD'));
@@ -8553,7 +8556,7 @@ function buildNaikKelasList(){
   const filterK=(document.getElementById('naik-filter-kelas')?document.getElementById('naik-filter-kelas').value:'');
   const wrap=document.getElementById('naik-kelas-list');
   let siswa=allSiswa;
-  if(q)siswa=siswa.filter(s=>s.nama.toLowerCase().includes(q));
+  if(q)siswa=siswa.filter(s=>cocokNama(s.nama,q));
   if(filterJ)siswa=siswa.filter(s=>getJenjangFromKelas(s.kelas)===filterJ);
   if(filterK)siswa=siswa.filter(s=>s.kelas===filterK);
   if(!siswa.length){wrap.innerHTML='<div class="hist-empty">Tidak ada siswa ditemukan</div>';return;}
@@ -8696,7 +8699,7 @@ function renderTunggakan(){
   const wrap=document.getElementById('tunggakan-wrap');
   const items=[];
   siswa.forEach(s=>{
-    if(q&&!s.nama.toLowerCase().includes(q))return;
+    if(q&&!cocokNama(s.nama,q))return;
     const srAll=rw.filter(r=>r.nama.toLowerCase()===s.nama.toLowerCase());
     let total=0;
     const detailParts=[];
@@ -10011,7 +10014,7 @@ body.ui-dark .navbar.scrolled{background:rgba(15,23,42,.85)!important}
       var pg=PAGES.filter(function(p){return !q||p[1].toLowerCase().indexOf(q)>=0;});
       if(pg.length){ h+='<div class="grp">Menu</div>'; pg.forEach(function(p){ items.push({t:'p',v:p[0]}); h+='<div class="it" data-i="'+(items.length-1)+'">📄 '+esc(p[1])+'</div>'; }); }
       if(q.length>=2&&typeof getSiswa==='function'){
-        var ss=getSiswa().filter(function(s){return (s.nama||'').toLowerCase().indexOf(q)>=0;}).slice(0,8);
+        var ss=getSiswa().filter(function(s){return cocokNama(s.nama,q);}).slice(0,8);
         if(ss.length){ h+='<div class="grp">Siswa — buka rekord</div>'; ss.forEach(function(s){ items.push({t:'s',v:s}); h+='<div class="it" data-i="'+(items.length-1)+'">👤 '+esc(s.nama)+'<small>'+esc(s.kelas||'')+'</small></div>'; }); }
       }
       if(!items.length) h='<div class="empty">Tidak ditemukan</div>';
@@ -10171,7 +10174,7 @@ body.ui-dark .navbar.scrolled{background:rgba(15,23,42,.85)!important}
     return getRiwayat().filter(function(r){
       if(a&&!(r.tanggal&&r.tanggal>=a)) return false;
       if(z&&!(r.tanggal&&r.tanggal<=z)) return false;
-      if(q&&(r.nama||'').toLowerCase().indexOf(q)<0&&String(r.no||'').toLowerCase().indexOf(q)<0) return false;
+      if(q&&!cocokNama(r.nama,q)&&String(r.no||'').toLowerCase().indexOf(q)<0) return false;
       if(F.metode.length&&F.metode.indexOf(r.metode||'Kas')<0) return false;
       if(F.tipe.length&&F.tipe.indexOf(r.tipe||'Lainnya')<0) return false;
       if(F.kelas.length&&F.kelas.indexOf(r.kelas||'Umum')<0) return false;
@@ -10403,6 +10406,7 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
 .fe-tools{display:flex;justify-content:space-around;padding:8px 6px}.fe-tools span{cursor:pointer;padding:6px 10px;border-radius:8px}.fe-tools span.on{color:#7dd3a8;background:rgba(125,211,168,.12)}
 .fe-sls{padding:0 16px;max-width:720px;width:100%;margin:0 auto;box-sizing:border-box}.fe-sl{margin-bottom:6px}.fe-sl div{display:flex;justify-content:space-between;font-size:12px;opacity:.9}.fe-sl input{width:100%;accent-color:#7dd3a8}
 .fe-ok{margin:8px 16px 14px;background:#5a9a78;border-radius:12px;padding:13px;text-align:center;font-weight:700;font-size:15px;cursor:pointer;max-width:690px;align-self:center;width:calc(100% - 32px);box-sizing:border-box}
+.sdd{position:absolute;z-index:100002;background:var(--card,#fff);border:1px solid var(--border,#e2e2e2);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.14);padding:4px;max-height:280px;overflow:auto;font-size:13px}.sdd-i{padding:7px 10px;border-radius:7px;cursor:pointer;white-space:nowrap}.sdd-i span{color:var(--text2,#6b7280)}.sdd-i:hover,.sdd-i.on{background:#eef6f1}
 .le-card{display:flex;gap:12px;border:1px solid var(--border,#e6e6e6);border-radius:12px;padding:10px;margin-bottom:10px;background:var(--card,#fff)}.le-img{width:74px;height:96px;object-fit:cover;border-radius:8px;background:#e5e9ee;cursor:zoom-in;flex:none}.le-new{background:#5a9a78;color:#fff;border-radius:6px;padding:1px 6px;font-size:11px}
 #bt-zoom{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:100000;display:none;align-items:center;justify-content:center;cursor:zoom-out}
 #bt-zoom img{max-width:94vw;max-height:94vh;border-radius:8px;background:#fff}
@@ -10980,7 +10984,7 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
       var i=idx[0], r=c.rows[i], s=r.nama?siswaByNama(r.nama):null, done=idx.every(function(k){return !!c.rows[k].doneNo;}), dis=done?' disabled':'';
       var nb, multi=idx.length>1;
       h+='<div class="bt-r'+(r.mode==='cicil'&&!multi?' cic':'')+(done?' done':'')+(multi?' bt-grp':'')+'">';
-      h+='<div class="bt-c bt-c-s"><label>Siswa '+(g+1)+(multi?' · '+idx.length+' item':'')+'</label><input list="bt-dl" value="'+(s?esc(s.nama)+' — '+esc(s.kelas):'')+'" placeholder="'+esc(r.aiNama?'Cari: '+r.aiNama:'Ketik nama siswa...')+'" onchange="btSiswa(\''+c.id+'\','+i+',this.value)"'+dis+'>';
+      h+='<div class="bt-c bt-c-s"><label>Siswa '+(g+1)+(multi?' · '+idx.length+' item':'')+'</label><input data-sis="1" autocomplete="off" value="'+(s?esc(s.nama)+' — '+esc(s.kelas):'')+'" placeholder="'+esc(r.aiNama?'Cari: '+r.aiNama:'Ketik nama siswa...')+'" onchange="btSiswa(\''+c.id+'\','+i+',this.value)"'+dis+'>';
       h+='<div class="bt-sub">'+(r.aiNama?'dari chat: “'+esc(r.aiNama)+(r.aiKelas?' · '+esc(r.aiKelas):'')+'”':'ditambah manual')+(r.potongan>0?' · <b style="color:#92400e">potongan '+rp(r.potongan)+(r.potKet?' ('+esc(r.potKet)+')':'')+'</b>':'')+(r.cand&&r.cand.length>1&&!done?' · <a href="javascript:void 0" onclick="btCand(\''+c.id+'\','+i+')">'+(r.cand.length)+' kandidat</a>':'')+'</div></div>';
       if(multi) h+='<div class="bt-items">';
       idx.forEach(function(i,n){ var r=c.rows[i], dis=r.doneNo?' disabled':''; nb=r.dari!=null?((r.sampai!=null&&r.sampai>=r.dari?r.sampai:r.dari)-r.dari+1):0;
@@ -11487,7 +11491,25 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
     dl.innerHTML=v.map(function(x){return '<option value="'+esc(x)+'">';}).join(''); dl.dataset.k=k;
   }
   window.btDl=btDl;
-  document.addEventListener('focusin',function(e){ var t=e.target; if(t&&t.getAttribute&&t.getAttribute('list')==='bt-dl') btDl(); },true);
+  // kolom "Cari siswa" Kuitansi Otomatis: daftar pilihan sendiri (cocokNama → leonardus = Leo Nardus)
+  var SDD=null, SDDi=-1;
+  function sddTutup(){ if(SDD){ SDD.remove(); SDD=null; } SDDi=-1; }
+  function sddBuka(inp){
+    var q=String(inp.value||'').split(' — ')[0].trim(); sddTutup(); if(!q) return;
+    var L=(getSiswa()||[]).filter(function(x){ return cocokNama(x.nama,q); }).slice(0,8); if(!L.length) return;
+    var r=inp.getBoundingClientRect(); SDD=document.createElement('div'); SDD.className='sdd';
+    SDD.style.left=(r.left+window.scrollX)+'px'; SDD.style.top=(r.bottom+window.scrollY+2)+'px'; SDD.style.minWidth=Math.max(r.width,240)+'px';
+    SDD.innerHTML=L.map(function(x,k){ return '<div class="sdd-i" data-k="'+k+'"><b>'+esc(x.nama)+'</b> <span>— '+esc(x.kelas||'')+'</span></div>'; }).join('');
+    SDD._L=L; SDD._inp=inp; document.body.appendChild(SDD);
+    SDD.addEventListener('mousedown',function(e){ var it=e.target.closest('.sdd-i'); if(!it) return; e.preventDefault(); sddPilih(+it.dataset.k); });
+  }
+  function sddPilih(k){ if(!SDD) return; var x=SDD._L[k], inp=SDD._inp; sddTutup(); if(!x) return; inp.value=x.nama+' — '+(x.kelas||''); inp.dispatchEvent(new Event('change',{bubbles:true})); }
+  document.addEventListener('input',function(e){ var t=e.target; if(t&&t.dataset&&t.dataset.sis) sddBuka(t); },true);
+  document.addEventListener('keydown',function(e){ var t=e.target; if(!SDD||!t||!t.dataset||!t.dataset.sis) return; var it=SDD.querySelectorAll('.sdd-i');
+    if(e.key==='ArrowDown'||e.key==='ArrowUp'){ e.preventDefault(); SDDi=(SDDi+(e.key==='ArrowDown'?1:-1)+it.length)%it.length; it.forEach(function(d,k){ d.classList.toggle('on',k===SDDi); }); }
+    else if(e.key==='Enter'){ e.preventDefault(); sddPilih(SDDi<0?0:SDDi); } else if(e.key==='Escape') sddTutup(); },true);
+  document.addEventListener('focusout',function(e){ var t=e.target; if(t&&t.dataset&&t.dataset.sis) setTimeout(sddTutup,150); },true);
+  window.addEventListener('scroll',function(){ if(SDD) sddTutup(); },true);
   function bkRender(){ btDl();
     simpanBK();
     var w=$('bk-list'); if(!w) return;
@@ -11523,7 +11545,7 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
       h+='<td><input type="checkbox" '+(r.pilih&&!disCk?'checked':'')+(disCk?' disabled':'')+' onchange="bkPilih(\''+pg.id+'\','+i+',this.checked)"></td>';
       h+='<td><input type="date" value="'+esc(r.tgl||'')+'" onchange="bkSet(\''+pg.id+'\','+i+',\'tgl\',this.value)"'+(dis?' disabled':'')+' style="width:130px"></td>';
       h+='<td style="font-size:12px;line-height:1.35"><b>'+esc(nUrut+'. '+r.aiNama)+'</b> ('+esc(r.aiKelas)+')<br><span style="color:var(--muted,#6b7280)">'+esc(r.ket)+(r.catatan?' · <i>'+esc(r.catatan)+'</i>':'')+'</span></td>';
-      h+='<td><input list="bt-dl" value="'+(s?esc(s.nama)+' — '+esc(s.kelas):'')+'" placeholder="Cari siswa..." onchange="bkSiswa(\''+pg.id+'\','+i+',this.value)"'+(dis?' disabled':'')+'>'+(r.cand&&r.cand.length>1&&!dis?'<div class="bt-sub"><a href="javascript:void 0" onclick="bkCand(\''+pg.id+'\','+i+')">'+r.cand.length+' kandidat</a></div>':'')+'</td>';
+      h+='<td><input data-sis="1" autocomplete="off" value="'+(s?esc(s.nama)+' — '+esc(s.kelas):'')+'" placeholder="Cari siswa..." onchange="bkSiswa(\''+pg.id+'\','+i+',this.value)"'+(dis?' disabled':'')+'>'+(r.cand&&r.cand.length>1&&!dis?'<div class="bt-sub"><a href="javascript:void 0" onclick="bkCand(\''+pg.id+'\','+i+')">'+r.cand.length+' kandidat</a></div>':'')+'</td>';
       h+='<td style="white-space:nowrap"><select onchange="bkBulan(\''+pg.id+'\','+i+',\'dari\',this.value)"'+(dis||r.jenis!=='SPP'?' disabled':'')+'><option value="">—</option>'+monthOpts(r.dari)+'</select> → <select onchange="bkBulan(\''+pg.id+'\','+i+',\'sampai\',this.value)"'+(dis||r.jenis!=='SPP'?' disabled':'')+'><option value="">—</option>'+monthOpts(r.sampai)+'</select>'+'<div class="bt-sub">'+(r.tagihan?'Tagihan '+rp(r.tagihan):'')+(r.taLalu?' · <span style="color:#b4581a">tahun ajaran lalu</span>':'')+'</div></td>';
       h+='<td><input type="number" value="'+(r.bayar||'')+'" onchange="bkSet(\''+pg.id+'\','+i+',\'bayar\',this.value)"'+(dis?' disabled':'')+' style="width:110px">'+(r.mode==='cicil'&&r.tagihan?'<div class="bt-sub w">cicil · sisa '+rp(r.tagihan-r.bayar-(Number(r.potongan)||0))+'</div>':'')+(r.jenis==='SPP'||!r.jenis?'<div class="bt-sub" style="margin-top:3px">potongan <input type="number" min="0" value="'+(r.potongan||'')+'" placeholder="0" onchange="bkSet(\''+pg.id+'\','+i+',\'pot\',this.value)"'+(dis?' disabled':'')+' style="width:86px!important;padding:2px 5px!important;font-size:11.5px!important"></div>':'')+'</td>';
       h+='<td><select onchange="bkSet(\''+pg.id+'\','+i+',\'metode\',this.value)"'+(dis?' disabled':'')+'><option value="Kas"'+(r.metode==='Kas'?' selected':'')+'>Kas (tunai)</option><option value="Transfer"'+(r.metode==='Transfer'?' selected':'')+'>Transfer</option></select></td>';
@@ -12904,11 +12926,12 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
 <!-- ===================== VERSI APLIKASI ===================== -->
 <script>
 // Ubah setiap kali ada update: x.y.z  (z = perbaikan kecil, y = fitur baru, x = perubahan besar)
-window.APP_VERSION='3.22.1';
-window.APP_BUILD='2026-10-26';
-window.APP_NOTES='Status baca AI dan lamanya ikut tampil di perangkat lain, tombol Baca di laptop ini bila lebih dari 1 menit, dan pratinjau edit foto lebih tajam.';
+window.APP_VERSION='3.23.0';
+window.APP_BUILD='2026-10-27';
+window.APP_NOTES='Pencarian nama tidak peduli spasi, titik dan tanda hubung, misalnya leonardus menemukan Leo Nardus.';
 // riwayat singkat (terbaru di atas) — tampil terlipat di halaman Admin
 window.APP_RIWAYAT=[
+  ['3.23.0','2026-10-27','Pencarian nama mengabaikan spasi/titik/tanda hubung (leonardus = Leo Nardus) di semua kolom cari + daftar pilihan siswa baru di Kuitansi Otomatis.'],
   ['3.22.1','2026-10-26','Status baca AI + ⏱ lama baca tersinkron; tombol ↻ Baca di laptop ini bila kartu dari HP > 1 menit; pratinjau edit foto tajam (layar HP).'],
   ['3.22.0','2026-10-26','Buku Kas: 📷 kamera HP + edit foto (crop, putar, kemiringan, perspektif, terang/kontras); tab 🕘 Last Entry; ⚡ sync real-time laptop ↔ HP (Firebase) untuk antrian & Last Entry.'],
   ['3.21.0','2026-10-26','Nama menu: ✨ Kuitansi Otomatis (AI); Mode Cicilan untuk 2+ siswa beda kelas (nominal per siswa atau total dibagi otomatis); ⚙ Pengaturan AI pakai password admin.'],
