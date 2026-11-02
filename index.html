@@ -10451,6 +10451,9 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
 .fb-antri{background:#eef0fb;border:1px solid #d9ddf5;border-radius:10px;padding:9px 12px;font-size:13px;color:#33408a}
 .fb-hilang{background:#fff8ee;border:1px solid #fde2b8;color:#9a5b00;border-radius:10px;padding:8px 12px;font-size:12.5px;margin-top:8px}
 .fb-lapchip{margin-left:auto;align-self:center;font-size:11.5px;font-weight:600;border-radius:8px;padding:3px 9px;background:#fdf3e1;color:#9a5b00}.fb-lapchip.on{background:#e3f1e8;color:#2f7a55}
+.bk-ljt{display:inline-block;background:#f5f0ff;color:#6d28d9;border-radius:6px;padding:0 7px;font-size:11.5px;font-weight:600;margin-left:4px}
+.bk-sumbox.bk-lanjut{color:#8a5a00;background:#fff8e6;border-radius:8px;padding:6px 10px}
+#bk-jenjang{display:none!important}
 .le-card{display:flex;gap:12px;border:1px solid var(--border,#e6e6e6);border-radius:12px;padding:10px;margin-bottom:10px;background:var(--card,#fff)}.le-img{width:74px;height:96px;object-fit:cover;border-radius:8px;background:#e5e9ee;cursor:zoom-in;flex:none}.le-new{background:#5a9a78;color:#fff;border-radius:6px;padding:1px 6px;font-size:11px}
 #bt-zoom{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:100000;display:none;align-items:center;justify-content:center;cursor:zoom-out}
 #bt-zoom img{max-width:94vw;max-height:94vh;border-radius:8px;background:#fff}
@@ -11493,11 +11496,29 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
   }
   function bkMasuk(F,j){
     F=F.filter(function(f){return /^image\//.test(f.type);}); if(!F.length) return;
-    // beberapa foto sekaligus = lembar berurutan → 1 kartu, dibaca AI bersama
-    var pg={id:'bk'+Date.now().toString(36)+(++seq), jenjang:j, state:'reading', rows:[], ditambah:new Date()};
-    BK.unshift(pg); bkRender();
-    Promise.all(F.map(prepImage)).then(function(ims){ pg.imgs=ims; pg.img=ims[0].url; bkRender(); return bkProses(pg); })
-      .catch(function(e){ pg.state='error'; pg.err=e.message; bkRender(); });
+    // v3.28: 1 foto = 1 kartu (tidak digabung). Beberapa foto sekaligus → kartu Foto 1, Foto 2, … dibaca berurutan
+    var base=Date.now(), batch=F.length>1?'b'+base.toString(36):'', L=F.map(function(f,i){
+      return {id:'bk'+(base+i).toString(36)+(++seq), jenjang:j, state:'reading', rows:[], ditambah:new Date(base-i), urut:base+i, batch:batch, fotoKe:i+1, fotoDari:F.length}; });
+    for(var i=L.length-1;i>=0;i--) BK.unshift(L[i]);
+    if(BKJ!=='Semua'&&BKJ!==j){ BKJ=j; lsw('kwbt_bk_tab',j); }
+    bkRender();
+    var chain=Promise.resolve();
+    L.forEach(function(pg,i){ chain=chain.then(function(){ return prepImage(F[i]).then(function(im){ pg.imgs=[im]; pg.img=im.url; bkRender(); return bkProses(pg); }).catch(function(e){ pg.state='error'; pg.err=e.message; bkRender(); }); }); });
+  }
+  function bkUrut(p){ return p.urut||(p.ditambah?new Date(p.ditambah).getTime():0); }
+  // kartu sebelumnya (jenjang sama) untuk tanggal foto lanjutan
+  function bkSebelum(pg){
+    var k=bkUrut(pg);
+    return BK.filter(function(p){ return p!==pg&&p.jenjang===pg.jenjang&&bkUrut(p)<k&&k-bkUrut(p)<12*3600e3; }).sort(function(a,b){ return bkUrut(b)-bkUrut(a); })[0]||null;
+  }
+  function bkIsiTanggalLanjutan(pg){
+    if(!pg.rows.some(function(r){ return r.tglKosong; })) return false;
+    var prev=bkSebelum(pg); if(!prev||prev.state!=='ok') return false;
+    var last=''; prev.rows.forEach(function(r){ if(r.tgl) last=r.tgl; }); if(!last) return false;
+    pg.rows.forEach(function(r){ if(r.tglKosong){ r.tgl=last; r.tglKosong=false; r.tglDariSebelum=1; } });
+    if(pg.jml&&pg.jml['']){ pg.jml[last]=pg.jml['']; delete pg.jml['']; }
+    pg.lanjutDari=prev.id; pg.rows.forEach(function(r){ bkEvalRow(pg,r); });
+    return true;
   }
   // foto lembar berikutnya ditempel terpisah: baris tanpa tanggal digabung ke kartu sebelumnya (jenjang sama)
   function bkGabungLanjutan(pg){
@@ -11532,7 +11553,7 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
       var d=await bacaBatas(bacaAI(pg.imgs||[], 'Jenjang buku: '+pg.jenjang, function(t){ if(pg._baca===tok){ pg.statusTxt=t; bkRender(); } }, PROMPT_BUKU));
       if(pg._baca!==tok) return; delete pg._baca;
       pg.statusTxt=''; pg.ai=d; pg.state='ok'; bkBangun(pg); bkCekJenjang(pg);
-      if(bkGabungLanjutan(pg)){ bkRender(); return; }
+      bkIsiTanggalLanjutan(pg); BK.forEach(function(q){ if(q!==pg&&q.state==='ok') bkIsiTanggalLanjutan(q); });
       btLog('Buku kas dibaca',null,{baris:pg.rows.length,ket:pg.jenjang+' · '+pg.rows.length+' baris · '+pg.rows.filter(function(r){return r.status==='siap';}).length+' siap'});
     }catch(e){ if(pg._baca!==tok) return; delete pg._baca; pg.state='error'; pg.err=e.message; pg.statusTxt=''; }
     bkRender();
@@ -11571,13 +11592,14 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
     var w=$('bk-list'); if(!w) return;
     var j=ls(BK_JENJANG_LS);
     document.querySelectorAll('#bk-jenjang .bt-tab').forEach(function(t){ t.classList.toggle('on',t.dataset.j===j); });
-    if(!BK.length){ w.innerHTML='<div class="bt-empty">Belum ada foto buku. Pilih jenjang, lalu tempel / seret foto halaman buku kas.</div>'; return; }
-    w.innerHTML=BK.map(bkCard).join('');
+    var LJ=BK.filter(function(p){ return BKJ==='Semua'||p.jenjang===BKJ; });
+    if(!LJ.length){ w.innerHTML='<div class="bt-empty">'+(BK.length?'Tidak ada foto buku '+esc(BKJ)+' di antrian.':'Belum ada foto buku. Tempel / seret / foto halaman buku kas.')+'</div>'; return; }
+    w.innerHTML=LJ.map(bkCard).join('');
   }
   function bkCard(pg){
     var h='<div class="bt-card bk-card" id="'+pg.id+'">';
     h+='<div class="bk-head">'+(pg.img?'<span class="bk-tw"><img class="bk-thumb" src="'+pg.img+'" onclick="bkZoom(\''+pg.id+'\',0)" title="Klik untuk memperbesar">'+(pg.imgs&&pg.imgs.length>1?'<span class="bk-nf">1/'+pg.imgs.length+'</span>':'')+'</span>':'<div class="bk-thumb"></div>')+
-      '<div style="font-size:12.5px;color:var(--muted,#6b7280)">'+fbAsal(pg)+'📒 Buku <b style="color:var(--ink,#1f2a24)">'+esc(pg.jenjang)+'</b>'+(pg.state==='ok'&&!pg.rows.some(function(r){return r.doneNo;})?' <select class="bk-jsel" onchange="bkGantiJenjang(\''+pg.id+'\',this.value)" title="Ganti jenjang buku">'+['TK','SD','SMP','SMK'].map(function(j){return '<option'+(j===pg.jenjang?' selected':'')+'>'+j+'</option>';}).join('')+'</select>':'')+' · ditambah '+pg.ditambah.toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'})+'<br><span style="font-size:11.5px">Klik foto untuk memperbesar & mencocokkan dengan tabel.</span></div></div><div>';
+      '<div style="font-size:12.5px;color:var(--muted,#6b7280)">'+fbAsal(pg)+'📒 Buku <b style="color:var(--ink,#1f2a24)">'+esc(pg.jenjang)+'</b>'+(pg.fotoKe&&pg.fotoDari>1?' · <b>Foto '+pg.fotoKe+'/'+pg.fotoDari+'</b>':'')+(pg.lanjutDari?' <span class="bk-ljt">lanjutan</span>':'')+(pg.state==='ok'&&!pg.rows.some(function(r){return r.doneNo;})?' <select class="bk-jsel" onchange="bkGantiJenjang(\''+pg.id+'\',this.value)" title="Ganti jenjang buku">'+['TK','SD','SMP','SMK'].map(function(j){return '<option'+(j===pg.jenjang?' selected':'')+'>'+j+'</option>';}).join('')+'</select>':'')+' · ditambah '+pg.ditambah.toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'})+'<br><span style="font-size:11.5px">Klik foto untuk memperbesar & mencocokkan dengan tabel.</span></div></div><div>';
     if(pg.state==='antri') return h+antriHtml(pg,'bkUlang','bkHapus')+'</div></div>';
     if(pg.state==='reading') return h+'<div style="font-size:13px;color:#4b55a0"><span class="bt-spin"></span> '+esc(pg.statusTxt||'AI sedang membaca halaman buku...')+' '+fbWaktuHtml(pg,'bkUlang','bkBatal1','bkHapus')+'</div>'+fotoHilangHtml(pg,'bkHapus')+'</div></div>';
     if(pg.state==='error') return h+'<ul class="bt-reasons"><li class="b">✗ '+esc(pg.err)+'</li></ul><div class="bt-acts"><span class="bt-b pri" onclick="bkUlang(\''+pg.id+'\')">Baca ulang</span><span class="bt-b red" onclick="bkHapus(\''+pg.id+'\')">Hapus</span></div></div></div>';
@@ -11595,7 +11617,7 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
       if(r.tgl!==lastT){ if(lastT!==null) h+=bkJumlahRow(pg,lastT); lastT=r.tgl; lastL=r.lembar||1; nUrut=0;
         var RT=pg.rows.filter(function(x){return x.tgl===r.tgl;}), per={}; RT.forEach(function(x){ var l=x.lembar||1; per[l]=(per[l]||0)+1; });
         var src=Object.keys(per).length>1||pg.nLembar>1?Object.keys(per).map(function(l){return 'lembar '+l+' · '+per[l]+' baris';}).join(' + '):RT.length+' baris';
-        h+='<tr class="bk-day"><td colspan="8">'+(r.tgl?esc(hariTgl(r.tgl)):'⚠ Tanpa tanggal (lanjutan halaman sebelumnya)')+' <span class="bk-src">'+esc(src)+'</span></td></tr>'; }
+        h+='<tr class="bk-day"><td colspan="8">'+(r.tgl?esc(hariTgl(r.tgl)):'⚠ Tanpa tanggal (lanjutan halaman sebelumnya) — isi tanggal di baris, atau baca dulu foto sebelumnya')+' <span class="bk-src">'+esc(src)+'</span>'+(r.tglDariSebelum?' <span class="bk-ljt">tanggal dari foto sebelumnya — ubah di kolom Tanggal bila salah</span>':'')+'</td></tr>'; }
       else if((r.lembar||1)!==lastL){ lastL=r.lembar||1; h+='<tr class="bk-lanj" onclick="bkZoom(\''+pg.id+'\','+(lastL-1)+')" title="Klik untuk melihat foto '+lastL+'" style="cursor:pointer"><td colspan="8">↳ lanjutan di lembar '+lastL+' (foto '+lastL+') — tanggal tetap '+esc(tglFmt(r.tgl))+(pg.imgs&&pg.imgs.length>=lastL?' <span class="bk-lf">🔍 Lihat foto '+lastL+'</span>':'')+'</td></tr>'; }
       var stt=BK_ST[r.status]||['warn',r.status];
       if(r.status==='ada'&&r.lewatBT) stt=['done','Sudah diinput lewat Bukti Transfer'+(r.lewatBT!=='ya'?' · '+r.lewatBT:'')];
@@ -11621,8 +11643,14 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
   var HARI_NM=['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
   function hariTgl(t){ var d=new Date(t+'T00:00:00'); return isNaN(d)?t:HARI_NM[d.getDay()]+', '+tglFmt(t); }
   function bkJumlah(pg,tgl){ var kas=0,tf=0; pg.rows.forEach(function(r){ if(r.tgl!==tgl) return; var v=Number(r.bayar)||0; if(r.metode==='Transfer') tf+=v; else kas+=v; }); return {kas:kas,tf:tf,tot:kas+tf}; }
+  function bkNamaKartu(p){ return p.fotoKe&&p.fotoDari>1?'Foto '+p.fotoKe:(p.lanjutDari?'foto lanjutan':'foto '+(p.ditambah?new Date(p.ditambah).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'}):'')); }
+  function bkKartuTgl(pg,tgl){ if(!tgl) return [pg]; return BK.filter(function(p){ return p.jenjang===pg.jenjang&&p.state==='ok'&&p.rows.some(function(r){ return r.tgl===tgl; }); }).sort(function(a,b){ return bkUrut(a)-bkUrut(b); }); }
   function bkJumlahRow(pg,tgl){
-    var j=bkJumlah(pg,tgl), b=(pg.jml||{})[tgl]||null, cek='';
+    var K=bkKartuTgl(pg,tgl);
+    if(K.length>1&&K[K.length-1]!==pg){ var nx=K[K.indexOf(pg)+1]||K[K.length-1];
+      return '<tr class="bk-sum"><td colspan="8"><div class="bk-sumbox bk-lanjut">↪ <b>'+esc(tglFmt(tgl).replace(/ \d{4}$/,''))+'</b> berlanjut di '+esc(bkNamaKartu(nx))+' — jumlah dicek di sana</div></td></tr>'; }
+    var j={kas:0,tf:0,tot:0}, b=null, cek='';
+    K.forEach(function(p){ var x=bkJumlah(p,tgl); j.kas+=x.kas; j.tf+=x.tf; j.tot+=x.tot; var bb=(p.jml||{})[tgl]; if(bb&&(bb.tunai||bb.total||bb.transfer)) b=bb; });
     var lembar={}; pg.rows.forEach(function(r){ if(r.tgl===tgl) lembar[r.lembar||1]=1; }); var nl=Object.keys(lembar).length;
     if(b&&(b.tunai||b.total||b.transfer)){
       // jumlah di buku = jumlah TUNAI (Ronald). Ambil angka dari kolom mana pun AI menaruhnya, bandingkan dengan Kas saja.
@@ -11630,7 +11658,7 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
       if(bt){ var d1=bt-j.kas; parts.push('tunai '+rp(bt)+(d1?' (selisih '+rp(Math.abs(d1))+')':'')); if(d1) ok=false; }
       cek='<span class="bk-jcek '+(ok?'ok':'bad')+'">'+(ok?'✓ Sama dengan jumlah di buku: ':'⚠ Di buku: ')+parts.join(' · ')+(ok?'':' — cek baris')+'</span>';
     } else cek='<span class="bk-jcek none">jumlah di buku tidak terbaca</span>';
-    return '<tr class="bk-sum"><td colspan="8"><div class="bk-sumbox"><span>Jumlah <b>'+(tgl?esc(tglFmt(tgl).replace(/ \d{4}$/,'')):'tanpa tanggal')+'</b>'+(nl>1?' <span class="bk-src">(lembar '+Object.keys(lembar).join(' + ')+')</span>':'')+'</span><span>Kas <b>'+rp(j.kas)+'</b></span><span>Transfer <b>'+rp(j.tf)+'</b></span><span class="bk-tot">'+rp(j.tot)+'</span>'+cek+'</div></td></tr>';
+    return '<tr class="bk-sum"><td colspan="8"><div class="bk-sumbox"><span>Jumlah <b>'+(tgl?esc(tglFmt(tgl).replace(/ \d{4}$/,'')):'tanpa tanggal')+'</b>'+(K.length>1?' <span class="bk-src">('+K.map(bkNamaKartu).join(' + ')+')</span>':'')+(nl>1?' <span class="bk-src">(lembar '+Object.keys(lembar).join(' + ')+')</span>':'')+'</span><span>Kas <b>'+rp(j.kas)+'</b></span><span>Transfer <b>'+rp(j.tf)+'</b></span><span class="bk-tot">'+rp(j.tot)+'</span>'+cek+'</div></td></tr>';
   }
   function bkKoreksi(p,r,apa,lama,baru){ if(String(lama==null?'':lama)===String(baru==null?'':baru)) return; btLog('Koreksi buku kas',null,{siswa:r.nama||r.aiNama,tglTf:r.tgl||'',nominal:Number(r.bayar)||0,ket:'Buku '+p.jenjang+' · '+apa+': '+(lama===''||lama==null?'(kosong)':lama)+' → '+(baru===''||baru==null?'(kosong)':baru)+' · tulisan: '+(r.aiNama+' ('+r.aiKelas+') '+r.ket).slice(0,80)}); }
 
@@ -11912,7 +11940,7 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
     });
   }
   // hitung ulang semua baris Buku Kas (data siswa/riwayat bisa berubah, mis. kelas diganti di Kelola Siswa)
-  function bkHitungUlang(){ BK.forEach(function(p){ if(p.state==='ok') p.rows.forEach(function(r){ if(!r.doneNo) bkEvalRow(p,r); }); }); }
+  function bkHitungUlang(){ BK.forEach(function(p){ if(p.state==='ok'){ bkIsiTanggalLanjutan(p); p.rows.forEach(function(r){ if(!r.doneNo) bkEvalRow(p,r); }); } }); }
   window.bkHitungUlang=function(){ bkHitungUlang(); bkRender(); };
   document.addEventListener('visibilitychange',function(){ if(!document.hidden&&MODE==='bk'&&$('page-buktiTf')&&$('page-buktiTf').classList.contains('active')){ bkHitungUlang(); bkRender(); } });
   window.btMode=function(m){
@@ -12040,7 +12068,8 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
   window._feDebug={st:function(){return FE;}};
 
   // ---------- (2) LAST ENTRY BUKU KAS: 2 halaman terakhir yang sudah dibuat kuitansinya ----------
-  var LASTBK=[], BKTAB='q';
+  var LASTBK=[], BKTAB='q', BKJ=ls('kwbt_bk_tab')||'Semua';
+  window.bkJTab=function(j){ BKJ=j; lsw('kwbt_bk_tab',j); if(j!=='Semua') lsw(BK_JENJANG_LS,j); BKTAB='q'; bkRender(); };
   function bkLeCatat(){
     if(!LE_SIAP) return; var ubah=false;
     BK.forEach(function(p){ if(p.state!=='ok') return;
@@ -12107,7 +12136,8 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
   var _bkR0=bkRender;
   bkRender=function(){
     try{ bkLeCatat(); }catch(e){ console.warn('last bk',e); }
-    var tb=$('bk-tabs'); if(tb) tb.innerHTML='<span class="bt-tab'+(BKTAB!=='last'?' on':'')+'" onclick="bkTab(\'q\')">📒 Antrian<i>'+BK.length+'</i></span><span class="bt-tab'+(BKTAB==='last'?' on':'')+'" onclick="bkTab(\'last\')">🕘 Last Entry<i>'+LASTBK.length+'</i></span>'+
+    var nJ=function(j){ return BK.filter(function(p){ return (j==='Semua'||p.jenjang===j)&&(p.state!=='ok'||p.rows.some(function(r){ return r.status!=='done'&&r.status!=='manual'&&r.status!=='coret'&&r.status!=='ada'; })); }).length; };
+    var tb=$('bk-tabs'); if(tb) tb.innerHTML=['Semua','TK','SD','SMP','SMK'].map(function(j){ return '<span class="bt-tab'+(BKTAB!=='last'&&BKJ===j?' on':'')+'" onclick="bkJTab(\''+j+'\')">'+j+'<i>'+nJ(j)+'</i></span>'; }).join('')+'<span style="width:10px"></span>'+'<span class="bt-tab" style="display:none"></span><span class="bt-tab'+(BKTAB==='last'?' on':'')+'" onclick="bkTab(\'last\')">🕘 Last Entry<i>'+LASTBK.length+'</i></span>'+
       (typeof hpTunda==='function'&&hpTunda()?'<span class="fb-lapchip'+(laptopAktif()?' on':'')+'">💻 '+(laptopAktif()?esc(laptopAktif())+' aktif':'Laptop tidak aktif')+'</span>':'');
     if(BKTAB==='last'){ btDl(); simpanBK(); var w=$('bk-list'); if(w) w.innerHTML=lastBkHtml(); return; }
     var rr=_bkR0.apply(this,arguments); try{ bkStickSync(); }catch(e){ console.warn('freeze',e); } return rr;
@@ -13091,11 +13121,12 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
 <!-- ===================== VERSI APLIKASI ===================== -->
 <script>
 // Ubah setiap kali ada update: x.y.z  (z = perbaikan kecil, y = fitur baru, x = perubahan besar)
-window.APP_VERSION='3.27.0';
-window.APP_BUILD='2026-10-28';
-window.APP_NOTES='HP cukup memotret dan laptop yang membaca, kartu macet bisa dibatalkan, dan menu Admin tampil penuh dengan animasi geser.';
+window.APP_VERSION='3.28.0';
+window.APP_BUILD='2026-11-02';
+window.APP_NOTES='Buku Kas: 1 foto jadi 1 kartu (tidak digabung) dan antrian dipisah per jenjang.';
 // riwayat singkat (terbaru di atas) — tampil terlipat di halaman Admin
 window.APP_RIWAYAT=[
+  ['3.28.0','2026-11-02','Buku Kas: 1 foto = 1 kartu (tidak digabung; foto lanjutan pakai tanggal foto sebelumnya, jumlah per tanggal dicek gabungan); tab antrian per jenjang Semua · TK · SD · SMP · SMK.'],
   ['3.27.0','2026-10-28','HP memotret → laptop membaca AI (tanda laptop aktif, Baca di HP saja); batas baca AI 3 menit, Batalkan/Hapus, kartu macet 10 menit → Terputus; menu Admin layar penuh (menu utama mengecil ke samping, ← Kembali / ✕ / Esc).'],
   ['3.26.0','2026-10-28','Foto Buku Kas: klik → geser ke foto 2 (+ sync foto lanjutan); Download Excel Tunggakan; SPP calon siswa via form Kwitansi pakai tarif kelas tujuan; 🔍 Cek nama mirip (gabung salah ketik / pisah nama sama beda kelas).'],
   ['3.25.0','2026-10-27','Menu Admin di sidebar kiri (Kelola & Rekord Siswa ditonjolkan, Riwayat update tab sendiri); peringatan sebelum membuka Pengaturan AI; perbaikan Last Entry hilang saat aplikasi dibuka (+ dipulihkan dari Firebase).'],
