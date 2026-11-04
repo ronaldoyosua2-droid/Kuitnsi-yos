@@ -13209,11 +13209,12 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
 <!-- ===================== VERSI APLIKASI ===================== -->
 <script>
 // Ubah setiap kali ada update: x.y.z  (z = perbaikan kecil, y = fitur baru, x = perubahan besar)
-window.APP_VERSION='3.30.0';
+window.APP_VERSION='3.31.0';
 window.APP_BUILD='2026-11-04';
-window.APP_NOTES='Kuitansi Otomatis dan Admin terbuka jauh lebih cepat, dan alarm palsu Sync gagal di Log Bug sudah dihapus.';
+window.APP_NOTES='Item bisa dicicil dengan tombol Bayar sisa, dan HP jadi mode lihat saja dengan transaksi darurat memakai password.';
 // riwayat singkat (terbaru di atas) — tampil terlipat di halaman Admin
 window.APP_RIWAYAT=[
+  ['3.31.0','2026-11-04','Item dicicil: utang item (PKL, seragam, dll.) tampil saat pilih siswa → + Bayar sisa, utang lama otomatis berkurang; HP mode lihat saja (data dari cloud, foto untuk AI tetap bisa), transaksi darurat dengan password tiap kali.'],
   ['3.30.0','2026-11-04','Lebih cepat: Kuitansi Otomatis (data dibaca sekali, ±15× lebih cepat), Admin & Tunggakan; Log Bug tidak lagi mencatat alarm palsu Sync HTTP 0.'],
   ['3.29.0','2026-11-04','Animasi buka Admin lebih ringan (hanya panel geser + fade); Admin → 🐞 Log Bug (error, bagian lambat, AI, sync; Salin untuk Claude).'],
   ['3.28.0','2026-11-02','Buku Kas: 1 foto = 1 kartu (tidak digabung; foto lanjutan pakai tanggal foto sebelumnya, jumlah per tanggal dicek gabungan); tab antrian per jenjang Semua · TK · SD · SMP · SMK.'],
@@ -13662,6 +13663,191 @@ body.adm-full .sn-collapse{display:none!important}
 
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',function(){ setTimeout(pasangTombol,600); }); else setTimeout(pasangTombol,600);
   window._cnDebug={cari:cari};
+})();
+</script>
+
+<!-- ===================== v3.31: ITEM DICICIL (bayar sisa) · HP MODE LIHAT SAJA + TRANSAKSI DARURAT ===================== -->
+<style>
+.ut-box{background:#fff8ee;border:1px solid #fde2b8;border-radius:12px;padding:10px 12px;margin:8px 0;font-size:13px}
+.ut-box b.h{color:#9a5b00}
+.ut-it{display:flex;align-items:center;gap:10px;background:#fff;border:1px solid #f3dfc0;border-radius:9px;padding:7px 10px;margin-top:6px}
+.ut-it .s{color:#b33a3a;font-weight:700}
+.ut-btn{background:#5a9a78;color:#fff;border-radius:9px;padding:6px 12px;font-weight:600;cursor:pointer;white-space:nowrap;border:0}
+.ut-btn[disabled]{opacity:.5;cursor:default}
+.trx-cicil{margin-top:10px;background:#fff8ee;border:1px solid #fde2b8;border-radius:10px;padding:8px 12px;font-size:12.5px;line-height:1.6}
+#hp-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:#eef0fb;color:#33408a;border-radius:12px;padding:8px 12px;font-size:12.5px;margin:0 0 10px}
+#hp-bar .hb{border:1px solid #c9cff0;background:#fff;border-radius:8px;padding:3px 9px;cursor:pointer;font-weight:600}
+#hp-bar .hd{background:#b4581a;color:#fff;border-color:#b4581a}
+body.hp-lihat #page-kwitansi .btn-primary[onclick*="buatKwitansi"]{opacity:.55}
+</style>
+<script>
+(function(){
+  function $(i){ return document.getElementById(i); }
+  function esc(v){ return String(v==null?'':v).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+  function rp(n){ return 'Rp '+(Number(n)||0).toLocaleString('id-ID'); }
+  var BUKAN=['SPP','Pendaftaran'];
+
+  // ================= A. ITEM DICICIL =================
+  function utangSiswa(nama){ // item non-SPP/non-Pendaftaran yang masih bersisa
+    var out=[]; (getRiwayat()||[]).forEach(function(r){ if(r.nama!==nama) return; (r.items||[]).forEach(function(it,idx){
+      if(!it||BUKAN.indexOf(it.tipe)>=0||!(Number(it.sisa)>0)) return;
+      out.push({recId:r.id,no:r.no,tgl:r.tanggal,idx:idx,label:String(it.label||it.tipe||'Item').replace(/^Pelunasan\s+/,'').replace(/\s*\(cicilan \d+\)$/,''),tagihan:Number(it.tagihan)||0,sisa:Number(it.sisa)||0,ke:((it.cicilan||[]).length)+2}); }); });
+    return out;
+  }
+  window.kwUtangSiswa=utangSiswa;
+  function sudahDiForm(u){ return (itemList||[]).some(function(it){ return it.cicilDari&&it.cicilDari.recId===u.recId&&it.cicilDari.idx===u.idx; }); }
+  function kotakUtang(){
+    var w=$('siswa-list-form'); if(!w) return; var old=w.querySelector('.ut-box'); if(old) old.remove();
+    var L=[]; (siswaList||[]).forEach(function(s,si){ if(!s||!s.nama) return; utangSiswa(s.nama).forEach(function(u){ u.si=si; u.nama=s.nama; L.push(u); }); });
+    if(!L.length) return;
+    var d=document.createElement('div'); d.className='ut-box';
+    d.innerHTML='<b class="h">💳 Masih ada utang item:</b>'+L.map(function(u,k){ var ada=sudahDiForm(u);
+      return '<div class="ut-it"><div style="flex:1;min-width:0"><b>'+esc(u.label)+'</b>'+((siswaList||[]).length>1?' · '+esc(u.nama):'')+' · sisa <span class="s">'+rp(u.sisa)+'</span> dari '+rp(u.tagihan)+
+        '<div style="color:#888;font-size:12px">'+esc(u.no||'')+' · '+esc(u.tgl||'')+'</div></div><button type="button" class="ut-btn" data-k="'+k+'"'+(ada?' disabled':'')+'>'+(ada?'✓ Sudah di daftar':'+ Bayar sisa')+'</button></div>'; }).join('');
+    d._L=L; w.appendChild(d);
+    d.addEventListener('click',function(e){ var b=e.target.closest('.ut-btn'); if(!b||b.disabled) return; bayarSisa(d._L[+b.dataset.k]); });
+  }
+  function bayarSisa(u){
+    var kosong=(itemList||[]).length===1&&!itemList[0].tipe;
+    if(!kosong) itemList.push({tipe:'',label:'',nominal:0,isCustom:false,customNominal:0,diskonPct:0,diskonAmt:0,catatan:null});
+    var i=itemList.length-1; onItemTipeChange(i,'Lainnya');
+    var it=itemList[i]; it.label='Pelunasan '+u.label+' (cicilan '+u.ke+')'; it.customNominal=u.sisa; it.nominal=u.sisa; it.selectedSiswa=[u.si];
+    it.cicilDari={recId:u.recId,idx:u.idx,no:u.no,sisa:u.sisa,label:u.label,ke:u.ke,nama:u.nama};
+    renderItemForms(); try{ updateKwTotalBar(); }catch(e){} kotakUtang();
+  }
+  var _rsf=window.renderSiswaForms; if(typeof _rsf==='function') window.renderSiswaForms=function(){ var r=_rsf.apply(this,arguments); try{ kotakUtang(); }catch(e){} return r; };
+  var _rif=window.renderItemForms; if(typeof _rif==='function') window.renderItemForms=function(){ var r=_rif.apply(this,arguments); try{ kotakUtang(); }catch(e){} return r; };
+  // setelah kuitansi tersimpan: kurangi utang di kuitansi lama
+  function pasangCicilHook(){
+    var _bk=window.buatKwitansi; if(typeof _bk!=='function'||_bk._cicil) return;
+    var g=function(){
+      var before=window._lastNewRecs, C=(itemList||[]).filter(function(it){ return it&&it.cicilDari; }).map(function(it){ return {cd:it.cicilDari,label:it.label}; });
+      var ret=_bk.apply(this,arguments);
+      try{ if(C.length&&window._lastNewRecs&&window._lastNewRecs!==before){
+        var rw=getRiwayat(), ubah=false;
+        C.forEach(function(c){
+          var rec=window._lastNewRecs.find(function(r){ return r.nama===c.cd.nama&&(r.items||[]).some(function(x){ return x.label===c.label; }); }); if(!rec) return;
+          var nr=rw.find(function(r){ return r.id===rec.id; }), ni=nr&&(nr.items||[]).find(function(x){ return x.label===c.label; }); if(!ni) return;
+          var bayar=Math.min(Number(ni.dibayar)||0,c.cd.sisa), sisaBaru=Math.max(0,c.cd.sisa-bayar);
+          var lama=rw.find(function(r){ return r.id===c.cd.recId; }), li=lama&&lama.items&&lama.items[c.cd.idx]; if(!li) return;
+          li.sisa=sisaBaru; li.cicilan=(li.cicilan||[]).concat([{no:nr.no,tgl:nr.tanggal,nom:bayar}]);
+          lama.sisa=lama.totalSisa=(lama.items||[]).reduce(function(a,x){ return a+(Number(x.sisa)||0); },0);
+          // kuitansi pelunasan tidak menambah utang baru (sisa dicatat di kuitansi lama)
+          ni.sisa=0; ni.tagihan=bayar; ni.sisaUtang=sisaBaru; ni.cicilDari={no:lama.no,recId:lama.id};
+          nr.sisa=nr.totalSisa=(nr.items||[]).reduce(function(a,x){ return a+(Number(x.sisa)||0); },0);
+          nr.catatan=(nr.catatan?nr.catatan+' | ':'')+'Cicilan '+c.cd.label+' dari '+lama.no+(sisaBaru?' · sisa utang '+rp(sisaBaru):' · LUNAS');
+          try{ addLog('kwitansi',nr.nama,'Bayar sisa '+c.cd.label+' '+rp(bayar)+' (dari '+lama.no+')'+(sisaBaru?' · sisa '+rp(sisaBaru):' · lunas')); }catch(e){}
+          ubah=true; });
+        if(ubah) setRiwayat(rw);
+      } }catch(e){ console.warn('cicil item',e); }
+      return ret; };
+    g._cicil=1; window.buatKwitansi=g;
+  }
+  // detail kuitansi: riwayat cicilan
+  var _otm=window.openTrxModal; if(typeof _otm==='function') window.openTrxModal=function(id){ var r=_otm.apply(this,arguments); try{
+      var rec=(getRiwayat()||[]).find(function(x){ return x.id===id; }), el=$('trx-modal-no'), box=el&&(el.closest('.modal-box')||el.closest('.modal-content')||el.parentElement&&el.parentElement.parentElement);
+      if(box){ var o=box.querySelector('.trx-cicil'); if(o) o.remove(); }
+      if(rec&&box){ var L=(rec.items||[]).filter(function(x){ return x.cicilan&&x.cicilan.length||x.cicilDari; });
+        if(L.length){ var d=document.createElement('div'); d.className='trx-cicil'; d.innerHTML=L.map(function(x){
+          if(x.cicilDari) return '💳 Pembayaran sisa dari <b>'+esc(x.cicilDari.no)+'</b>'+(x.sisaUtang?' · sisa utang '+rp(x.sisaUtang):' · <b style="color:#2f7a55">lunas</b>');
+          var n=Number(x.dibayar)||0; return '💳 <b>'+esc(x.label)+'</b> dicicil: '+[{tgl:rec.tanggal,nom:n,no:rec.no}].concat(x.cicilan).map(function(c){ return esc(c.tgl)+' '+rp(c.nom)+(c.no&&c.no!==rec.no?' ('+esc(c.no)+')':''); }).join(' · ')+' · sisa '+(Number(x.sisa)>0?'<b style="color:#b33a3a">'+rp(x.sisa)+'</b>':'<b style="color:#2f7a55">lunas</b>'); }).join('<br>');
+          var tb=box.querySelector('table'); if(tb&&tb.parentNode) tb.parentNode.insertBefore(d,tb.nextSibling); else box.appendChild(d); } }
+    }catch(e){} return r; };
+
+  // ================= B. HP MODE LIHAT SAJA =================
+  var PERAN='kw_peran', DAR=null, UPLOAD_OK=false, MUAT_T=0;
+  function mobile(){ return /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent); }
+  function hpLihat(){ var v=''; try{ v=localStorage.getItem(PERAN)||''; }catch(e){} return v?v==='hp':mobile(); }
+  window.kwHpLihat=hpLihat;
+  function daruratAktif(){ return !!(DAR&&Date.now()<DAR.sampai); }
+  function jam(d){ return String(d.getHours()).padStart(2,'0')+'.'+String(d.getMinutes()).padStart(2,'0'); }
+  function bar(){
+    var b=$('hp-bar'); if(!hpLihat()){ if(b) b.remove(); document.body.classList.remove('hp-lihat'); return; }
+    document.body.classList.add('hp-lihat');
+    if(!b){ b=document.createElement('div'); b.id='hp-bar'; b.addEventListener('click',function(e){ var t=e.target.closest('[data-hb]'); if(!t) return; if(t.dataset.hb==='muat') hpMuat(true); else mintaDarurat(null); }); }
+    var pg=document.querySelector('.page.active'), box=pg&&(pg.querySelector('.kw-main')||pg); if(box&&b.parentNode!==box) box.insertBefore(b,box.firstChild);
+    var t=lsGet('ya_last_sync');
+    b.innerHTML='📱 <b>Mode lihat saja</b> · data dari cloud'+(t?' · dimuat '+jam(new Date(t)):'')+(daruratAktif()?' · <b style="color:#b4581a">🔓 darurat aktif</b>':'')+
+      '<span style="margin-left:auto;display:flex;gap:6px"><span class="hb" data-hb="muat">↻ Muat</span><span class="hb hd" data-hb="dar">🔒 Transaksi darurat</span></span>';
+  }
+  window.kwHpBar=bar;
+  async function hpMuat(tampil){
+    if(!hpLihat()||typeof SCRIPT_URL==='undefined'||!SCRIPT_URL) return false;
+    if(Date.now()-MUAT_T<4000&&!tampil) return false; MUAT_T=Date.now();
+    try{ setSyncStatus('syncing'); }catch(e){}
+    try{
+      var resp=await Promise.race([fetch(SCRIPT_URL+'?action=load_all'),new Promise(function(_,r){ setTimeout(function(){ r(new Error('timeout')); },12000); })]);
+      if(!resp.ok) throw new Error('HTTP '+resp.status);
+      var j=await resp.json(); if(!j.ok||!j.data) throw new Error('data kosong'); var d=j.data;
+      var A=function(x){ return Array.isArray(x)?x:(x?JSON.parse(x):[]); }, O=function(x){ return x&&typeof x==='object'?x:(x?JSON.parse(x):{}); };
+      var cl=A(d.riwayat), ids={}; cl.forEach(function(r){ ids[r.id]=1; });
+      var pend=(getRiwayat()||[]).filter(function(r){ return r.dibuatDi&&!ids[r.id]; });   // kuitansi darurat yang belum naik
+      if(d.riwayat) lsSet('ya_riwayat',pend.concat(cl));
+      if(d.siswa) lsSet('ya_siswa',A(d.siswa));
+      var tf=O(d.tarif); if(tf.spp) setSPP(tf.spp); if(tf.pgm) setPGM(tf.pgm); if(tf.daftar) setDaftar(tf.daftar); if(tf.diskon) setDiskon(tf.diskon);
+      if(d.kasHarian) lsSet('ya_kas_awal_harian',O(d.kasHarian)); if(d.pengeluaran) lsSet('ya_pengeluaran',A(d.pengeluaran)); if(d.pinjaman) lsSet('ya_pinjaman',A(d.pinjaman));
+      lsSet('ya_last_sync',new Date().toISOString()); try{ setSyncStatus('online'); }catch(e){}
+      var pg=document.querySelector('.page.active'); if(pg&&!document.querySelector('.rk-del-bg')){ var id=pg.id.replace('page-',''); if(id!=='kwitansi'&&id!=='siswaBaru'&&id!=='siswaPindah'&&typeof _spAsli==='function') _spAsli(id); }
+      bar(); if(pend.length){ UPLOAD_OK=true; window.syncToCloud(true); }
+      return true;
+    }catch(e){ try{ setSyncStatus('offline'); }catch(x){} try{ kwBug('sync','HP: muat dari cloud gagal',e.message); }catch(x){} if(tampil) alert('Gagal muat dari cloud: '+e.message); bar(); return false; }
+  }
+  window.kwHpMuat=hpMuat;
+  var _spAsli=null;
+  // blokir upload dari HP (kecuali kuitansi darurat)
+  function pasangSync(){
+    var _s=window.syncToCloud; if(typeof _s==='function'&&!_s._hp){ var g=function(){ if(hpLihat()&&!UPLOAD_OK){ try{ setSyncStatus('online'); }catch(e){} return Promise.resolve('skip'); } UPLOAD_OK=false; return _s.apply(this,arguments); }; g._hp=1; window.syncToCloud=g; }
+    var _c=window.checkAndLoadCloud; if(typeof _c==='function'&&!_c._hp){ var h=function(){ if(hpLihat()) return hpMuat(false); return _c.apply(this,arguments); }; h._hp=1; window.checkAndLoadCloud=h; }
+    var _m=window.manualSync; if(typeof _m==='function'&&!_m._hp){ var k=function(){ if(hpLihat()) return hpMuat(true); return _m.apply(this,arguments); }; k._hp=1; window.manualSync=k; }
+  }
+  // kunci aksi tulis di HP
+  var KW=['buatKwitansi','buatKwitansiSiswaBaru','buatKwitansiPindah','kaBuat','bkBuat'];
+  var AKSI=['hapusSatuRiwayat','editKwitansi','editCatatanInModal','saveTarif','saveSiswa','saveModalAwal','simpanKasTunai','tambahPinjaman','hapusPinjaman','tambahPengeluaran','hapusPengeluaran','hapusSiswa','rekordHapusSiswa','prosesNaikKelas','prosesNaikKelasSemua','undoNaikKelas','triggerImportSiswa','triggerImportExcel','tambahTarifKustom','hapusTarifKustom','cekNamaMirip','saveTema','resetTema'];
+  function kunci(){
+    KW.concat(AKSI).forEach(function(n){ var f=window[n]; if(typeof f!=='function'||f._hpk) return; var isKw=KW.indexOf(n)>=0;
+      var g=function(){ if(!hpLihat()||daruratAktif()){ var r=f.apply(this,arguments); if(!isKw&&daruratAktif()&&DAR&&!DAR.kw) selesaiDarurat(); return r; }
+        var self=this,args=arguments; mintaDarurat(function(){ f.apply(self,args); if(!isKw) selesaiDarurat(); }, isKw); };
+      g._hpk=1; window[n]=g; });
+  }
+  function modal(html){ var m=document.createElement('div'); m.className='rk-del-bg'; m.style.zIndex=100006; m.innerHTML='<div class="rk-del-box">'+html+'</div>'; document.body.appendChild(m); m.addEventListener('click',function(e){ if(e.target===m) m.remove(); }); return m; }
+  function mintaDarurat(lanjut,isKw){
+    if(lanjut){ var m0=modal('<div style="font-weight:700;font-size:16px">📱 Mode lihat saja</div><div style="font-size:13px;margin:8px 0 14px;line-height:1.55">Di HP data hanya dilihat (dimuat dari cloud). <b>Transaksi dibuat di laptop.</b><br>Kalau darurat, buka 1 transaksi dengan password admin.</div><div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-x>Tutup</button><button class="btn" data-d style="background:#b4581a;color:#fff;border-color:#b4581a;font-weight:600">🔒 Transaksi darurat</button></div>');
+      m0.querySelector('[data-x]').onclick=function(){ m0.remove(); }; m0.querySelector('[data-d]').onclick=function(){ m0.remove(); pw(lanjut,isKw); }; return; }
+    pw(null,true);
+  }
+  function pw(lanjut,isKw){
+    var m=modal('<div style="font-weight:700;font-size:16px;color:#b4581a">⚠ Transaksi darurat di HP</div><div style="font-size:12.5px;color:#555;margin:6px 0 10px;line-height:1.5">Untuk <b>1 transaksi</b> saja. Data dimuat dari cloud dulu, lalu kuitansi langsung dikirim ke cloud setelah disimpan.</div>'+
+      '<input type="password" placeholder="Password admin" style="width:100%"><div class="hp-err" style="color:var(--danger,#c0392b);font-size:12.5px;min-height:18px;margin-top:4px"></div><div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-x>Batal</button><button class="btn" data-ok style="background:#b4581a;color:#fff;border-color:#b4581a;font-weight:600">Buka 1 transaksi</button></div>');
+    var inp=m.querySelector('input'); setTimeout(function(){ inp.focus(); },50);
+    var go=function(){ if(inp.value!==PASSWORD){ m.querySelector('.hp-err').textContent='Password salah.'; inp.select(); return; }
+      m.querySelector('[data-ok]').textContent='Memuat data cloud…'; m.querySelector('[data-ok]').disabled=true;
+      hpMuat(false).then(function(){ m.remove(); DAR={sampai:Date.now()+15*60000,kw:isKw!==false,rec:window._lastNewRecs}; bar(); try{ kwBug('sync','Transaksi darurat HP dibuka',''); }catch(e){} if(lanjut) lanjut(); }); };
+    m.querySelector('[data-ok]').onclick=go; m.querySelector('[data-x]').onclick=function(){ m.remove(); };
+    inp.addEventListener('keydown',function(e){ if(e.key==='Enter') go(); if(e.key==='Escape') m.remove(); });
+  }
+  function selesaiDarurat(){ DAR=null; bar(); UPLOAD_OK=true; window.syncToCloud(true); }
+  // kuitansi darurat tersimpan → tandai, kunci lagi, kirim ke cloud
+  setInterval(function(){ if(!DAR||!DAR.kw) { if(DAR&&!daruratAktif()){ DAR=null; bar(); } return; }
+    if(window._lastNewRecs&&window._lastNewRecs!==DAR.rec){ var recs=window._lastNewRecs, rw=getRiwayat(), ids={}; recs.forEach(function(r){ ids[r.id]=1; });
+      rw.forEach(function(r){ if(ids[r.id]){ r.dibuatDi='HP (darurat)'; r.catatan=(r.catatan?r.catatan+' | ':'')+'📱 dibuat di HP (darurat)'; } }); lsSet('ya_riwayat',rw);
+      recs.forEach(function(r){ try{ addLog('kwitansi',r.nama,r.no+' dibuat di HP (darurat)'); }catch(e){} });
+      DAR=null; bar(); UPLOAD_OK=true; window.syncToCloud(true); }
+    else if(!daruratAktif()){ DAR=null; bar(); } },800);
+  // pengaturan peran perangkat (di Pengaturan AI)
+  function pasangSetelan(){ var s=$('bt-set'); if(!s||$('kw-peran')) return; var d=document.createElement('div'); d.style.cssText='margin:14px 0 6px;font-size:12.5px';
+    d.innerHTML='<b>📱 Peran perangkat ini</b> <select id="kw-peran" style="margin-left:6px"><option value="">Otomatis ('+(mobile()?'HP':'Laptop')+')</option><option value="laptop">Laptop utama — boleh transaksi</option><option value="hp">HP — lihat saja (transaksi darurat + password)</option></select>';
+    var ref=s.querySelector('p b'); s.insertBefore(d,s.firstChild); var sel=d.querySelector('select'); try{ sel.value=localStorage.getItem(PERAN)||''; }catch(e){}
+    sel.onchange=function(){ try{ localStorage.setItem(PERAN,sel.value); }catch(e){} bar(); if(hpLihat()) hpMuat(true); }; }
+  function mulai(){
+    pasangCicilHook(); pasangSync(); kunci(); pasangSetelan();
+    var _sp=window.showPage; _spAsli=_sp; if(typeof _sp==='function'&&!_sp._hpb){ var g=function(){ var r=_sp.apply(this,arguments); setTimeout(bar,0); return r; }; g._hpb=1; window.showPage=g; }
+    bar(); if(hpLihat()) hpMuat(false);
+    setInterval(function(){ if(hpLihat()&&!daruratAktif()&&!document.hidden) hpMuat(false); },5*60000);
+    document.addEventListener('visibilitychange',function(){ if(!document.hidden&&hpLihat()&&!daruratAktif()&&Date.now()-MUAT_T>60000) hpMuat(false); });
+  }
+  pasangSync();
+  window._hpLihatDebug={dar:function(){ return DAR; },mulai:mulai};
+  if(document.readyState==='loading') window.addEventListener('load',function(){ setTimeout(mulai,2600); }); else setTimeout(mulai,2600);
 })();
 </script>
 
