@@ -6,6 +6,86 @@
 <style id="anti-flash">html.af body{visibility:hidden}html.af *,html.af *::before,html.af *::after{transition:none!important;animation:none!important}</style>
 <script>/* sembunyikan tampilan lama (biru) sampai tema & UI modern siap */document.documentElement.classList.add('af');window._afT=setTimeout(function(){document.documentElement.classList.remove('af');},4000);</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+// ===================== v3.29: LOG BUG (error, bagian lambat, AI, sync) — hanya di perangkat ini =====================
+(function(){
+  var KEY='ya_buglog', MAX=500, HARI=14*864e5, L=null, _t=null;
+  function muat(){ if(L) return L; try{ L=JSON.parse(localStorage.getItem(KEY))||[]; }catch(e){ L=[]; } var bt=Date.now()-HARI; L=L.filter(function(x){ return x&&x.w>bt; }); return L; }
+  function simpan(){ clearTimeout(_t); _t=setTimeout(function(){ try{ localStorage.setItem(KEY,JSON.stringify(L.slice(-MAX))); }catch(e){} },400); }
+  function hal(){ var p=document.querySelector('.page.active'); return p?p.id.replace('page-',''):''; }
+  function bersih(s){ return String(s==null?'':s).replace(/AIza[0-9A-Za-z_\-]{10,}/g,'AIza…').replace(/([?&](key|token|tok)=)[^&\s]+/gi,'$1…').slice(0,300); }
+  window.kwBug=function(jenis,kejadian,detail){
+    try{ muat(); var last=L[L.length-1], k=bersih(kejadian), d=bersih(detail);
+      if(last&&last.j===jenis&&last.k===k&&Date.now()-last.w<5000){ last.n=(last.n||1)+1; last.w=Date.now(); simpan(); return; }
+      L.push({w:Date.now(),j:jenis,k:k,d:d,h:hal(),v:window.APP_VERSION||''}); if(L.length>MAX) L=L.slice(-MAX); simpan();
+      if(document.getElementById('tab-logBug')&&document.getElementById('tab-logBug').classList.contains('active')) render();
+    }catch(e){}
+  };
+  // error aplikasi
+  window.addEventListener('error',function(e){ if(!e||!e.message) return; var f=String(e.filename||'').split('/').pop().split('?')[0];
+    var st=(e.error&&e.error.stack||'').split('\n')[1]||''; var fn=(st.match(/at ([\w.$]+)/)||[])[1]||'';
+    kwBug('error',e.message,(fn?fn+' · ':'')+'baris '+(e.lineno||'?')+(f&&f!=='index.html'?' · '+f:'')); });
+  window.addEventListener('unhandledrejection',function(e){ var r=e&&e.reason; var m=r&&r.message||String(r||''); if(!m) return; var fn=((r&&r.stack||'').split('\n')[1]||'').match(/at ([\w.$]+)/); kwBug('error',m,(fn?fn[1]+' · ':'')+'promise'); });
+  // tugas berat (blokir layar > 250 ms)
+  try{ var _lt=0; new PerformanceObserver(function(list){ list.getEntries().forEach(function(en){ if(en.duration<250||Date.now()-_lt<8000) return; _lt=Date.now(); kwBug('lambat','Layar macet sebentar',Math.round(en.duration)+' ms · halaman '+hal()); }); }).observe({entryTypes:['longtask']}); }catch(e){}
+  // fetch: catat gagal sync / AI (tanpa isi, tanpa key/token)
+  if(window.fetch){ var _f=window.fetch; window.fetch=function(u,o){ var url=String(u&&u.url||u||''), host=(url.match(/^https?:\/\/([^\/?#]+)/)||[])[1]||'', jenis=/script\.google/.test(host)?'sync':/generativelanguage/.test(host)?'ai':''; var t0=Date.now();
+    var p=_f.apply(this,arguments); if(!jenis) return p;
+    return p.then(function(r){ if(!r.ok) kwBug(jenis,(jenis==='ai'?'AI menolak / sibuk':'Sync / Drive gagal'),'HTTP '+r.status+' · '+(Date.now()-t0)+' ms'); return r; },function(err){ kwBug(jenis,(jenis==='ai'?'AI tidak terjangkau':'Sync / Drive tidak terjangkau'),(err&&err.message||'jaringan')+' · '+(Date.now()-t0)+' ms'); throw err; }); }; }
+  // bagian lambat: bungkus fungsi utama (> 500 ms dicatat)
+  var NAMA_FN={showPage:'Buka halaman',switchTab:'Buka tab Admin',buatKwitansi:'Buat kwitansi',renderAdminSiswa:'Tampilkan Kelola Siswa',renderRekordSiswa:'Tampilkan Rekord Siswa',renderTunggakan:'Tampilkan Tunggakan',generateTagihan:'Generate Tagihan',renderRiwayat:'Tampilkan Riwayat',bkHitungUlang:'Hitung ulang Buku Kas'};
+  function bungkus(){ Object.keys(NAMA_FN).forEach(function(n){ var f=window[n]; if(typeof f!=='function'||f._bug) return;
+    var g=function(){ var t0=performance.now(), r=f.apply(this,arguments), d=performance.now()-t0; if(d>500) kwBug('lambat',NAMA_FN[n]+(n==='showPage'||n==='switchTab'?' ('+arguments[0]+')':''),Math.round(d)+' ms · layar '+innerWidth+'×'+innerHeight); return r; };
+    g._bug=1; window[n]=g; }); }
+  // ukur animasi (dipakai menu Admin): hitung frame patah selama ms
+  window.kwBugAnim=function(nama,ms){ try{ var t0=performance.now(), prev=t0, patah=0, maks=0;
+    (function loop(t){ var dt=t-prev; if(t!==t0&&dt>34){ patah++; } if(dt>maks) maks=dt; prev=t; if(t-t0<ms) requestAnimationFrame(loop);
+      else if(patah>=3) kwBug('lambat',nama,'patah-patah '+patah+' frame · frame terlama '+Math.round(maks)+' ms · layar '+innerWidth+'×'+innerHeight); })(t0); }catch(e){} };
+  // ---------------- tampilan Admin → Log Bug ----------------
+  var FIL='semua', LBL={error:['✗ Error','#fdeaea','#b33a3a'],lambat:['🐢 Lambat','#fdeee0','#b4581a'],ai:['🤖 AI','#eef0fb','#4b55a0'],sync:['☁ Sync','#e3f1e8','#2f7a55']};
+  function esc(v){ return String(v==null?'':v).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+  function tgl(w){ var d=new Date(w); return String(d.getDate()).padStart(2,'0')+' '+['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'][d.getMonth()]+' '+String(d.getHours()).padStart(2,'0')+'.'+String(d.getMinutes()).padStart(2,'0'); }
+  function perangkat(){ return /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent)?'HP':'Laptop'; }
+  function teks(){ muat(); var A=L.slice().reverse().slice(0,150);
+    return 'LOG BUG Kwitansi Yos Anugerah · v'+(window.APP_VERSION||'')+' · '+perangkat()+' · layar '+innerWidth+'×'+innerHeight+' · '+(navigator.userAgent.match(/(Chrome|Firefox|Safari|Edg)\/[\d.]+/)||[''])[0]+'\n'+A.length+' catatan terbaru:\n'+
+      A.map(function(x){ return tgl(x.w)+' | '+x.j+' | '+x.k+(x.n>1?' (×'+x.n+')':'')+' | '+x.d+(x.h?' | hal '+x.h:'')+(x.v&&x.v!==window.APP_VERSION?' | v'+x.v:''); }).join('\n'); }
+  function render(){
+    var box=document.getElementById('lb-isi'); if(!box) return; muat();
+    var n={semua:L.length,error:0,lambat:0,ai:0,sync:0}; L.forEach(function(x){ n[x.j]=(n[x.j]||0)+1; });
+    var A=L.filter(function(x){ return FIL==='semua'||x.j===FIL; }).slice().reverse().slice(0,300);
+    box.innerHTML='<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px"><span style="color:var(--text2,#888);font-size:12.5px">v'+esc(window.APP_VERSION||'')+' · '+perangkat()+' · '+L.length+' catatan (14 hari terakhir)</span>'+
+      '<span style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap"><button class="btn btn-primary" data-lb="salin">📋 Salin untuk Claude</button><button class="btn" data-lb="unduh">⬇ Unduh</button><button class="btn" data-lb="hapus" style="color:#b33a3a;border-color:#f1c4c4">Hapus log</button></span></div>'+
+      '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">'+['semua','error','lambat','ai','sync'].map(function(k){ return '<span class="lb-f'+(FIL===k?' on':'')+'" data-f="'+k+'">'+(k==='semua'?'Semua':LBL[k][0])+' <b>'+(n[k]||0)+'</b></span>'; }).join('')+'</div>'+
+      (A.length?'<div style="overflow-x:auto"><table class="lb-t"><thead><tr><th>Waktu</th><th>Jenis</th><th>Kejadian</th><th>Detail</th></tr></thead><tbody>'+A.map(function(x){ var b=LBL[x.j]||[x.j,'#eee','#555'];
+        return '<tr><td style="white-space:nowrap">'+tgl(x.w)+'</td><td><span class="lb-j" style="background:'+b[1]+';color:'+b[2]+'">'+b[0]+'</span></td><td>'+esc(x.k)+(x.n>1?' <span style="color:#999">×'+x.n+'</span>':'')+'</td><td style="color:var(--text2,#666)">'+esc(x.d)+(x.h?' · hal '+esc(x.h):'')+'</td></tr>'; }).join('')+'</tbody></table></div>'
+        :'<div class="hist-empty">✓ Belum ada catatan'+(FIL!=='semua'?' di jenis ini':'')+'.</div>')+
+      '<div style="font-size:12px;color:var(--text2,#777);margin-top:10px">Mencatat otomatis: error aplikasi, bagian lambat (&gt; 0,5 dtk), animasi patah-patah, AI gagal/sibuk, sync/Drive gagal. Tidak mencatat data siswa, nominal, API key, atau token. Hanya tersimpan di perangkat ini.</div>';
+  }
+  window.kwBugRender=render;
+  document.addEventListener('click',function(e){ var box=document.getElementById('lb-isi'); if(!box||!box.contains(e.target)) return;
+    var f=e.target.closest('[data-f]'); if(f){ FIL=f.dataset.f; render(); return; }
+    var b=e.target.closest('[data-lb]'); if(!b) return; var a=b.dataset.lb;
+    if(a==='salin'){ var t=teks(), ok=function(){ b.textContent='✓ Disalin — tempel ke chat Claude'; setTimeout(render,2500); };
+      if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(ok,function(){ prompt('Salin teks ini:',t); }); else prompt('Salin teks ini:',t); }
+    if(a==='unduh'){ var bl=new Blob([teks()],{type:'text/plain'}), x=document.createElement('a'); x.href=URL.createObjectURL(bl); x.download='log bug '+new Date().toISOString().slice(0,10)+'.txt'; document.body.appendChild(x); x.click(); x.remove(); }
+    if(a==='hapus'){ if(!confirm('Hapus semua catatan log bug di perangkat ini?')) return; L=[]; try{ localStorage.removeItem(KEY); }catch(x){} render(); }
+  });
+  function pasangTab(){
+    var ap=document.getElementById('admin-panel'), bar=ap&&ap.querySelector('.tab-bar'); if(!bar) return;
+    if(!bar.querySelector('.tab[onclick*="logBug"]')){ var t=document.createElement('div'); t.className='tab'; t.setAttribute('onclick',"switchTab('logBug')"); t.innerHTML='🐞 Log Bug'; var ru=bar.querySelector('.tab[onclick*="riwayatUpdate"]'); if(ru) bar.insertBefore(t,ru); else bar.appendChild(t); }
+    if(!document.getElementById('tab-logBug')){ var c=document.createElement('div'); c.className='tab-content'; c.id='tab-logBug'; c.innerHTML='<div class="card"><div class="card-title">🐞 Log Bug</div><div id="lb-isi"></div></div>';
+      var tc=ap.querySelectorAll(':scope>.tab-content'), last=tc[tc.length-1]; if(last&&last.nextSibling) ap.insertBefore(c,last.nextSibling); else ap.appendChild(c); }
+  }
+  window.kwBugPasang=pasangTab;
+  function mulai(){ pasangTab(); setTimeout(bungkus,1500); }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',function(){ setTimeout(mulai,300); }); else setTimeout(mulai,300);
+})();
+</script>
+<style>
+.lb-f{border:1px solid var(--line,#ddd);border-radius:9px;padding:4px 10px;cursor:pointer;font-size:12.5px;background:var(--surface,#fff)}.lb-f.on{background:#1f2a24;color:#fff;border-color:#1f2a24}.lb-f b{font-weight:700;opacity:.8}
+.lb-t{width:100%;border-collapse:collapse;font-size:12.5px}.lb-t th{text-align:left;color:var(--text2,#888);padding:6px 8px;font-weight:600}.lb-t td{border-top:1px solid var(--line,#eee);padding:7px 8px;vertical-align:top}
+.lb-j{border-radius:6px;padding:1px 7px;white-space:nowrap;font-size:12px}
+</style>
 <title>Kwitansi — Sekolah Swasta Yos Anugerah</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#f4f5f4">
@@ -10754,8 +10834,9 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
     var tok=Math.random().toString(36).slice(2); c._baca=tok;
     c.state='reading'; c.err=''; c.mulaiBaca=Date.now(); c.pembaca=(typeof FB!=='undefined'&&FB.dev)||''; render();
     try{
-      var d=await bacaBatas(bacaAI(c.imgs||[],c.extra||'',function(t){ if(c._baca===tok){ c.statusTxt=t; render(); } }));
+      var d=await bacaBatas(bacaAI(c.imgs||[],c.extra||'',function(t){ if(c._baca===tok){ if(/sibuk|coba|model lain/i.test(t||'')) c._ulang=(c._ulang||0)+1; c.statusTxt=t; render(); } }));
       if(c._baca!==tok) return; delete c._baca;
+      try{ kwBug('ai','Bukti transfer dibaca',Math.round((Date.now()-c.mulaiBaca)/1000)+' dtk · model '+(ls(MODEL_LS)||'?')+(c._ulang?' · '+c._ulang+'× coba ulang':'')); }catch(x){} delete c._ulang;
       c.statusTxt='';
       c.ai=d; c.state='ok';
       c.nominal=parseInt(String(d.nominal||'').replace(/[^\d]/g,''))||0;
@@ -10763,7 +10844,7 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
       bangunRows(c); cekDobel(c);
       btLog('Dibaca AI',c,{ket:(c.rows.length?c.rows.length+' siswa terbaca':'tanpa nama siswa')+(ls(MODEL_LS)?' · '+ls(MODEL_LS):'')});
       if(c.dup) btLog('Terdeteksi dobel',c,{ket:c.dup});
-    }catch(e){ if(c._baca!==tok) return; delete c._baca; c.state='error'; c.err=e.message; c.statusTxt=''; btLog('Gagal dibaca',c,{ket:e.message.slice(0,200)}); }
+    }catch(e){ if(c._baca!==tok) return; delete c._baca; try{ kwBug('ai','Gagal baca bukti transfer',e.message); }catch(x){} c.state='error'; c.err=e.message; c.statusTxt=''; btLog('Gagal dibaca',c,{ket:e.message.slice(0,200)}); }
     render();
   }
   // batas waktu baca AI: 3 menit
@@ -11550,12 +11631,13 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
     var tok=Math.random().toString(36).slice(2); pg._baca=tok;
     pg.state='reading'; pg.err=''; pg.mulaiBaca=Date.now(); pg.pembaca=(typeof FB!=='undefined'&&FB.dev)||''; bkRender();
     try{
-      var d=await bacaBatas(bacaAI(pg.imgs||[], 'Jenjang buku: '+pg.jenjang, function(t){ if(pg._baca===tok){ pg.statusTxt=t; bkRender(); } }, PROMPT_BUKU));
+      var d=await bacaBatas(bacaAI(pg.imgs||[], 'Jenjang buku: '+pg.jenjang, function(t){ if(pg._baca===tok){ if(/sibuk|coba|model lain/i.test(t||'')) pg._ulang=(pg._ulang||0)+1; pg.statusTxt=t; bkRender(); } }, PROMPT_BUKU));
       if(pg._baca!==tok) return; delete pg._baca;
+      try{ kwBug('ai','Buku kas '+pg.jenjang+' dibaca',Math.round((Date.now()-pg.mulaiBaca)/1000)+' dtk · model '+(ls(MODEL_LS)||'?')+(pg._ulang?' · '+pg._ulang+'× coba ulang':'')); }catch(x){} delete pg._ulang;
       pg.statusTxt=''; pg.ai=d; pg.state='ok'; bkBangun(pg); bkCekJenjang(pg);
       bkIsiTanggalLanjutan(pg); BK.forEach(function(q){ if(q!==pg&&q.state==='ok') bkIsiTanggalLanjutan(q); });
       btLog('Buku kas dibaca',null,{baris:pg.rows.length,ket:pg.jenjang+' · '+pg.rows.length+' baris · '+pg.rows.filter(function(r){return r.status==='siap';}).length+' siap'});
-    }catch(e){ if(pg._baca!==tok) return; delete pg._baca; pg.state='error'; pg.err=e.message; pg.statusTxt=''; }
+    }catch(e){ if(pg._baca!==tok) return; delete pg._baca; try{ kwBug('ai','Gagal baca buku kas '+pg.jenjang,e.message); }catch(x){} pg.state='error'; pg.err=e.message; pg.statusTxt=''; }
     bkRender();
   }
   function bkP(id){ return BK.find(function(p){return p.id===id;}); }
@@ -12233,8 +12315,8 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
       FB.unsub=fbCol('kartu').onSnapshot(function(snap){ var pertama=!FB.on; FB.on=true; FB.err=''; fbStatus(); if(pertama){ dengarPerangkat(); detak(); setTimeout(ambilAntri,1500); }
           snap.docChanges().forEach(function(ch){ try{ fbTerima(ch); }catch(e){ console.warn('fb terima',e); } });
           fbPush(); },
-        function(e){ FB.on=false; FB.err=/permission/i.test(e.message)?'Ditolak — cek Rules Firestore (lihat panduan)':e.message; fbStatus(); });
-    }).catch(function(e){ FB.err=e.message; fbStatus(); });
+        function(e){ FB.on=false; FB.err=/permission/i.test(e.message)?'Ditolak — cek Rules Firestore (lihat panduan)':e.message; fbStatus(); try{ kwBug('sync','Firebase error',e.message); }catch(x){} });
+    }).catch(function(e){ FB.err=e.message; fbStatus(); try{ kwBug('sync','Firebase gagal dimuat',e.message); }catch(x){} });
   }
   window.kwFbStart=fbMulai;
   // dorong perubahan lokal setiap antrian disimpan
@@ -13121,11 +13203,12 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
 <!-- ===================== VERSI APLIKASI ===================== -->
 <script>
 // Ubah setiap kali ada update: x.y.z  (z = perbaikan kecil, y = fitur baru, x = perubahan besar)
-window.APP_VERSION='3.28.0';
-window.APP_BUILD='2026-11-02';
-window.APP_NOTES='Buku Kas: 1 foto jadi 1 kartu (tidak digabung) dan antrian dipisah per jenjang.';
+window.APP_VERSION='3.29.0';
+window.APP_BUILD='2026-11-04';
+window.APP_NOTES='Animasi buka Admin lebih ringan dan ada tab Log Bug di Admin untuk mencatat error dan bagian yang lambat.';
 // riwayat singkat (terbaru di atas) — tampil terlipat di halaman Admin
 window.APP_RIWAYAT=[
+  ['3.29.0','2026-11-04','Animasi buka Admin lebih ringan (hanya panel geser + fade); Admin → 🐞 Log Bug (error, bagian lambat, AI, sync; Salin untuk Claude).'],
   ['3.28.0','2026-11-02','Buku Kas: 1 foto = 1 kartu (tidak digabung; foto lanjutan pakai tanggal foto sebelumnya, jumlah per tanggal dicek gabungan); tab antrian per jenjang Semua · TK · SD · SMP · SMK.'],
   ['3.27.0','2026-10-28','HP memotret → laptop membaca AI (tanda laptop aktif, Baca di HP saja); batas baca AI 3 menit, Batalkan/Hapus, kartu macet 10 menit → Terputus; menu Admin layar penuh (menu utama mengecil ke samping, ← Kembali / ✕ / Esc).'],
   ['3.26.0','2026-10-28','Foto Buku Kas: klik → geser ke foto 2 (+ sync foto lanjutan); Download Excel Tunggakan; SPP calon siswa via form Kwitansi pakai tarif kelas tujuan; 🔍 Cek nama mirip (gabung salah ketik / pisah nama sama beda kelas).'],
@@ -13305,9 +13388,10 @@ body.adm-sb .sn-admin,.adm-caret{display:none!important}
 body.adm-full{--sidenav-w:318px!important}
 body.adm-full .nav-btns{width:78px!important}
 body.adm-full .sn-collapse{display:none!important}
-body,.navbar,.nav-btns{transition:padding-left .32s cubic-bezier(.2,.8,.2,1),left .32s cubic-bezier(.2,.8,.2,1),width .32s cubic-bezier(.2,.8,.2,1)}
 #adm-panel{position:fixed;top:0;bottom:0;left:78px;width:240px;box-sizing:border-box;background:var(--side-bg,#f7f7f7);border-right:1px solid var(--line,#ececec);z-index:98;padding:18px 12px;overflow-y:auto;
-  transform:translateX(-40px);opacity:0;pointer-events:none;transition:transform .34s cubic-bezier(.2,.8,.2,1),opacity .26s;box-shadow:8px 0 22px rgba(0,0,0,.06)}
+  transform:translateX(-24px);opacity:0;pointer-events:none;transition:transform .22s cubic-bezier(.2,.8,.2,1),opacity .18s;box-shadow:4px 0 10px rgba(0,0,0,.04)}
+#page-admin.adm-in{animation:admIn .22s ease-out}
+@keyframes admIn{from{opacity:0;transform:translateX(10px)}to{opacity:1;transform:none}}
 #adm-panel.open{transform:none;opacity:1;pointer-events:auto}
 .adm-ph{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:14px}.adm-ph b{font-size:15px}
 .adm-pb{border:1px solid var(--line,#ddd);background:var(--surface,#fff);border-radius:9px;padding:5px 10px;font-size:12.5px;cursor:pointer;white-space:nowrap}.adm-pb:hover{background:var(--hover,#efefef)}
@@ -13326,12 +13410,13 @@ body,.navbar,.nav-btns{transition:padding-left .32s cubic-bezier(.2,.8,.2,1),lef
 </style>
 <script>
 (function(){
-  var NAMA={siswa:'Kelola Siswa',rekordSiswa:'Rekord Siswa',tarif:'Tarif & Diskon',naikKelas:'Naik Kelas',tunggakan:'Tunggakan',laporanHarian:'Transaksi Harian',laporanJenjang:'Per Jenjang',tema:'Tema',modalAwal:'Kas Awal Harian',pengeluaran:'Pengeluaran',pinjaman:'Pinjaman',kasTunai:'Kas Tunai',riwayatUpdate:'Riwayat update'};
+  var NAMA={siswa:'Kelola Siswa',rekordSiswa:'Rekord Siswa',tarif:'Tarif & Diskon',naikKelas:'Naik Kelas',tunggakan:'Tunggakan',laporanHarian:'Transaksi Harian',laporanJenjang:'Per Jenjang',tema:'Tema',modalAwal:'Kas Awal Harian',pengeluaran:'Pengeluaran',pinjaman:'Pinjaman',kasTunai:'Kas Tunai',riwayatUpdate:'Riwayat update',logBug:'Log Bug'};
   var UTAMA=['siswa','rekordSiswa'], AKTIF='tarif';
   function $(i){ return document.getElementById(i); }
   function tabKey(el){ var m=(el.getAttribute('onclick')||'').match(/switchTab\('(\w+)'\)/); return m?m[1]:''; }
   // tab Riwayat update (isi: kotak versi + daftar update)
   function pasangRiwayat(){
+    try{ if(window.kwBugPasang) kwBugPasang(); }catch(e){}
     var ap=$('admin-panel'), bar=ap&&ap.querySelector('.tab-bar'); if(!bar) return;
     if(!bar.querySelector('.tab[onclick*="riwayatUpdate"]')){ var t=document.createElement('div'); t.className='tab'; t.setAttribute('onclick',"switchTab('riwayatUpdate')"); t.innerHTML='ⓘ Riwayat update'; bar.appendChild(t); }
     if(!$('tab-riwayatUpdate')){ var c=document.createElement('div'); c.className='tab-content'; c.id='tab-riwayatUpdate'; c.innerHTML='<div class="card"><div class="card-title">Riwayat update</div><div id="ru-isi"></div></div>'; var tc=ap.querySelectorAll(':scope>.tab-content'), last=tc[tc.length-1]; if(last&&last.nextSibling) ap.insertBefore(c,last.nextSibling); else ap.appendChild(c); }
@@ -13367,11 +13452,14 @@ body,.navbar,.nav-btns{transition:padding-left .32s cubic-bezier(.2,.8,.2,1),lef
     return P;
   }
   function tutup(){ showPage(PREV&&PREV!=='admin'?PREV:'kwitansi'); }
+  // v3.29: susunan pindah sekali (tanpa animasi lebar), yang beranimasi hanya panel + fade isi (ringan, GPU)
   function masuk(){ var P=panel(); if(!P) return; FULL=true; WAS_COL=document.body.classList.contains('sn-collapsed');
-    document.body.classList.add('sn-collapsed','adm-full'); requestAnimationFrame(function(){ P.classList.add('open'); });
-    setTimeout(function(){ window.dispatchEvent(new Event('resize')); },340); }
+    document.body.classList.add('sn-collapsed','adm-full'); var pa=$('page-admin'); if(pa){ pa.classList.remove('adm-in'); void pa.offsetWidth; pa.classList.add('adm-in'); }
+    requestAnimationFrame(function(){ P.classList.add('open'); });
+    try{ if(window.kwBugAnim) kwBugAnim('Animasi buka Admin',300); }catch(e){}
+    setTimeout(function(){ window.dispatchEvent(new Event('resize')); },260); }
   function keluar(){ var P=$('adm-panel'); FULL=false; if(P) P.classList.remove('open'); document.body.classList.remove('adm-full'); if(!WAS_COL) document.body.classList.remove('sn-collapsed');
-    setTimeout(function(){ window.dispatchEvent(new Event('resize')); },340); }
+    setTimeout(function(){ window.dispatchEvent(new Event('resize')); },260); }
   function segar(){
     pasangRiwayat();
     var pa=$('page-admin'), ap=$('admin-panel'), on=!!(pa&&pa.classList.contains('active')&&ap&&ap.style.display!=='none'&&window.innerWidth>700);
@@ -13382,7 +13470,7 @@ body,.navbar,.nav-btns{transition:padding-left .32s cubic-bezier(.2,.8,.2,1),lef
   }
   document.addEventListener('keydown',function(e){ if(e.key!=='Escape'||!FULL) return; if(document.querySelector('.rk-del-bg,#bt-zoom[style*="flex"],.modal[style*="flex"]')) return; var a=document.activeElement; if(a&&/INPUT|TEXTAREA|SELECT/.test(a.tagName)) return; tutup(); });
   var _st=window.switchTab;
-  if(typeof _st==='function') window.switchTab=function(t){ AKTIF=t; var r=_st.apply(this,arguments); segar(); return r; };
+  if(typeof _st==='function') window.switchTab=function(t){ AKTIF=t; var r=_st.apply(this,arguments); segar(); if(t==='logBug'&&window.kwBugRender) kwBugRender(); return r; };
   var _sp=window.showPage;
   if(typeof _sp==='function') window.showPage=function(p){ if(p!=='admin'){ PREV=p; } else { var cur=document.querySelector('.page.active'); if(cur&&cur.id!=='page-admin') PREV=cur.id.replace('page-',''); } var r=_sp.apply(this,arguments); setTimeout(segar,0); return r; };
   var _lo=window.logoutAdmin; if(typeof _lo==='function') window.logoutAdmin=function(){ var r=_lo.apply(this,arguments); setTimeout(segar,0); return r; };
