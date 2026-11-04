@@ -31,7 +31,7 @@
   // fetch: catat gagal sync / AI (tanpa isi, tanpa key/token)
   if(window.fetch){ var _f=window.fetch; window.fetch=function(u,o){ var url=String(u&&u.url||u||''), host=(url.match(/^https?:\/\/([^\/?#]+)/)||[])[1]||'', jenis=/script\.google/.test(host)?'sync':/generativelanguage/.test(host)?'ai':''; var t0=Date.now();
     var p=_f.apply(this,arguments); if(!jenis) return p;
-    return p.then(function(r){ if(!r.ok) kwBug(jenis,(jenis==='ai'?'AI menolak / sibuk':'Sync / Drive gagal'),'HTTP '+r.status+' · '+(Date.now()-t0)+' ms'); return r; },function(err){ kwBug(jenis,(jenis==='ai'?'AI tidak terjangkau':'Sync / Drive tidak terjangkau'),(err&&err.message||'jaringan')+' · '+(Date.now()-t0)+' ms'); throw err; }); }; }
+    return p.then(function(r){ if(!r.ok&&r.type!=='opaque'&&r.status!==0) kwBug(jenis,(jenis==='ai'?'AI menolak / sibuk':'Sync / Drive gagal'),'HTTP '+r.status+' · '+(Date.now()-t0)+' ms'); return r; },function(err){ kwBug(jenis,(jenis==='ai'?'AI tidak terjangkau':'Sync / Drive tidak terjangkau'),(err&&err.message||'jaringan')+' · '+(Date.now()-t0)+' ms'); throw err; }); }; }
   // bagian lambat: bungkus fungsi utama (> 500 ms dicatat)
   var NAMA_FN={showPage:'Buka halaman',switchTab:'Buka tab Admin',buatKwitansi:'Buat kwitansi',renderAdminSiswa:'Tampilkan Kelola Siswa',renderRekordSiswa:'Tampilkan Rekord Siswa',renderTunggakan:'Tampilkan Tunggakan',generateTagihan:'Generate Tagihan',renderRiwayat:'Tampilkan Riwayat',bkHitungUlang:'Hitung ulang Buku Kas'};
   function bungkus(){ Object.keys(NAMA_FN).forEach(function(n){ var f=window[n]; if(typeof f!=='function'||f._bug) return;
@@ -3156,6 +3156,9 @@ function lsGet(k){
   return _lsParse(k);
 }
 function lsSet(k,v){ if(_readCache) delete _readCache[k]; localStorage.setItem(k,JSON.stringify(v)); }
+// v3.30: indeks riwayat per nama (hanya dipakai selama cache baca aktif → aman dari data berubah)
+var _rwIdx=new WeakMap();
+function rwPerNama(rw){ var m=_readCache?_rwIdx.get(rw):null; if(m) return m; m={}; for(var i=0;i<rw.length;i++){ var r=rw[i], k=String(r&&r.nama||'').toLowerCase(); (m[k]||(m[k]=[])).push(r); } if(_readCache) _rwIdx.set(rw,m); return m; }
 function withReadCache(fn){
   return function(){
     if(_readCache) return fn.apply(this,arguments);   // sudah di dalam cache (nested)
@@ -4439,7 +4442,7 @@ function getSisaAktualPendaftaran(nama){
   let totalDibayar = 0;
   let found = false;
 
-  rw.filter(r => r.nama.toLowerCase() === namaLower).forEach(function(r){
+  (rwPerNama(rw)[namaLower]||[]).forEach(function(r){
     if(r.tipe === 'Pendaftaran'){
       // Kwitansi murni Pendaftaran - pakai nominalBayar dari record utama
       // JANGAN baca items juga karena akan double count
@@ -8790,7 +8793,7 @@ function getTunggakanItems(q){
   const items=[];
   siswa.forEach(s=>{
     if(q&&!cocokNama(s.nama,q))return;
-    const srAll=rw.filter(r=>r.nama.toLowerCase()===s.nama.toLowerCase());
+    const srAll=(rwPerNama(rw)[s.nama.toLowerCase()]||[]);
     let total=0;
     const parts=[];
     const aktualDaftar=getSisaAktualPendaftaran(s.nama);
@@ -8808,7 +8811,7 @@ function renderTunggakan(){
   const items=[];
   siswa.forEach(s=>{
     if(q&&!cocokNama(s.nama,q))return;
-    const srAll=rw.filter(r=>r.nama.toLowerCase()===s.nama.toLowerCase());
+    const srAll=(rwPerNama(rw)[s.nama.toLowerCase()]||[]);
     let total=0;
     const detailParts=[];
     // Pendaftaran: gunakan sisa akumulasi
@@ -9394,7 +9397,7 @@ function resetDariPreview(){
 
 <script>
 // Percepat render berat (hanya-baca) di Admin & Tagihan dengan cache baca sementara
-['renderTunggakan','renderRekordSiswa','buildRekordCache','generateTagihan'].forEach(function(n){
+['renderTunggakan','renderRekordSiswa','buildRekordCache','generateTagihan','renderAdminSiswa','buildNaikKelasList','getTunggakanItems','downloadTunggakanExcel'].forEach(function(n){
   if(typeof window[n]==='function' && typeof withReadCache==='function') window[n]=withReadCache(window[n]);
 });
 </script>
@@ -12215,6 +12218,9 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
   }
   var _frzT=null; window.addEventListener('resize',function(){ clearTimeout(_frzT); _frzT=setTimeout(function(){ try{ bkStickSync(); }catch(e){} },150); });
   window._bkStickSync=function(){ bkStickSync(); };
+  // v3.30: data siswa/kuitansi dibaca SEKALI per hitung/tampil (dulu ±2.000× → 2 dtk)
+  function denganCache(fn){ return function(){ if(typeof _readCache==='undefined'||_readCache) return fn.apply(this,arguments); _readCache={}; try{ return fn.apply(this,arguments); } finally{ _readCache=null; } }; }
+  bkHitungUlang=denganCache(bkHitungUlang); bkRender=denganCache(bkRender); render=denganCache(render);
   var _bkR0=bkRender;
   bkRender=function(){
     try{ bkLeCatat(); }catch(e){ console.warn('last bk',e); }
@@ -13203,11 +13209,12 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
 <!-- ===================== VERSI APLIKASI ===================== -->
 <script>
 // Ubah setiap kali ada update: x.y.z  (z = perbaikan kecil, y = fitur baru, x = perubahan besar)
-window.APP_VERSION='3.29.0';
+window.APP_VERSION='3.30.0';
 window.APP_BUILD='2026-11-04';
-window.APP_NOTES='Animasi buka Admin lebih ringan dan ada tab Log Bug di Admin untuk mencatat error dan bagian yang lambat.';
+window.APP_NOTES='Kuitansi Otomatis dan Admin terbuka jauh lebih cepat, dan alarm palsu Sync gagal di Log Bug sudah dihapus.';
 // riwayat singkat (terbaru di atas) — tampil terlipat di halaman Admin
 window.APP_RIWAYAT=[
+  ['3.30.0','2026-11-04','Lebih cepat: Kuitansi Otomatis (data dibaca sekali, ±15× lebih cepat), Admin & Tunggakan; Log Bug tidak lagi mencatat alarm palsu Sync HTTP 0.'],
   ['3.29.0','2026-11-04','Animasi buka Admin lebih ringan (hanya panel geser + fade); Admin → 🐞 Log Bug (error, bagian lambat, AI, sync; Salin untuk Claude).'],
   ['3.28.0','2026-11-02','Buku Kas: 1 foto = 1 kartu (tidak digabung; foto lanjutan pakai tanggal foto sebelumnya, jumlah per tanggal dicek gabungan); tab antrian per jenjang Semua · TK · SD · SMP · SMK.'],
   ['3.27.0','2026-10-28','HP memotret → laptop membaca AI (tanda laptop aktif, Baca di HP saja); batas baca AI 3 menit, Batalkan/Hapus, kartu macet 10 menit → Terputus; menu Admin layar penuh (menu utama mengecil ke samping, ← Kembali / ✕ / Esc).'],
