@@ -799,7 +799,7 @@ function toggleNotePopup(){
 }
 
 function npRenderMini(){
-  var mini=document.getElementById('note-mini');
+  var mini=document.getElementById('note-mini'); if(!mini) return;
   if(!npNotes.length){mini.style.display='none';return;}
   var show=npNotes.slice(0,2);
   mini.innerHTML='';
@@ -12221,6 +12221,20 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
   // v3.30: data siswa/kuitansi dibaca SEKALI per hitung/tampil (dulu ±2.000× → 2 dtk)
   function denganCache(fn){ return function(){ if(typeof _readCache==='undefined'||_readCache) return fn.apply(this,arguments); _readCache={}; try{ return fn.apply(this,arguments); } finally{ _readCache=null; } }; }
   bkHitungUlang=denganCache(bkHitungUlang); bkRender=denganCache(bkRender); render=denganCache(render);
+  // v3.32: gambar ulang hanya bila halaman & tabnya terlihat (simpan tetap jalan); posisi geser tabel dipertahankan
+  function halBT(){ var pg=$('page-buktiTf'); return !!(pg&&pg.classList.contains('active')); }
+  var _rG=render; render=function(){
+    if(!$('bt-list')||(halBT()&&MODE!=='bk')) return _rG.apply(this,arguments);
+    simpanQ(); try{ var n=counts(), nb=document.querySelector('.nav-btn[onclick*="buktiTf"] .bt-badge'); if(nb){ nb.textContent=n.warn+n.ok; nb.style.display=(n.warn+n.ok)?'':'none'; } }catch(e){}
+  };
+  var _bG=bkRender; bkRender=function(){
+    if(!$('bk-list')||!(halBT()&&MODE==='bk')){ try{ bkLeCatat(); }catch(e){} simpanBK(); return; }
+    var pos={}, y=window.scrollY; document.querySelectorAll('#bk-list .bk-card').forEach(function(c){ var w=c.querySelector('.bk-tbl-wrap'); if(w&&w.scrollLeft) pos[c.id]=w.scrollLeft; });
+    var r=_bG.apply(this,arguments);
+    Object.keys(pos).forEach(function(id){ var c=document.getElementById(id), w=c&&c.querySelector('.bk-tbl-wrap'); if(w){ w.scrollLeft=pos[id]; var st=c.querySelector('.bk-sth-in'); if(st) st.style.transform='translateX('+(-w.scrollLeft)+'px)'; } });
+    if(Math.abs(window.scrollY-y)>2) window.scrollTo(window.scrollX,y);
+    return r;
+  };
   var _bkR0=bkRender;
   bkRender=function(){
     try{ bkLeCatat(); }catch(e){ console.warn('last bk',e); }
@@ -12382,7 +12396,7 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
   function laptopAktif(){ var now=Date.now(), n=''; Object.keys(DEVS).forEach(function(k){ var d=DEVS[k]; if(k!==FB.dev&&d.pembaca&&now-(d.t||0)<150000) n=d.dn||'Laptop'; }); return n; }
   function detak(){ if(!FB.on||!pembacaOn()) return; fbCol('perangkat').doc(FB.dev).set({dn:FB.nama,t:Date.now(),pembaca:true}).catch(function(){}); }
   setInterval(detak,60000);
-  function dengarPerangkat(){ if(FB._devUnsub||!FB.db) return; FB._devUnsub=fbCol('perangkat').onSnapshot(function(snap){ snap.docChanges().forEach(function(ch){ if(ch.type==='removed') delete DEVS[ch.doc.id]; else DEVS[ch.doc.id]=ch.doc.data()||{}; }); render(); bkRender(); },function(){}); }
+  function dengarPerangkat(){ if(FB._devUnsub||!FB.db) return; FB._devUnsub=fbCol('perangkat').onSnapshot(function(snap){ snap.docChanges().forEach(function(ch){ if(ch.type==='removed') delete DEVS[ch.doc.id]; else DEVS[ch.doc.id]=ch.doc.data()||{}; }); var la=laptopAktif(); if(la!==FB._lap){ FB._lap=la; render(); bkRender(); } },function(){}); }
   // laptop: ambil kartu 'antri' yang fotonya sudah ada lalu baca
   function ambilAntri(){
     if(!FB.on||!pembacaOn()) return;
@@ -13209,11 +13223,12 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
 <!-- ===================== VERSI APLIKASI ===================== -->
 <script>
 // Ubah setiap kali ada update: x.y.z  (z = perbaikan kecil, y = fitur baru, x = perubahan besar)
-window.APP_VERSION='3.31.0';
+window.APP_VERSION='3.32.0';
 window.APP_BUILD='2026-11-04';
-window.APP_NOTES='Item bisa dicicil dengan tombol Bayar sisa, dan HP jadi mode lihat saja dengan transaksi darurat memakai password.';
+window.APP_NOTES='Tabel Buku Kas tidak balik ke kiri lagi dan aplikasi tidak macet tiap menit.';
 // riwayat singkat (terbaru di atas) — tampil terlipat di halaman Admin
 window.APP_RIWAYAT=[
+  ['3.32.0','2026-11-04','Tabel hasil AI Buku Kas tidak balik ke kiri saat digeser; tidak macet lagi tiap menit (tanda laptop aktif tidak menggambar ulang tabel); perbaikan error catatan mini.'],
   ['3.31.0','2026-11-04','Item dicicil: utang item (PKL, seragam, dll.) tampil saat pilih siswa → + Bayar sisa, utang lama otomatis berkurang; HP mode lihat saja (data dari cloud, foto untuk AI tetap bisa), transaksi darurat dengan password tiap kali.'],
   ['3.30.0','2026-11-04','Lebih cepat: Kuitansi Otomatis (data dibaca sekali, ±15× lebih cepat), Admin & Tunggakan; Log Bug tidak lagi mencatat alarm palsu Sync HTTP 0.'],
   ['3.29.0','2026-11-04','Animasi buka Admin lebih ringan (hanya panel geser + fade); Admin → 🐞 Log Bug (error, bagian lambat, AI, sync; Salin untuk Claude).'],
