@@ -10524,6 +10524,7 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
 #fe-modal .fe-top{display:flex;justify-content:space-between;align-items:center;padding:12px 14px}.fe-x{cursor:pointer;padding:4px 6px}.fe-x.g{color:#7dd3a8}
 #fe-modal .fe-stage{flex:1;position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden;min-height:180px}
 #fe-cv{max-width:100%;max-height:100%;display:block;touch-action:none}
+.fe-quad{position:absolute;display:none;touch-action:none;overflow:visible}.fe-qc{fill:#fff;stroke:#1d5e3c;stroke-width:3;cursor:grab}.fe-qm{fill:#fff;stroke:#1d5e3c;stroke-width:1.5;cursor:move}.fe-loupe{position:absolute;display:none;width:96px;height:96px;border-radius:50%;border:3px solid #fff;box-shadow:0 4px 16px rgba(0,0,0,.5);pointer-events:none;z-index:3}
 .fe-crop{position:absolute;border:2px solid #fff;box-shadow:0 0 0 2000px rgba(0,0,0,.45);pointer-events:none}
 .fe-crop i{position:absolute;width:26px;height:26px;pointer-events:auto;touch-action:none}
 .fe-crop i[data-h=tl]{left:-6px;top:-6px;border-left:4px solid #fff;border-top:4px solid #fff}.fe-crop i[data-h=tr]{right:-6px;top:-6px;border-right:4px solid #fff;border-top:4px solid #fff}
@@ -12176,8 +12177,50 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
     var r=cv.getBoundingClientRect(), pr=FE.el.querySelector('.fe-stage').getBoundingClientRect();
     o.style.left=(r.left-pr.left+c[0]*r.width)+'px'; o.style.top=(r.top-pr.top+c[1]*r.height)+'px';
     o.style.width=((c[2]-c[0])*r.width)+'px'; o.style.height=((c[3]-c[1])*r.height)+'px';
-    o.style.display=FE.tab==='crop'?'block':'none';
+    o.style.display=FE.tab==='crop'&&FE.cmode==='kotak'?'block':'none';
+    feQuadGambar();
   }
+  // v3.35: crop bebas 4 sudut (tiap sudut bergerak sendiri; ▬ tengah sisi = geser 1 sisi) → diluruskan
+  function feQuadGambar(){
+    var sv=FE.el.querySelector('.fe-quad'); if(!sv) return; var cv=FE.el.querySelector('#fe-cv');
+    var r=cv.getBoundingClientRect(), pr=FE.el.querySelector('.fe-stage').getBoundingClientRect();
+    var on=FE.tab==='crop'&&FE.cmode==='bebas'; sv.style.display=on?'block':'none'; if(!on) return;
+    var w=r.width, h=r.height; sv.style.left=(r.left-pr.left)+'px'; sv.style.top=(r.top-pr.top)+'px'; sv.setAttribute('width',w); sv.setAttribute('height',h); sv.setAttribute('viewBox','0 0 '+w+' '+h);
+    var P=FE.quad.map(function(q){ return [q[0]*w,q[1]*h]; }), pts=P.map(function(p){ return p[0].toFixed(1)+','+p[1].toFixed(1); }).join(' ');
+    var hS='';
+    for(var k=0;k<4;k++){ var a=P[k], b=P[(k+1)%4], mx=(a[0]+b[0])/2, my=(a[1]+b[1])/2, ang=Math.atan2(b[1]-a[1],b[0]-a[0])*180/Math.PI;
+      hS+='<rect data-m="'+k+'" x="'+(mx-13)+'" y="'+(my-5)+'" width="26" height="10" rx="5" transform="rotate('+ang.toFixed(1)+' '+mx+' '+my+')" class="fe-qm"/>'; }
+    for(var c=0;c<4;c++) hS+='<circle data-q="'+c+'" cx="'+P[c][0]+'" cy="'+P[c][1]+'" r="11" class="fe-qc"/><circle data-q="'+c+'" cx="'+P[c][0]+'" cy="'+P[c][1]+'" r="24" fill="transparent"/>';
+    sv.innerHTML='<path d="M0 0H'+w+'V'+h+'H0Z M'+pts.split(' ').join(' L')+' Z" fill="rgba(0,0,0,.45)" fill-rule="evenodd" pointer-events="none"/>'+
+      '<polygon points="'+pts+'" fill="none" stroke="#fff" stroke-width="2" pointer-events="none"/>'+hS;
+  }
+  function feQuadAsli(q){ return !q||q.every(function(p,i){ var t=[[0,0],[1,0],[1,1],[0,1]][i]; return Math.abs(p[0]-t[0])<1e-3&&Math.abs(p[1]-t[1])<1e-3; }); }
+  // homografi kotak satuan → segi empat (tl,tr,br,bl)
+  function feHomo(Q){ var x0=Q[0][0],y0=Q[0][1],x1=Q[1][0],y1=Q[1][1],x2=Q[2][0],y2=Q[2][1],x3=Q[3][0],y3=Q[3][1];
+    var dx1=x1-x2,dx2=x3-x2,dx3=x0-x1+x2-x3,dy1=y1-y2,dy2=y3-y2,dy3=y0-y1+y2-y3, g=0,h=0;
+    if(Math.abs(dx3)>1e-9||Math.abs(dy3)>1e-9){ var den=dx1*dy2-dx2*dy1; if(Math.abs(den)<1e-12) den=1e-12; g=(dx3*dy2-dx2*dy3)/den; h=(dx1*dy3-dx3*dy1)/den; }
+    var a=x1-x0+g*x1,b=x3-x0+h*x3,d=y1-y0+g*y1,e=y3-y0+h*y3;
+    return function(u,v){ var z=g*u+h*v+1; return [(a*u+b*v+x0)/z,(d*u+e*v+y0)/z]; }; }
+  function feLurus(src,Q){ // Q dalam piksel src
+    var L=function(a,b){ return Math.hypot(b[0]-a[0],b[1]-a[1]); };
+    var ow=Math.max(20,Math.round((L(Q[0],Q[1])+L(Q[3],Q[2]))/2)), oh=Math.max(20,Math.round((L(Q[0],Q[3])+L(Q[1],Q[2]))/2));
+    var M=Math.max(ow,oh); if(M>2600){ var kk=2600/M; ow=Math.round(ow*kk); oh=Math.round(oh*kk); }
+    var fin=document.createElement('canvas'); fin.width=ow; fin.height=oh; var x=fin.getContext('2d'); x.fillStyle='#fff'; x.fillRect(0,0,ow,oh);
+    var H=feHomo(Q), N=20, P=[]; for(var j=0;j<=N;j++){ P[j]=[]; for(var i=0;i<=N;i++) P[j][i]=H(i/N,j/N); }
+    for(var j2=0;j2<N;j2++) for(var i2=0;i2<N;i2++){
+      var d00=[i2/N*ow,j2/N*oh], d10=[(i2+1)/N*ow,j2/N*oh], d01=[i2/N*ow,(j2+1)/N*oh], d11=[(i2+1)/N*ow,(j2+1)/N*oh];
+      feTri(x,src,P[j2][i2],P[j2][i2+1],P[j2+1][i2],d00,d10,d01); feTri(x,src,P[j2][i2+1],P[j2+1][i2+1],P[j2+1][i2],d10,d11,d01); }
+    x.setTransform(1,0,0,1,0,0); return fin; }
+  window._feLurus=feLurus;
+  function feLoupe(q){ var lp=FE.el.querySelector('.fe-loupe'), cv=FE.el.querySelector('#fe-cv'); if(!lp) return;
+    if(!q){ lp.style.display='none'; return; }
+    var r=cv.getBoundingClientRect(), pr=FE.el.querySelector('.fe-stage').getBoundingClientRect(), S=96, z=2.4;
+    var px=r.left-pr.left+q[0]*r.width, py=r.top-pr.top+q[1]*r.height;
+    lp.style.display='block'; lp.style.left=Math.max(4,Math.min(pr.width-S-4,px-S/2))+'px'; lp.style.top=(py-S-28<4?py+28:py-S-28)+'px';
+    var dpr=Math.min(2,window.devicePixelRatio||1); if(lp.width!==S*dpr){ lp.width=S*dpr; lp.height=S*dpr; }
+    var x=lp.getContext('2d'), kx=cv.width/r.width, sw=S/z*kx, sx=q[0]*cv.width-sw/2, sy=q[1]*cv.height-sw/2;
+    x.fillStyle='#222'; x.fillRect(0,0,lp.width,lp.height); x.drawImage(cv,sx,sy,sw,sw,0,0,lp.width,lp.height);
+    x.strokeStyle='#1d5e3c'; x.lineWidth=2*dpr; x.beginPath(); x.moveTo(lp.width/2-14*dpr,lp.height/2); x.lineTo(lp.width/2+14*dpr,lp.height/2); x.moveTo(lp.width/2,lp.height/2-14*dpr); x.lineTo(lp.width/2,lp.height/2+14*dpr); x.stroke(); }
   function feTutup(){ if(FE&&FE.el) FE.el.remove(); FE=null; document.body.style.overflow=''; }
   window.fotoEdit=function(files,selesai){
     var F=[].slice.call(files||[]).filter(function(f){return /^image\//.test(f.type);}); if(!F.length) return;
@@ -12192,13 +12235,13 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
   };
   function feBuka(img,i,n,ok,batal){
     if(FE&&FE.el) FE.el.remove();
-    FE={img:img,rot:0,flip:false,ang:0,ph:0,pv:0,br:0,ct:0,crop:[0,0,1,1],tab:'crop'};
+    FE={img:img,rot:0,flip:false,ang:0,ph:0,pv:0,br:0,ct:0,crop:[0,0,1,1],tab:'crop',cmode:'bebas',quad:[[0,0],[1,0],[1,1],[0,1]]};
     FE.base=feDasar(FE);
     var el=document.createElement('div'); el.id='fe-modal'; FE.el=el; document.body.style.overflow='hidden';
     var sl=function(id,lbl,min,max){ return '<div class="fe-sl" data-s="'+id+'"><div><span>'+lbl+'</span><b id="fe-v-'+id+'">0</b></div><input type="range" min="'+min+'" max="'+max+'" step="'+(id==='ang'?0.5:1)+'" value="0" data-k="'+id+'"></div>'; };
     el.innerHTML='<div class="fe-top"><span class="fe-x" data-a="batal">✕ Batal</span><b>Edit foto'+(n>1?' '+(i+1)+'/'+n:'')+'</b><span class="fe-x g" data-a="reset">↺ Reset</span></div>'+
-      '<div class="fe-stage"><canvas id="fe-cv"></canvas><div class="fe-crop"><i data-h="tl"></i><i data-h="tr"></i><i data-h="bl"></i><i data-h="br"></i></div></div>'+
-      '<div class="fe-tools"><span data-a="crop" class="on">⬚ Crop</span><span data-a="rot">⟲ Putar 90°</span><span data-a="flip">⇋ Balik</span></div>'+
+      '<div class="fe-stage"><canvas id="fe-cv"></canvas><div class="fe-crop"><i data-h="tl"></i><i data-h="tr"></i><i data-h="bl"></i><i data-h="br"></i></div><svg class="fe-quad"></svg><canvas class="fe-loupe"></canvas></div>'+
+      '<div class="fe-tools"><span data-a="cbebas" class="on">⬚ Crop bebas</span><span data-a="ckotak">▭ Kotak</span><span data-a="rot">⟲ Putar 90°</span><span data-a="flip">⇋ Balik</span></div>'+
       '<div class="fe-sls">'+sl('ang','Kemiringan',-15,15)+sl('ph','Horizontal (perspektif)',-100,100)+sl('pv','Vertikal (perspektif)',-100,100)+sl('br','Terang',-50,50)+sl('ct','Kontras',-50,50)+'</div>'+
       '<div class="fe-ok" data-a="ok">✓ Kirim &amp; baca AI</div>';
     document.body.appendChild(el);
@@ -12206,11 +12249,14 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
     var t=null; el.querySelectorAll('input[type=range]').forEach(function(r){ r.addEventListener('input',function(){ FE[r.dataset.k]=parseFloat(r.value)||0; el.querySelector('#fe-v-'+r.dataset.k).textContent=(r.dataset.k==='ang'?r.value+'°':r.value); clearTimeout(t); t=setTimeout(feGambar,16); }); });
     el.addEventListener('click',function(e){ var a=e.target.closest('[data-a]'); if(!a) return; a=a.dataset.a;
       if(a==='batal'){ batal(); return; }
-      if(a==='reset'){ FE.rot=0; FE.flip=false; FE.ang=FE.ph=FE.pv=FE.br=FE.ct=0; FE.crop=[0,0,1,1]; FE.base=feDasar(FE); el.querySelectorAll('input[type=range]').forEach(function(r){ r.value=0; el.querySelector('#fe-v-'+r.dataset.k).textContent=r.dataset.k==='ang'?'0°':'0'; }); feGambar(); return; }
-      if(a==='rot'){ FE.rot=(FE.rot+3)%4; FE.crop=[0,0,1,1]; FE.base=feDasar(FE); feGambar(); return; }
+      if(a==='reset'){ FE.rot=0; FE.flip=false; FE.ang=FE.ph=FE.pv=FE.br=FE.ct=0; FE.crop=[0,0,1,1]; FE.quad=[[0,0],[1,0],[1,1],[0,1]]; FE.base=feDasar(FE); el.querySelectorAll('input[type=range]').forEach(function(r){ r.value=0; el.querySelector('#fe-v-'+r.dataset.k).textContent=r.dataset.k==='ang'?'0°':'0'; }); feGambar(); return; }
+      if(a==='rot'){ FE.rot=(FE.rot+3)%4; FE.crop=[0,0,1,1]; FE.quad=[[0,0],[1,0],[1,1],[0,1]]; FE.base=feDasar(FE); feGambar(); return; }
       if(a==='flip'){ FE.flip=!FE.flip; FE.base=feDasar(FE); feGambar(); return; }
       if(a==='crop'){ FE.tab=FE.tab==='crop'?'':'crop'; e.target.classList.toggle('on',FE.tab==='crop'); feCropGambar(); return; }
+      if(a==='cbebas'||a==='ckotak'){ var md=a==='cbebas'?'bebas':'kotak'; if(FE.cmode===md&&FE.tab==='crop'){ FE.tab=''; } else { FE.cmode=md; FE.tab='crop'; }
+        el.querySelectorAll('[data-a=cbebas],[data-a=ckotak]').forEach(function(b){ b.classList.toggle('on',FE.tab==='crop'&&b.dataset.a===(FE.cmode==='bebas'?'cbebas':'ckotak')); }); feCropGambar(); return; }
       if(a==='ok'){ var out=document.createElement('canvas'); feRender(FE,out,1);
+        if(FE.cmode==='bebas'){ var fq=feQuadAsli(FE.quad)?out:feLurus(out,FE.quad.map(function(q){ return [q[0]*out.width,q[1]*out.height]; })); fq.toBlob(function(b){ ok(b); },'image/jpeg',0.9); return; }
         var c=FE.crop, cx=Math.round(c[0]*out.width), cy=Math.round(c[1]*out.height), cw=Math.max(20,Math.round((c[2]-c[0])*out.width)), ch=Math.max(20,Math.round((c[3]-c[1])*out.height));
         var fin=document.createElement('canvas'); fin.width=cw; fin.height=ch; fin.getContext('2d').drawImage(out,cx,cy,cw,ch,0,0,cw,ch);
         fin.toBlob(function(b){ ok(b); },'image/jpeg',0.9); }
@@ -12218,11 +12264,21 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
     // seret sudut crop (mouse & sentuh)
     var drag=null;
     function pos(e){ var p=e.touches?e.touches[0]:e, r=el.querySelector('#fe-cv').getBoundingClientRect(); return [Math.min(1,Math.max(0,(p.clientX-r.left)/r.width)),Math.min(1,Math.max(0,(p.clientY-r.top)/r.height))]; }
-    function mulai(e){ var h=e.target.dataset&&e.target.dataset.h; if(!h) return; e.preventDefault(); drag=h; }
-    function gerak(e){ if(!drag) return; e.preventDefault(); var q=pos(e), c=FE.crop, m=0.08;
+    function posB(e){ var p=e.touches?e.touches[0]:e, r=el.querySelector('#fe-cv').getBoundingClientRect(); return [(p.clientX-r.left)/r.width,(p.clientY-r.top)/r.height]; }
+    var kl=function(v){ return Math.min(1,Math.max(0,v)); };
+    function mulai(e){ var ds=e.target.dataset||{};
+      if(ds.q!=null){ e.preventDefault(); drag={q:+ds.q}; feLoupe(FE.quad[+ds.q]); return; }
+      if(ds.m!=null){ e.preventDefault(); var k=+ds.m; drag={m:k,p0:posB(e),a:FE.quad[k].slice(),b:FE.quad[(k+1)%4].slice()}; return; }
+      var h=ds.h; if(!h) return; e.preventDefault(); drag=h; }
+    function gerak(e){ if(!drag) return; e.preventDefault();
+      if(drag.q!=null){ var qq=pos(e); FE.quad[drag.q]=[qq[0],qq[1]]; feQuadGambar(); feLoupe(FE.quad[drag.q]); return; }
+      if(drag.m!=null){ var p=posB(e), dx=p[0]-drag.p0[0], dy=p[1]-drag.p0[1], A=drag.a, B=drag.b;
+        dx=Math.min(1-Math.max(A[0],B[0]),Math.max(-Math.min(A[0],B[0]),dx)); dy=Math.min(1-Math.max(A[1],B[1]),Math.max(-Math.min(A[1],B[1]),dy));
+        FE.quad[drag.m]=[kl(A[0]+dx),kl(A[1]+dy)]; FE.quad[(drag.m+1)%4]=[kl(B[0]+dx),kl(B[1]+dy)]; feQuadGambar(); return; }
+      var q=pos(e), c=FE.crop, m=0.08;
       if(drag[1]==='l') c[0]=Math.min(q[0],c[2]-m); else c[2]=Math.max(q[0],c[0]+m);
       if(drag[0]==='t') c[1]=Math.min(q[1],c[3]-m); else c[3]=Math.max(q[1],c[1]+m); feCropGambar(); }
-    function selesai(){ drag=null; }
+    function selesai(){ drag=null; if(FE) feLoupe(null); }
     el.addEventListener('mousedown',mulai); el.addEventListener('touchstart',mulai,{passive:false});
     window.addEventListener('mousemove',gerak); el.addEventListener('touchmove',gerak,{passive:false});
     window.addEventListener('mouseup',selesai); el.addEventListener('touchend',selesai);
@@ -13306,11 +13362,12 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
 <!-- ===================== VERSI APLIKASI ===================== -->
 <script>
 // Ubah setiap kali ada update: x.y.z  (z = perbaikan kecil, y = fitur baru, x = perubahan besar)
-window.APP_VERSION='3.34.0';
+window.APP_VERSION='3.35.0';
 window.APP_BUILD='2026-11-04';
-window.APP_NOTES='Isi tanggal di 1 baris lanjutan → semua baris tanpa tanggal ikut; Log Bug kini mencatat penyebab layar macet.';
+window.APP_NOTES='Editor foto: crop bebas 4 sudut (ikuti tepi kertas) + kaca pembesar, hasil otomatis diluruskan.';
 // riwayat singkat (terbaru di atas) — tampil terlipat di halaman Admin
 window.APP_RIWAYAT=[
+  ['3.35.0','2026-11-05','Editor foto Buku Kas: Crop bebas — tiap sudut ditarik sendiri mengikuti tepi kertas (▬ tengah sisi menggeser 1 sisi), kaca pembesar saat menyeret, hasil otomatis diluruskan jadi persegi. Crop Kotak lama tetap ada.'],
   ['3.34.0','2026-11-04','Buku Kas: isi tanggal di satu baris "Tanpa tanggal" → semua baris tanpa tanggal di foto itu ikut (bisa Batalkan). Log Bug: catatan Layar macet kini menulis bagian yang sedang jalan & pemicunya. Perbaikan error saat tabel digambar ulang ketika kolom masih aktif.'],
   ['3.33.1','2026-11-04','Kartu Buku Kas tidak hilang lagi: tetap di antrian selama baris Manual belum dibuat, dan Tutup/Hapus terkunci 🔒 sampai foto & rekap di Drive dan kuitansi tersync; selesai → kartu hijau + Tutup kartu.'],
   ['3.33.0','2026-11-04','Buku Kas: baris yang sudah dicatat (mis. ditulis ulang lalu dicoret tapi tetap terbaca AI) bisa dilewati — ikon kecil ⋯ → ✓ Sudah dicatat, lewati → OK; tanda ⚠ bila nama, item & nominal sama sudah ada dalam 7 hari.'],
