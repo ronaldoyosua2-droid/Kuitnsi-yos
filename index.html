@@ -3208,6 +3208,86 @@ function genNo(tipe){
 }
 function getBulanNow(){return BULAN[new Date().getMonth()]}
 
+// v3.37: status SPP per siswa (mini = 1 baris di bawah nama siswa)
+function kwSppStatus(snm,it,mini){
+  it=it||{};
+          if(!snm) return '';
+          const sisamap=getSppSisaPerBulan(snm);
+          const hasSisa=Object.keys(sisamap).length>0;
+          // Info status SPP terakhir (selalu tampil saat siswa dipilih)
+          const rw=getRiwayat().filter(r=>r.nama===snm&&r.tipe==='SPP');
+          const lastRw=rw.sort((a,b)=>b.tanggal>a.tanggal?1:-1)[0];
+          let infoHtml='';
+          if(lastRw){
+            const lastSisa=Object.values(sisamap).reduce((a,v)=>a+v,0);
+            // Hitung skip dulu sebelum tentukan status (butuh hist)
+            const hist=getSppHistory(snm);
+            const taY=parseInt(getTAAktif().split('/')[0]);
+            const taBulanList=[];
+            for(let b=6;b<12;b++) taBulanList.push(BULAN[b]+' '+taY);
+            for(let b=0;b<6;b++) taBulanList.push(BULAN[b]+' '+(taY+1));
+            for(let k=taBulanList.length-1;k>=0;k--){ if(sppSebelumMulai(snm,taBulanList[k])) taBulanList.splice(k,1); }
+            const sudahTA=taBulanList.filter(m=>hist.paid.has(m)||hist.partial.has(m));
+            const belumTA=taBulanList.filter(m=>!hist.paid.has(m)&&!hist.partial.has(m)&&!(sisamap[m]>0));
+            const lastPaidIdx=sudahTA.length>0?taBulanList.lastIndexOf(sudahTA[sudahTA.length-1]):-1;
+            const skipBulan=belumTA.filter(m=>taBulanList.indexOf(m)<lastPaidIdx);
+            const berikutnya=belumTA.filter(m=>taBulanList.indexOf(m)>lastPaidIdx)[0]||null;
+            const hasSkip=skipBulan.length>0;
+            // Status gabungan: pertimbangkan sisa tunggakan DAN skip
+            const statusColor=lastSisa>0?'var(--danger)':hasSkip?'#c2410c':'var(--green)';
+            const statusIcon=lastSisa>0?'⚠️':hasSkip?'⚠️':'✅';
+            const skipInfo=hasSkip?' · '+skipBulan.length+' bulan belum bayar (skip)':'';
+            const statusText=lastSisa>0?('Total kurang: Rp '+lastSisa.toLocaleString('id-ID')):hasSkip?('Ada '+skipBulan.length+' bulan skip di TA ini'):'Lunas TA ini';
+            const bulanSisa=Object.entries(sisamap).map(([k,v])=>`${k}: kurang Rp ${v.toLocaleString('id-ID')}`).join(' · ');
+            // Tentukan warna panel
+            const panelBgTop=lastSisa>0?'#fef9c3':hasSkip?'#fff7ed':'var(--green-light)';
+            const panelBorderTop=lastSisa>0?'#fcd34d':hasSkip?'#fdba74':'#86efac';
+            if(mini){ var bst=null,bIdx=-1; [hist.paid,hist.partial].forEach(function(S){ S.forEach(function(m){ var mm=String(m).trim().split(/\s+/), bi=BULAN.indexOf(mm[0]), y=parseInt(mm[1]); if(bi<0||!y) return; if(y*12+bi>bIdx){ bIdx=y*12+bi; bst=BULAN[bi].slice(0,3)+' '+y; } }); });
+              var sk=function(m){ var a=String(m).split(' '); return a[0].slice(0,3)+' '+a[1]; };
+              infoHtml='<div class="sp-mini" style="background:'+panelBgTop+';border-color:'+panelBorderTop+'"><b style="color:'+statusColor+'">'+statusIcon+' '+(lastSisa>0?'Kurang Rp '+lastSisa.toLocaleString('id-ID'):hasSkip?skipBulan.length+' bulan skip':'Lunas TA ini')+'</b>'
+                +(hasSkip?' · '+skipBulan.map(sk).join(', ')+' belum':'')+' · '+sudahTA.length+'/'+taBulanList.length+' bulan'+(bst?' · terakhir <b>'+bst+'</b>':'')+(berikutnya?' · berikutnya <b>'+sk(berikutnya)+'</b>':'')+'</div>'; }
+            else infoHtml='<div style="margin-top:6px;padding:8px 12px;background:'+panelBgTop+';border:1px solid '+panelBorderTop+';border-radius:7px;font-size:12px">'
+              +'<div style="font-weight:700;color:'+statusColor+'">'+statusIcon+' Status SPP: '+statusText+'</div>'
+              +(bulanSisa?'<div style="color:#92400e;margin-top:3px;font-size:11px">'+bulanSisa+'</div>':'')
+              +(skipBulan.length>0?'<div style="color:#c2410c;margin-top:3px;font-size:11px">⚠️ Belum bayar (skip): <strong>'+skipBulan.join(', ')+'</strong></div>':'')
+              +'<div style="color:var(--text2);margin-top:3px;font-size:11px">TA ini: '+sudahTA.length+'/'+taBulanList.length+' bulan'+(sppMulaiIdx(snm)>=0&&taBulanList.length<12?' (mulai '+sppMulaiLabel(snm)+')':'')+(berikutnya?' · Berikutnya: <strong style="color:var(--blue)">'+berikutnya+'</strong>':sudahTA.length===12?' · <strong style="color:var(--green)">Lunas semua TA ini! 🎉</strong>':'')+'</div>'
+              +(function(){
+                  // Bulan SPP terakhir yang sudah dibayar (bukan tanggal kwitansi / pengeditan)
+                  var best=null,bestIdx=-1,isPart=false;
+                  [[hist.paid,false],[hist.partial,true]].forEach(function(pr){ pr[0].forEach(function(m){
+                    var mm=String(m).trim().split(/\s+/), bi=BULAN.indexOf(mm[0]), y=parseInt(mm[1]);
+                    if(bi<0||!y) return; var idx=y*12+bi;
+                    if(idx>bestIdx||(idx===bestIdx&&!pr[1])){ bestIdx=idx; best=BULAN[bi]+' '+y; isPart=pr[1]; }
+                  }); });
+                  var txt=best?('<strong style="color:var(--text)">'+best+'</strong>'+(isPart?' (baru sebagian)':'')):lastRw.bayarLabel;
+                  return '<div style="color:var(--text2);margin-top:2px;font-size:11px">Bulan terakhir dibayar: '+txt+'</div>';
+                })()
+              +'</div>';
+          } else {
+            if(mini) infoHtml='<div class="sp-mini" style="background:var(--gray-light);border-color:var(--border);color:var(--text2)">📋 Belum ada riwayat SPP</div>';
+            else infoHtml='<div style="margin-top:6px;padding:8px 12px;background:var(--gray-light);border:1px solid var(--border);border-radius:7px;font-size:12px;color:var(--text2)">'
+              +'📋 Belum ada riwayat pembayaran SPP'
+              +'</div>';
+          }
+          // Warning bulan spesifik yang dipilih
+          let warnHtml='';
+          if(hasSisa&&it.label&&it.sppDari!==undefined){
+            const thn2=it.sppTahun||new Date().getFullYear();
+            const sampai2=it.sppSampai!==undefined?it.sppSampai:it.sppDari;
+            const warnings=[];
+            for(let b=it.sppDari;b<=sampai2;b++){
+              const key=BULAN[b]+' '+thn2;
+              if(sisamap[key]>0) warnings.push(key+' (kurang Rp '+sisamap[key].toLocaleString('id-ID')+')');
+            }
+            if(warnings.length){
+              warnHtml='<div style="margin-top:4px;padding:5px 8px;background:#fef9c3;border:1px solid #fcd34d;border-radius:5px;font-size:11px;color:#92400e">'
+                +'⚠️ Sisa dari pembayaran sebelumnya: '+warnings.join(', ')
+                +'<br><span style="opacity:.8">Nominal akan disesuaikan otomatis.</span></div>';
+            }
+          }
+          return infoHtml+warnHtml;
+
+}
 // ===================== PAGE NAV =====================
 function showPage(p){
   document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
@@ -3404,78 +3484,10 @@ function renderItemForms(){
             </span>`:''}
         </div>
         ${it.label?`<div style="font-size:11px;color:var(--blue);font-weight:500;margin-top:6px;padding:4px 8px;background:var(--blue-light);border-radius:5px">📋 ${it.label}</div>`:''}
-        ${(()=>{
-          const snm=siswaList.length?siswaList[0].nama:null;
-          if(!snm) return '';
-          const sisamap=getSppSisaPerBulan(snm);
-          const hasSisa=Object.keys(sisamap).length>0;
-          // Info status SPP terakhir (selalu tampil saat siswa dipilih)
-          const rw=getRiwayat().filter(r=>r.nama===snm&&r.tipe==='SPP');
-          const lastRw=rw.sort((a,b)=>b.tanggal>a.tanggal?1:-1)[0];
-          let infoHtml='';
-          if(lastRw){
-            const lastSisa=Object.values(sisamap).reduce((a,v)=>a+v,0);
-            // Hitung skip dulu sebelum tentukan status (butuh hist)
-            const hist=getSppHistory(snm);
-            const taY=parseInt(getTAAktif().split('/')[0]);
-            const taBulanList=[];
-            for(let b=6;b<12;b++) taBulanList.push(BULAN[b]+' '+taY);
-            for(let b=0;b<6;b++) taBulanList.push(BULAN[b]+' '+(taY+1));
-            for(let k=taBulanList.length-1;k>=0;k--){ if(sppSebelumMulai(snm,taBulanList[k])) taBulanList.splice(k,1); }
-            const sudahTA=taBulanList.filter(m=>hist.paid.has(m)||hist.partial.has(m));
-            const belumTA=taBulanList.filter(m=>!hist.paid.has(m)&&!hist.partial.has(m)&&!(sisamap[m]>0));
-            const lastPaidIdx=sudahTA.length>0?taBulanList.lastIndexOf(sudahTA[sudahTA.length-1]):-1;
-            const skipBulan=belumTA.filter(m=>taBulanList.indexOf(m)<lastPaidIdx);
-            const berikutnya=belumTA.filter(m=>taBulanList.indexOf(m)>lastPaidIdx)[0]||null;
-            const hasSkip=skipBulan.length>0;
-            // Status gabungan: pertimbangkan sisa tunggakan DAN skip
-            const statusColor=lastSisa>0?'var(--danger)':hasSkip?'#c2410c':'var(--green)';
-            const statusIcon=lastSisa>0?'⚠️':hasSkip?'⚠️':'✅';
-            const skipInfo=hasSkip?' · '+skipBulan.length+' bulan belum bayar (skip)':'';
-            const statusText=lastSisa>0?('Total kurang: Rp '+lastSisa.toLocaleString('id-ID')):hasSkip?('Ada '+skipBulan.length+' bulan skip di TA ini'):'Lunas TA ini';
-            const bulanSisa=Object.entries(sisamap).map(([k,v])=>`${k}: kurang Rp ${v.toLocaleString('id-ID')}`).join(' · ');
-            // Tentukan warna panel
-            const panelBgTop=lastSisa>0?'#fef9c3':hasSkip?'#fff7ed':'var(--green-light)';
-            const panelBorderTop=lastSisa>0?'#fcd34d':hasSkip?'#fdba74':'#86efac';
-            infoHtml='<div style="margin-top:6px;padding:8px 12px;background:'+panelBgTop+';border:1px solid '+panelBorderTop+';border-radius:7px;font-size:12px">'
-              +'<div style="font-weight:700;color:'+statusColor+'">'+statusIcon+' Status SPP: '+statusText+'</div>'
-              +(bulanSisa?'<div style="color:#92400e;margin-top:3px;font-size:11px">'+bulanSisa+'</div>':'')
-              +(skipBulan.length>0?'<div style="color:#c2410c;margin-top:3px;font-size:11px">⚠️ Belum bayar (skip): <strong>'+skipBulan.join(', ')+'</strong></div>':'')
-              +'<div style="color:var(--text2);margin-top:3px;font-size:11px">TA ini: '+sudahTA.length+'/'+taBulanList.length+' bulan'+(sppMulaiIdx(snm)>=0&&taBulanList.length<12?' (mulai '+sppMulaiLabel(snm)+')':'')+(berikutnya?' · Berikutnya: <strong style="color:var(--blue)">'+berikutnya+'</strong>':sudahTA.length===12?' · <strong style="color:var(--green)">Lunas semua TA ini! 🎉</strong>':'')+'</div>'
-              +(function(){
-                  // Bulan SPP terakhir yang sudah dibayar (bukan tanggal kwitansi / pengeditan)
-                  var best=null,bestIdx=-1,isPart=false;
-                  [[hist.paid,false],[hist.partial,true]].forEach(function(pr){ pr[0].forEach(function(m){
-                    var mm=String(m).trim().split(/\s+/), bi=BULAN.indexOf(mm[0]), y=parseInt(mm[1]);
-                    if(bi<0||!y) return; var idx=y*12+bi;
-                    if(idx>bestIdx||(idx===bestIdx&&!pr[1])){ bestIdx=idx; best=BULAN[bi]+' '+y; isPart=pr[1]; }
-                  }); });
-                  var txt=best?('<strong style="color:var(--text)">'+best+'</strong>'+(isPart?' (baru sebagian)':'')):lastRw.bayarLabel;
-                  return '<div style="color:var(--text2);margin-top:2px;font-size:11px">Bulan terakhir dibayar: '+txt+'</div>';
-                })()
-              +'</div>';
-          } else {
-            infoHtml='<div style="margin-top:6px;padding:8px 12px;background:var(--gray-light);border:1px solid var(--border);border-radius:7px;font-size:12px;color:var(--text2)">'
-              +'📋 Belum ada riwayat pembayaran SPP'
-              +'</div>';
-          }
-          // Warning bulan spesifik yang dipilih
-          let warnHtml='';
-          if(hasSisa&&it.label&&it.sppDari!==undefined){
-            const thn2=it.sppTahun||new Date().getFullYear();
-            const sampai2=it.sppSampai!==undefined?it.sppSampai:it.sppDari;
-            const warnings=[];
-            for(let b=it.sppDari;b<=sampai2;b++){
-              const key=BULAN[b]+' '+thn2;
-              if(sisamap[key]>0) warnings.push(key+' (kurang Rp '+sisamap[key].toLocaleString('id-ID')+')');
-            }
-            if(warnings.length){
-              warnHtml='<div style="margin-top:4px;padding:5px 8px;background:#fef9c3;border:1px solid #fcd34d;border-radius:5px;font-size:11px;color:#92400e">'
-                +'⚠️ Sisa dari pembayaran sebelumnya: '+warnings.join(', ')
-                +'<br><span style="opacity:.8">Nominal akan disesuaikan otomatis.</span></div>';
-            }
-          }
-          return infoHtml+warnHtml;
+        ${(()=>{ if(!siswaList.length||!siswaList[0].nama) return '';
+          // v3.37: status per siswa tampil di bawah nama (daftar pilih siswa); kotak ini hanya saat daftar tidak tampil (SPP kustom)
+          if(!isSPPKustom&&siswaList.some(s=>s.nama.trim())) return '';
+          return '<div style="margin-top:6px;font-size:12px;font-weight:700;color:var(--text)">'+siswaList[0].nama+(siswaList.length>1?' (+'+(siswaList.length-1)+' siswa)':'')+'</div>'+kwSppStatus(siswaList[0].nama,it,false);
         })()}
         <div style="margin-top:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
           <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;padding:5px 12px;border:1.5px solid ${isSPPKustom?'var(--orange)':'var(--border)'};border-radius:6px;background:${isSPPKustom?'var(--orange-light)':'#fff'}">
@@ -3576,9 +3588,10 @@ function renderItemForms(){
               <span style="font-weight:600;font-size:13px;color:${isSelected?'var(--text)':'var(--text2)'}">${s.nama||'—'}</span>
               <span style="font-size:11px;color:var(--text2);margin-left:6px">${isSPP?(()=>{const itD=itemList[i]||{};const thnD=itD.sppTahun||new Date().getFullYear();const blnD=itD.sppDari!==undefined?itD.sppDari:new Date().getMonth();const tglD=itD.sppDari!==undefined?(thnD+'-'+String(blnD+1).padStart(2,'0')+'-01'):(document.getElementById('inp-tanggal')?.value||today());return getKelasEfektif(s.kelas,tglD,s)||s.kelas;})():s.kelas||''}</span>
               ${isSelected&&nom>0?`<span style="font-size:11px;color:var(--text2);margin-left:4px">(${nomLabel})</span>`:''}
+              ${isSPP&&s.nama?kwSppStatus(s.nama,it,true):''}
             </div>
           </div>
-          <span style="font-weight:700;color:${isSelected?'var(--blue)':'var(--text2)'};font-size:13px">${isSelected&&nom>0?fmt(subtotalSiswa):'—'}</span>
+          <span style="font-weight:700;color:${isSelected?'var(--blue)':'var(--text2)'};font-size:13px;white-space:nowrap;margin-left:8px">${isSelected&&nom>0?fmt(subtotalSiswa):'—'}</span>
         </label>`;
       }).join('');
       const totalSelected=siswaList.reduce((a,s,si)=>{
@@ -5981,6 +5994,22 @@ function getSppHistory(nama){
   return {paid:paid, partial:partial};
 }
 
+// v3.37: daftar bulan SPP di satu kuitansi (indeks y*12+b) — untuk urutan Rekord
+function sppBulanRec(r){ var L=[]; if(!r||r.tipe!=='SPP') return L; var recYear=r.tanggal?r.tanggal.substring(0,4):String(new Date().getFullYear());
+  var add=function(b,y){ b=typeof b==='number'?b:BULAN.indexOf(b); y=parseInt(y); if(b>=0&&y) L.push(y*12+b); };
+  var items=r.items&&r.items.length?r.items:[{label:r.bayarLabel||r.label||''}];
+  items.forEach(function(item){
+    if(item.cicilanResult&&item.cicilanResult.length){ item.cicilanResult.forEach(function(cr){ var mm=String(cr.label||'').trim().split(/\s+/); add(mm[0],mm[1]); }); return; }
+    var label=String(item.label||'').replace(/\s*\([^)]*\)/g,'').trim();
+    var m2=label.match(/SPP\s+(\w+)\s*-\s*(\w+)\s+(\d{4})/), m1=!m2&&label.match(/SPP\s+(\w+)\s+(\d{4})/), m2o=!m2&&!m1&&label.match(/SPP\s+(\w+)\s*-\s*(\w+)/), m1o=!m2&&!m1&&!m2o&&label.match(/SPP\s+(\w+)/);
+    if(m2){ var d=BULAN.indexOf(m2[1]), z=BULAN.indexOf(m2[2]); if(d>=0&&z>=0) for(var b=d;b<=z;b++) add(b,m2[3]); }
+    else if(m1) add(m1[1],m1[2]);
+    else if(m2o){ var d2=BULAN.indexOf(m2o[1]), z2=BULAN.indexOf(m2o[2]); if(d2>=0&&z2>=0) for(var b2=d2;b2<=z2;b2++) add(b2,recYear); }
+    else if(m1o) add(m1o[1],recYear);
+  });
+  return L; }
+function sppBulanLabel(L){ if(!L.length) return ''; var a=Math.min.apply(null,L), z=Math.max.apply(null,L), f=function(i){ return BULAN[i%12].slice(0,3); };
+  return a===z?f(a)+' '+Math.floor(a/12):(Math.floor(a/12)===Math.floor(z/12)?f(a)+'–'+f(z)+' '+Math.floor(z/12):f(a)+' '+Math.floor(a/12)+'–'+f(z)+' '+Math.floor(z/12)); }
 
 function getTunggakanSPP(nama, targetLabel){
   var manual=(getSiswa().find(function(s){return s.nama===nama;})||{}).tunggakanSPP||[];
@@ -9041,11 +9070,15 @@ function renderSiswaRekordModal(){
     return;
   }
 
+  // v3.37: urut — SPP menurut bulan SPP terakhir di kuitansi, lainnya menurut tanggal bayar; terbaru di atas
+  const kunciRek=r=>{ const L=sppBulanRec(r); if(L.length){ const z=Math.max.apply(null,L); return Date.UTC(Math.floor(z/12),z%12,1); } return r.tanggal?Date.parse(r.tanggal):0; };
+  rw=rw.map(r=>({r:r,k:kunciRek(r),t:r.tanggal?Date.parse(r.tanggal):0,id:r.id||0})).sort((a,b)=>b.k-a.k||b.t-a.t||b.id-a.id).map(x=>x.r);
   const rows=rw.map(r=>{
-    const isTrf=r.metode==='Transfer';
+    const isTrf=r.metode==='Transfer'; const blnSpp=sppBulanLabel(sppBulanRec(r));
     const tipeColor=r.tipe==='SPP'?'badge-blue':r.tipe==='Pengembangan'?'badge-green':r.tipe==='Koperasi'?'badge-orange':'badge-orange';
     return `<tr style="cursor:pointer;background:${isTrf?'#eff6ff':''}" onclick="openTrxModal(${r.id})">
       <td><span class="badge badge-blue" style="font-size:10px">${r.no}</span></td>
+      <td style="font-weight:700;white-space:nowrap">${blnSpp||'<span style="color:var(--text2);font-weight:400">—</span>'}</td>
       <td>${fmtTgl(r.tanggal)}</td>
       <td><span style="font-size:10px;padding:2px 7px;border-radius:10px;background:${isTrf?'#dbeafe':'#dcfce7'};color:${isTrf?'#1d4ed8':'#15803d'};font-weight:700">${isTrf?'🏦 TF':'💵 Kas'}</span></td>
       <td><span class="badge ${tipeColor}" style="font-size:10px">${r.tipe}</span></td>
@@ -9058,7 +9091,7 @@ function renderSiswaRekordModal(){
   document.getElementById('srm-table').innerHTML=`
     <table class="hist-table" style="font-size:12px">
       <thead><tr>
-        <th>No.</th><th>Tanggal</th><th>Metode</th><th>Jenis</th><th>Keterangan</th><th>Dibayar</th><th>Sisa</th>
+        <th>No.</th><th>Bulan SPP</th><th>Tgl bayar</th><th>Metode</th><th>Jenis</th><th>Keterangan</th><th>Dibayar</th><th>Sisa</th>
       </tr></thead>
       <tbody>${rows}</tbody>
     </table>
@@ -10452,7 +10485,7 @@ body.ui-dark .navbar.scrolled{background:rgba(15,23,42,.85)!important}
 .bk-tbl input,.bk-tbl select{font-size:12.5px;padding:4px 6px;border:1px solid var(--line,#dfe3e0);border-radius:7px;background:var(--surface,#fff);color:inherit;max-width:100%}
 .bk-tbl input[list]{width:100%}
 .bk-day td{background:var(--soft,#eef1ef);font-weight:700;font-size:12.5px;padding:6px 8px}
-.bk-coret,.bk-ada{opacity:.55}.kw-rek{display:inline-block;border:1px solid #1d5e3c;color:#1d5e3c;border-radius:12px;padding:1px 9px;font-size:11.5px;cursor:pointer;white-space:nowrap;background:#fff}.kw-rek:hover{background:rgba(29,94,60,.08)}#siswa-rekord-modal.srm-lihat #srm-tunggakan{display:none!important}.bk-toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);background:#1f2a24;color:#fff;border-radius:10px;padding:10px 16px;font-size:14px;z-index:9998;box-shadow:0 6px 24px rgba(0,0,0,.25);animation:bkLw .18s ease-out}.bk-toast a{color:#9fe0b8;font-weight:700;margin-left:10px}.bk-fin{margin-top:10px;border-radius:10px;padding:10px 12px;font-size:13px}.bk-fin-w{background:#fff7e6;border:1px solid #f0c674}.bk-fin-g{background:#eaf5ee;border:1px solid #9fd0b0}.bk-fin-x{color:#b4581a;font-weight:600}.bk-fin-ok{color:#1d6b42;font-weight:600}.bk-fin-a{margin-top:8px;display:flex;gap:6px;flex-wrap:wrap}.bk-fin-lock{opacity:.5;cursor:not-allowed}.bk-lww{display:inline-block;vertical-align:middle}.bk-lw{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border:1px solid var(--border,#d1d5db);border-radius:50%;color:var(--muted,#9ca3af);font-size:13px;line-height:1;cursor:pointer;user-select:none}.bk-lw:hover{color:#1d5e3c;border-color:#1d5e3c}.bk-lwb{display:none;border:1px solid #1d5e3c;color:#1d5e3c;border-radius:14px;padding:3px 10px;font-size:12px;cursor:pointer;white-space:nowrap;animation:bkLw .15s ease-out}.bk-lwb:hover{background:rgba(29,94,60,.08)}.bk-lww.buka .bk-lw{display:none}.bk-lww.buka .bk-lwb{display:inline-block}@keyframes bkLw{from{transform:scale(.6);opacity:0}to{transform:none;opacity:1}}.bk-dob{color:#b8860b;font-size:15px;cursor:help;vertical-align:middle}.bk-manual>td:not(.bk-stc){opacity:.5}.bk-man{background:#5a9a78!important;color:#fff!important;border-color:#5a9a78!important;font-weight:600;white-space:nowrap}.bk-man:hover{background:#4a8566!important}.bk-done{background:rgba(90,154,120,.08)}.bk-err{background:rgba(185,28,28,.06)}
+.bk-coret,.bk-ada{opacity:.55}.sp-mini{margin-top:4px;padding:3px 8px;border:1px solid;border-radius:6px;font-size:11px;font-weight:400;color:var(--text2);line-height:1.45;white-space:normal}.kw-rek{display:inline-block;border:1px solid #1d5e3c;color:#1d5e3c;border-radius:12px;padding:1px 9px;font-size:11.5px;cursor:pointer;white-space:nowrap;background:#fff}.kw-rek:hover{background:rgba(29,94,60,.08)}#siswa-rekord-modal.srm-lihat #srm-tunggakan{display:none!important}.bk-toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);background:#1f2a24;color:#fff;border-radius:10px;padding:10px 16px;font-size:14px;z-index:9998;box-shadow:0 6px 24px rgba(0,0,0,.25);animation:bkLw .18s ease-out}.bk-toast a{color:#9fe0b8;font-weight:700;margin-left:10px}.bk-fin{margin-top:10px;border-radius:10px;padding:10px 12px;font-size:13px}.bk-fin-w{background:#fff7e6;border:1px solid #f0c674}.bk-fin-g{background:#eaf5ee;border:1px solid #9fd0b0}.bk-fin-x{color:#b4581a;font-weight:600}.bk-fin-ok{color:#1d6b42;font-weight:600}.bk-fin-a{margin-top:8px;display:flex;gap:6px;flex-wrap:wrap}.bk-fin-lock{opacity:.5;cursor:not-allowed}.bk-lww{display:inline-block;vertical-align:middle}.bk-lw{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border:1px solid var(--border,#d1d5db);border-radius:50%;color:var(--muted,#9ca3af);font-size:13px;line-height:1;cursor:pointer;user-select:none}.bk-lw:hover{color:#1d5e3c;border-color:#1d5e3c}.bk-lwb{display:none;border:1px solid #1d5e3c;color:#1d5e3c;border-radius:14px;padding:3px 10px;font-size:12px;cursor:pointer;white-space:nowrap;animation:bkLw .15s ease-out}.bk-lwb:hover{background:rgba(29,94,60,.08)}.bk-lww.buka .bk-lw{display:none}.bk-lww.buka .bk-lwb{display:inline-block}@keyframes bkLw{from{transform:scale(.6);opacity:0}to{transform:none;opacity:1}}.bk-dob{color:#b8860b;font-size:15px;cursor:help;vertical-align:middle}.bk-manual>td:not(.bk-stc){opacity:.5}.bk-man{background:#5a9a78!important;color:#fff!important;border-color:#5a9a78!important;font-weight:600;white-space:nowrap}.bk-man:hover{background:#4a8566!important}.bk-done{background:rgba(90,154,120,.08)}.bk-err{background:rgba(185,28,28,.06)}
 .bt-drop{border:2px dashed #a9cbb8;background:rgba(90,154,120,.07);border-radius:16px;padding:20px 22px;display:flex;align-items:center;gap:18px;margin-bottom:14px;transition:.15s}
 .bt-drop.over{background:rgba(90,154,120,.18);border-color:#5a9a78}
 .bt-drop .bt-ic{width:50px;height:50px;border-radius:14px;background:#5a9a78;display:grid;place-items:center;flex:none}
@@ -13392,11 +13425,12 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
 <!-- ===================== VERSI APLIKASI ===================== -->
 <script>
 // Ubah setiap kali ada update: x.y.z  (z = perbaikan kecil, y = fitur baru, x = perubahan besar)
-window.APP_VERSION='3.36.0';
-window.APP_BUILD='2026-11-05';
-window.APP_NOTES='Tombol 📋 Rekord di tiap siswa hasil AI; kartu foto pakai gambar kecil agar tidak macet.';
+window.APP_VERSION='3.37.0';
+window.APP_BUILD='2026-11-06';
+window.APP_NOTES='Status SPP tampil di bawah nama tiap siswa; Rekord Siswa diurutkan dari bulan SPP terbaru.';
 // riwayat singkat (terbaru di atas) — tampil terlipat di halaman Admin
 window.APP_RIWAYAT=[
+  ['3.37.0','2026-11-06','Form Kwitansi: status SPP tampil di bawah nama masing-masing siswa (bukan satu kotak di kanan). Rekord Siswa: kolom Bulan SPP, urutan dari bulan SPP terbaru (SPP telat tetap di urutan bulannya).'],
   ['3.36.0','2026-11-05','Kuitansi Otomatis: tombol 📋 Rekord di tiap siswa (Bukti TF & Buku Kas) langsung membuka popup Rekord Siswa; kartu memakai foto kecil (foto asli untuk zoom & AI) supaya tidak macet; perbaikan error ketik nama di form Kwitansi.'],
   ['3.35.1','2026-11-05','Crop bebas lebih ringan saat menggeser sudut di HP (digambar 1× per frame, bingkai tidak dibuat ulang, kaca pembesar dari salinan kecil).'],
   ['3.35.0','2026-11-05','Editor foto Buku Kas: Crop bebas — tiap sudut ditarik sendiri mengikuti tepi kertas (▬ tengah sisi menggeser 1 sisi), kaca pembesar saat menyeret, hasil otomatis diluruskan jadi persegi. Crop Kotak lama tetap ada.'],
