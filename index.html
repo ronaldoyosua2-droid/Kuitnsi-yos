@@ -7239,9 +7239,9 @@ function rincianDetailHtml(nama,filterTipe){
     const rows=D.bulan.map(b=>{ tT+=b.tagihan; tD+=b.dibayar; tK+=b.kurang;
       const src=b.src.map(r=>'<a href="javascript:void 0" onclick="openTrxModal('+r.id+')" title="'+e(r.no)+' · '+e(rdTglPendek(r.tanggal))+'">'+e(rdNoPendek(r.no))+'</a>').join(' + ');
       return '<tr class="'+(b.kurang>0?'rd-kr':'')+'"><td>'+(b.kurang>0?'<b>'+e(b.m)+'</b>':e(b.m))+'</td><td class="rd-n">'+rp(b.tagihan)+'</td><td class="rd-n">'+(b.belum?'—':rp(b.dibayar))+(b.kira?' ≈':'')+'</td><td class="rd-src">'+src+'</td><td class="rd-st '+(b.kurang>0?'k':'l')+'">'+(b.belum?'belum':b.kurang>0?rp(b.kurang):'✓')+'</td></tr>'; }).join('');
-    kanan='<div class="rd-col"><div class="rd-h">② Per bulan — status akhir</div><table class="rd-t rd-b"><tr><th>Bulan</th><th class="rd-n">Tagihan</th><th class="rd-n">Dibayar</th><th>Kuitansi</th><th class="rd-n">Kurang</th></tr>'+(rows||'<tr><td colspan="5" class="rd-mut">Belum ada data SPP</td></tr>')+
+    kanan='<div class="rd-col"><div class="rd-h">② Rincian per Bulan</div><table class="rd-t rd-b"><tr><th>Bulan</th><th class="rd-n">Tagihan</th><th class="rd-n">Dibayar</th><th>Kuitansi</th><th class="rd-n">Kurang</th></tr>'+(rows||'<tr><td colspan="5" class="rd-mut">Belum ada data SPP</td></tr>')+
       (rows?'<tr class="rd-sum"><td>Total</td><td class="rd-n">'+rp(tT)+'</td><td class="rd-n">'+rp(tD)+'</td><td></td><td class="rd-st '+(tK>0?'k':'l')+'">'+(tK>0?rp(tK):'✓')+'</td></tr>':'')+'</table><div class="rd-mut" style="margin-top:6px">Sampai bulan ini · klik nomor kuitansi untuk detail'+(D.bulan.some(b=>b.kira)?' · ≈ = kuitansi lama dibagi rata per bulan':'')+'</div></div>'; }
-  return '<div class="rd-wrap"><div class="rd-col rd-kiri"><div class="rd-h">① Per kuitansi — uangnya dipakai untuk apa</div>'+kiri+'</div>'+kanan+'</div>'; }
+  return '<div class="rd-wrap"><div class="rd-col rd-kiri"><div class="rd-h">① Rincian Kuitansi</div>'+kiri+'</div>'+kanan+'</div>'; }
 function srmCetak(){ if(!rekordCurrentSiswa) return; const nama=rekordCurrentSiswa.nama, kelas=rekordCurrentSiswa.kelas||'', ft=(document.getElementById('srm-filter')||{}).value||'';
   const css=Array.from(document.querySelectorAll('style')).map(s=>s.textContent).filter(t=>t.indexOf('.rd-wrap')>=0).join('\n');
   const esc=v=>String(v).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
@@ -13493,11 +13493,12 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
 <!-- ===================== VERSI APLIKASI ===================== -->
 <script>
 // Ubah setiap kali ada update: x.y.z  (z = perbaikan kecil, y = fitur baru, x = perubahan besar)
-window.APP_VERSION='3.38.0';
+window.APP_VERSION='3.38.1';
 window.APP_BUILD='2026-11-09';
-window.APP_NOTES='Rekord Siswa: tab Rincian detail — tiap kuitansi dipakai untuk bulan apa, status per bulan, bisa dicetak.';
+window.APP_NOTES='Rincian detail: judul diganti jadi Rincian Kuitansi & Rincian per Bulan.';
 // riwayat singkat (terbaru di atas) — tampil terlipat di halaman Admin
 window.APP_RIWAYAT=[
+  ['3.38.1','2026-11-09','Rincian detail: judul diganti jadi Rincian Kuitansi dan Rincian per Bulan (juga di hasil cetak).'],
   ['3.38.0','2026-11-09','Rekord Siswa: tab 📑 Rincian detail — per kuitansi (uangnya untuk bulan apa, lunas/kurang) dan per bulan (tagihan, dibayar, kuitansi, kurang), bisa dicetak 1 lembar.'],
   ['3.37.0','2026-11-06','Form Kwitansi: status SPP tampil di bawah nama masing-masing siswa (bukan satu kotak di kanan). Rekord Siswa: kolom Bulan SPP, urutan dari bulan SPP terbaru (SPP telat tetap di urutan bulannya).'],
   ['3.36.0','2026-11-05','Kuitansi Otomatis: tombol 📋 Rekord di tiap siswa (Bukti TF & Buku Kas) langsung membuka popup Rekord Siswa; kartu memakai foto kecil (foto asli untuk zoom & AI) supaya tidak macet; perbaikan error ketik nama di form Kwitansi.'],
