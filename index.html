@@ -22,10 +22,12 @@
     }catch(e){}
   };
   // error aplikasi
-  window.addEventListener('error',function(e){ if(!e||!e.message) return; var f=String(e.filename||'').split('/').pop().split('?')[0];
+  window.addEventListener('error',function(e){ if(!e||!e.message) return; if(/^Script error\.?$/i.test(e.message)&&!e.lineno) return; // v3.39: error dari luar aplikasi (ekstensi / jendela cetak) tanpa isi
+    var f=String(e.filename||'').split('/').pop().split('?')[0];
     var st=(e.error&&e.error.stack||'').split('\n')[1]||''; var fn=(st.match(/at ([\w.$]+)/)||[])[1]||'';
     kwBug('error',e.message,(fn?fn+' · ':'')+'baris '+(e.lineno||'?')+(f&&f!=='index.html'?' · '+f:'')); });
   window.addEventListener('unhandledrejection',function(e){ var r=e&&e.reason; var m=r&&r.message||String(r||''); if(!m) return; var fn=((r&&r.stack||'').split('\n')[1]||'').match(/at ([\w.$]+)/); kwBug('error',m,(fn?fn[1]+' · ':'')+'promise'); });
+  window.addEventListener('beforeprint',function(){ window._kwCetak=true; }); window.addEventListener('afterprint',function(){ window._kwCetak=false; window._kwCetakSampai=Date.now()+3000; });
   // v3.34: jejak — bagian aplikasi yang sedang jalan (untuk tahu penyebab 'Layar macet')
   var JJ=[];
   window.kwJejak=function(nama,t0,ms,picu){ JJ.push({n:nama,t0:t0,ms:ms,p:picu||''}); if(JJ.length>60) JJ.shift(); };
@@ -41,7 +43,7 @@
     var L=JJ.filter(function(x){ return x.t0<z&&x.t0+x.ms>a&&x.ms>=40; }).sort(function(x,y){ return y.ms-x.ms; }).slice(0,3);
     return L.length?' · isi: '+L.map(function(x){ return x.n+' '+Math.round(x.ms)+' ms'+(x.p?' ['+x.p+']':''); }).join(' ; '):' · isi: tidak terlacak'; }
   // tugas berat (blokir layar > 250 ms)
-  try{ var _lt=0; new PerformanceObserver(function(list){ list.getEntries().forEach(function(en){ if(en.duration<250||Date.now()-_lt<8000) return; _lt=Date.now(); var _en=en; setTimeout(function(){ kwBug('lambat','Layar macet sebentar',Math.round(_en.duration)+' ms · halaman '+hal()+isiMacet(_en)); },0); }); }).observe({entryTypes:['longtask']}); }catch(e){}
+  try{ var _lt=0; new PerformanceObserver(function(list){ list.getEntries().forEach(function(en){ if(en.duration<250||Date.now()-_lt<8000) return; if(en.duration>60000||window._kwCetak||(window._kwCetakSampai&&Date.now()<window._kwCetakSampai)) return; /* v3.39: jendela cetak terbuka bukan macet */ _lt=Date.now(); var _en=en; setTimeout(function(){ kwBug('lambat','Layar macet sebentar',Math.round(_en.duration)+' ms · halaman '+hal()+isiMacet(_en)); },0); }); }).observe({entryTypes:['longtask']}); }catch(e){}
   // fetch: catat gagal sync / AI (tanpa isi, tanpa key/token)
   if(window.fetch){ var _f=window.fetch; window.fetch=function(u,o){ var url=String(u&&u.url||u||''), host=(url.match(/^https?:\/\/([^\/?#]+)/)||[])[1]||'', jenis=/script\.google/.test(host)?'sync':/generativelanguage/.test(host)?'ai':''; var t0=Date.now();
     var p=_f.apply(this,arguments); if(!jenis) return p;
@@ -5660,7 +5662,7 @@ async function loadFromCloud(){
         return false;
       }
     }
-    if(d.riwayat)     lsSet('ya_riwayat', d.riwayat);
+    if(d.riwayat)     lsSet('ya_riwayat', (typeof kwSaringHapus==='function'?kwSaringHapus(d.riwayat).list:d.riwayat));
     if(d.siswa)       lsSet('ya_siswa', d.siswa);
     if(d.tarif){
       if(d.tarif.spp)    setSPP(d.tarif.spp);
@@ -6711,7 +6713,7 @@ function renderRiwayatTable(){
   wrap.innerHTML=`<table class="hist-table">
     <thead><tr><th>No. Kwitansi</th><th>Tanggal</th><th>Keterangan</th><th>Tagihan</th><th>Dibayar</th><th>Sisa</th><th>Aksi</th></tr></thead>
     <tbody>`+rw.map(r=>`<tr>
-      <td><span class="badge badge-blue">${r.no}</span></td>
+      <td><span class="badge badge-blue">${r.no}</span>${typeof kwDobelTag==='function'?kwDobelTag(r):''}</td>
       <td>${tglFmt(r.tanggal)}</td>
       <td>${r.bayarLabel}${r.catatan?' <span style="color:var(--text2);font-size:11px">('+r.catatan+')</span>':''}</td>
       <td>${fmt(r.tagihan)}</td>
@@ -6750,7 +6752,7 @@ function filterAllRiwayat(){
   wrap.innerHTML=`<table class="hist-table">
     <thead><tr><th>No. Kwitansi</th><th>Nama</th><th>Kelas</th><th>Metode</th><th>Tanggal</th><th>Keterangan</th><th>Dibayar</th><th>Sisa</th><th>Aksi</th></tr></thead>
     <tbody>`+rw.map(r=>`<tr>
-      <td><span class="badge badge-blue">${r.no}</span></td>
+      <td><span class="badge badge-blue">${r.no}</span>${typeof kwDobelTag==='function'?kwDobelTag(r):''}</td>
       <td>${r.nama}</td>
       <td><span class="badge ${r.kelas&&r.kelas.includes('Plus')?'badge-orange':'badge-blue'}">${r.kelas||'—'}</span></td>
       <td><span style="font-size:11px;padding:2px 7px;border-radius:10px;font-weight:600;background:${r.metode==='Transfer'?'#fef3c7':'var(--green-light)'};color:${r.metode==='Transfer'?'#92400e':'var(--green)'}">${r.metode==='Transfer'?'🏦 Transfer':'💵 Kas'}</span></td>
@@ -7247,7 +7249,7 @@ function srmCetak(){ if(!rekordCurrentSiswa) return; const nama=rekordCurrentSis
   const esc=v=>String(v).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
   const html='<!doctype html><html><head><meta charset="utf-8"><title>Rincian '+esc(nama)+'</title><style>'+css+'body{font-family:Arial,sans-serif;margin:12mm;color:#111;font-size:12px;background:#fff}h1{font-size:17px;margin:0}.sub{color:#555;margin:2px 0 12px}a{color:#111;text-decoration:none}@page{size:A4;margin:0}</style></head><body><h1>Rincian Pembayaran — '+esc(nama)+'</h1><div class="sub">'+esc(kelas)+(ft?' · '+esc(ft):' · semua jenis')+' · dicetak '+new Date().toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'})+' · Sekolah Yos Anugerah</div>'+rincianDetailHtml(nama,ft)+'</body></html>';
   let f=document.getElementById('srm-print-frame'); if(f) f.remove(); f=document.createElement('iframe'); f.id='srm-print-frame'; f.style.cssText='position:fixed;right:0;bottom:0;width:0;height:0;border:0'; document.body.appendChild(f);
-  const d=f.contentWindow.document; d.open(); d.write(html); d.close(); setTimeout(()=>{ try{ f.contentWindow.focus(); f.contentWindow.print(); }catch(e){ alert('Gagal membuka cetak: '+e.message); } },300); }
+  const d=f.contentWindow.document; d.open(); d.write(html); d.close(); setTimeout(()=>{ window._kwCetak=true; try{ f.contentWindow.focus(); f.contentWindow.print(); }catch(e){ alert('Gagal membuka cetak: '+e.message); } window._kwCetak=false; window._kwCetakSampai=Date.now()+3000; },300); }
 
 
 function getJenjangSiswa(kelas){
@@ -7363,9 +7365,8 @@ function renderRekordSiswa(){
   const wrap=document.getElementById('rekord-siswa-list');
   if(!siswa.length){wrap.innerHTML='<div class="hist-empty">Tidak ada siswa ditemukan</div>';return;}
 
-  wrap.innerHTML=`<table class="siswa-table">
-    <thead><tr><th>#</th><th>Nama</th><th>Kelas</th><th>Total Bayar</th><th>Tunggakan</th><th>Terakhir</th><th>Aksi</th></tr></thead>
-    <tbody>`+siswa.map((s,i)=>{
+  // v3.39: tampil bertahap — 50 baris dulu, sisanya saat digulir
+  const _rkRows=siswa.map((s,i)=>{
       const namaKey=s.nama.toLowerCase();
       const cached=_rekordCacheData&&_rekordCacheData[namaKey];
       const sr=rwByNama[namaKey]||[];
@@ -7390,8 +7391,20 @@ function renderRekordSiswa(){
         <td>${(()=>{const sr2=((rwByNamaKelas[(s.nama+'|'+(s.kelas||'')).toLowerCase()]||rwByNama[s.nama.toLowerCase()])||[]).sort((a,b)=>(b.tanggal||'').localeCompare(a.tanggal||''));const lt=sr2[0];return lt?`<div style="font-size:11px;font-weight:600">${lt.tanggal?new Date(lt.tanggal).toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'2-digit'}):'—'}</div><div style="font-size:10px;color:var(--text2)">${lt.tipe||''}</div>`:'<span style="color:var(--text2);font-size:11px">—</span>';})()} </td>
         <td><button class="btn" style="font-size:11px;padding:3px 10px" onclick="bukaRekordModal('${encodeURIComponent(s.nama)}','${encodeURIComponent(s.kelas)}')">&#128203; Lihat</button> <button class="btn rk-del" title="Hapus siswa (password admin)" onclick="rekordHapusSiswa('${encodeURIComponent(s.nama)}','${encodeURIComponent(s.kelas)}')">&#128465;</button></td>
       </tr>`;
-    }).join('')+`</tbody></table>
+    });
+  const _RK_AWAL=50;
+  wrap.innerHTML=`<table class="siswa-table">
+    <thead><tr><th>#</th><th>Nama</th><th>Kelas</th><th>Total Bayar</th><th>Tunggakan</th><th>Terakhir</th><th>Aksi</th></tr></thead>
+    <tbody>`+_rkRows.slice(0,_RK_AWAL).join('')+(_rkRows.length>_RK_AWAL?`<tr class="rk-more"><td colspan="7">Memuat ${_rkRows.length-_RK_AWAL} siswa lagi…</td></tr>`:'')+`</tbody></table>
     <p style="font-size:12px;color:var(--text2);margin-top:8px">Menampilkan ${siswa.length} siswa</p>`;
+  if(window._rkObs){ try{ window._rkObs.disconnect(); }catch(e){} window._rkObs=null; }
+  if(_rkRows.length>_RK_AWAL){
+    let _rkPos=_RK_AWAL; const tb=wrap.querySelector('tbody');
+    const tambah=()=>{ const more=tb.querySelector('.rk-more'); if(!more) return; const ke=Math.min(_rkRows.length,_rkPos+100); more.insertAdjacentHTML('beforebegin',_rkRows.slice(_rkPos,ke).join('')); _rkPos=ke;
+      if(_rkPos>=_rkRows.length){ more.remove(); if(window._rkObs){ window._rkObs.disconnect(); window._rkObs=null; } } else more.firstElementChild.textContent='Memuat '+(_rkRows.length-_rkPos)+' siswa lagi…'; };
+    if('IntersectionObserver' in window){ window._rkObs=new IntersectionObserver(es=>{ if(es.some(e=>e.isIntersecting)) tambah(); },{rootMargin:'600px'}); window._rkObs.observe(tb.querySelector('.rk-more')); }
+    else setTimeout(function isi(){ tambah(); if(_rkPos<_rkRows.length) setTimeout(isi,50); },50);
+  }
 }
 
 function bukaRekordSiswa(encNama,encKelas){
@@ -7513,7 +7526,7 @@ function renderRekordDetail(){
       const tipeColor=r.tipe==='SPP'?'badge-blue':r.tipe==='Pengembangan'?'badge-green':'badge-orange';
       const catatanVal=r.catatan||'';
       html+=`<tr>
-        <td><span class="badge badge-blue">${r.no}</span></td>
+        <td><span class="badge badge-blue">${r.no}</span>${typeof kwDobelTag==='function'?kwDobelTag(r):''}</td>
         <td>${fmtTgl(r.tanggal)}</td>
         <td><span class="badge ${tipeColor}">${r.tipe}</span></td>
         <td>${r.bayarLabel}</td>
@@ -7622,7 +7635,7 @@ function rwTable(data,tableId,showKelas=true){
       const isTrf=r.metode==='Transfer';
       return `<tr style="background:${isTrf?'#eff6ff':''}" data-dibayar="${r.nominalBayar||0}">
         <td><input type="checkbox" class="${tableId}-rowcheck" onchange="rwTableUpdateSel('${tableId}')" style="width:14px;height:14px;cursor:pointer"></td>
-        <td><span class="badge badge-blue">${r.no}</span></td>
+        <td><span class="badge badge-blue">${r.no}</span>${typeof kwDobelTag==='function'?kwDobelTag(r):''}</td>
         <td>${r.nama}</td>
         ${showKelas?`<td><span class="badge ${r.kelas&&r.kelas.includes('Plus')?'badge-orange':'badge-blue'}">${r.kelas||'—'}</span></td>`:''}
         <td>
@@ -9143,7 +9156,7 @@ function renderSiswaRekordModal(){
     const isTrf=r.metode==='Transfer'; const blnSpp=sppBulanLabel(sppBulanRec(r));
     const tipeColor=r.tipe==='SPP'?'badge-blue':r.tipe==='Pengembangan'?'badge-green':r.tipe==='Koperasi'?'badge-orange':'badge-orange';
     return `<tr style="cursor:pointer;background:${isTrf?'#eff6ff':''}" onclick="openTrxModal(${r.id})">
-      <td><span class="badge badge-blue" style="font-size:10px">${r.no}</span></td>
+      <td><span class="badge badge-blue" style="font-size:10px">${r.no}</span>${typeof kwDobelTag==='function'?kwDobelTag(r):''}</td>
       <td style="font-weight:700;white-space:nowrap">${blnSpp||'<span style="color:var(--text2);font-weight:400">—</span>'}</td>
       <td>${fmtTgl(r.tanggal)}</td>
       <td><span style="font-size:10px;padding:2px 7px;border-radius:10px;background:${isTrf?'#dbeafe':'#dcfce7'};color:${isTrf?'#1d4ed8':'#15803d'};font-weight:700">${isTrf?'🏦 TF':'💵 Kas'}</span></td>
@@ -9357,7 +9370,7 @@ function showKasPopup(tgl){
         <tbody>`;
     groups[j].transaksi.forEach(r=>{
       html+=`<tr onclick="openTrxModal(${r.id});document.getElementById('kas-popup-modal').style.display='none'" style="cursor:pointer">
-        <td><span class="badge badge-blue" style="font-size:10px">${r.no}</span></td>
+        <td><span class="badge badge-blue" style="font-size:10px">${r.no}</span>${typeof kwDobelTag==='function'?kwDobelTag(r):''}</td>
         <td>${r.nama}</td>
         <td><span class="badge badge-blue" style="font-size:10px">${r.kelas||'—'}</span></td>
         <td style="font-size:11px">${r.tipe}</td>
@@ -12866,7 +12879,8 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
   function banding(d){
     var L=getRiwayat()||[], C=arr(d.riwayat);
     var lk={}, ck={}; L.forEach(function(r){ lk[kunci(r)]=1; }); C.forEach(function(r){ ck[kunci(r)]=1; });
-    return { cloudBaru:C.filter(function(r){ return !lk[kunci(r)]; }), lokalBaru:L.filter(function(r){ return !ck[kunci(r)]; }), C:C, L:L };
+    var cb=C.filter(function(r){ return !lk[kunci(r)]; }), sh=(typeof kwSaringHapus==='function')?kwSaringHapus(cb):{list:cb,diabaikan:[]};
+    return { cloudBaru:sh.list, diabaikan:sh.diabaikan, lokalBaru:L.filter(function(r){ return !ck[kunci(r)]; }), C:C, L:L };
   }
   // Cek cloud dulu; true = aman untuk upload
   async function cekDulu(){
@@ -12908,7 +12922,7 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
     }catch(e){ console.warn('backup',e); }
   }
   function terapkanCloud(d){
-    if(d.riwayat) lsSet('ya_riwayat', arr(d.riwayat));
+    if(d.riwayat) lsSet('ya_riwayat', (typeof kwSaringHapus==='function'?kwSaringHapus(arr(d.riwayat)).list:arr(d.riwayat)));
     if(d.siswa) lsSet('ya_siswa', arr(d.siswa));
     var t=obj(d.tarif); if(t.spp) setSPP(t.spp); if(t.pgm) setPGM(t.pgm); if(t.daftar) setDaftar(t.daftar); if(t.diskon) setDiskon(t.diskon);
     if(d.kasHarian) lsSet('ya_kas_awal_harian', obj(d.kasHarian));
@@ -12930,7 +12944,7 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
     if(!CONF) return;
     unduhBackup();
     var d=CONF.d;
-    var rw=gabungArr(getRiwayat()||[], arr(d.riwayat), kunci).sort(function(a,b){ return (Number(b.id)||0)-(Number(a.id)||0); });
+    var rw=gabungArr(getRiwayat()||[], (typeof kwSaringHapus==='function'?kwSaringHapus(arr(d.riwayat)).list:arr(d.riwayat)), kunci).sort(function(a,b){ return (Number(b.id)||0)-(Number(a.id)||0); });
     lsSet('ya_riwayat', rw);
     lsSet('ya_siswa', gabungArr(getSiswa()||[], arr(d.siswa), function(s){ return String(s.nama||'').trim().toLowerCase(); }));
     lsSet('ya_pengeluaran', gabungArr(getPengeluaran()||[], arr(d.pengeluaran), kId));
@@ -12953,6 +12967,9 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
       '<div class="ss-num"><div><b>'+cb.length+'</b>baru di cloud'+(terbaru?' (terbaru '+esc(tg(terbaru))+')':'')+'</div><div><b>'+lb.length+'</b>hanya ada di perangkat ini</div></div>'+
       (cb.length?'<div class="ss-list"><b>Contoh data baru di cloud:</b><br>'+daftar(cb)+'</div>':'')+
       (lb.length?'<div class="ss-list"><b>Hanya di perangkat ini:</b><br>'+daftar(lb)+'</div>':'')+
+      ((b.diabaikan&&b.diabaikan.length)?'<div class="ss-hapus">🗑 <b>'+b.diabaikan.length+' kuitansi yang kamu hapus</b> di perangkat ini diabaikan (tidak dikembalikan): '+b.diabaikan.slice(0,5).map(function(r){ return esc(r.no||'')+' · '+esc(r.nama||'')+' · '+esc(tg(r.tanggal)); }).join('; ')+(b.diabaikan.length>5?' …':'')+'</div>':'')+
+      (function(){ try{ if(typeof kwGrupDobel!=='function') return ''; var CL=(typeof kwSaringHapus==='function'?kwSaringHapus(b.C).list:b.C), nG=kwGrupDobel(gabungArr(b.L,CL,kunci)).length, nL=kwGrupDobel(b.L).length, nM=kwGrupDobel(CL).length;
+        var t=[]; if(nG>nL) t.push('<b>Gabungkan</b> → '+(nG-nL)+' kuitansi jadi dobel'); if(nM>nL) t.push('<b>Muat</b> → '+(nM-nL)+' kuitansi jadi dobel'); return t.length?'<div class="ss-dobel">⚠ '+t.join(' · ')+' (nomor sama / bulan SPP & nominal sama). Setelahnya cek di Admin → Cek kuitansi dobel.</div>':''; }catch(e){ return ''; } })()+
       '<div class="ss-acts">'+
         '<button class="ss-b'+(lb.length?'':' pri')+'" onclick="ssMuat()">⬇ Muat dari cloud'+(lb.length?'':' (disarankan)')+'<small>Data perangkat ini diganti dengan data cloud. Backup otomatis diunduh dulu.</small></button>'+
         '<button class="ss-b'+(lb.length?' pri':'')+'" onclick="ssGabung()">⇄ Gabungkan'+(lb.length?' (disarankan)':'')+'<small>Data cloud ditambahkan ke perangkat ini, lalu disimpan ke cloud. Pilih ini bila perangkat ini juga membuat kuitansi baru. Catatan: transaksi yang sudah dihapus di perangkat lain bisa muncul lagi.</small></button>'+
@@ -13493,11 +13510,12 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
 <!-- ===================== VERSI APLIKASI ===================== -->
 <script>
 // Ubah setiap kali ada update: x.y.z  (z = perbaikan kecil, y = fitur baru, x = perubahan besar)
-window.APP_VERSION='3.38.1';
+window.APP_VERSION='3.39.0';
 window.APP_BUILD='2026-11-09';
-window.APP_NOTES='Rincian detail: judul diganti jadi Rincian Kuitansi & Rincian per Bulan.';
+window.APP_NOTES='Kuitansi yang dihapus tidak kembali lagi saat sync; tanda & cek kuitansi dobel; Rekord Siswa lebih cepat.';
 // riwayat singkat (terbaru di atas) — tampil terlipat di halaman Admin
 window.APP_RIWAYAT=[
+  ['3.39.0','2026-11-09','Kuitansi yang dihapus tidak muncul lagi saat sync / Gabungkan / Muat; tanda ⚠ dobel di Riwayat & Rekord, peringatan dobel di notif cloud, tombol Cek kuitansi dobel di Kelola Siswa; Rekord Siswa tampil bertahap (lebih cepat); log tidak lagi mencatat jendela cetak sebagai macet.'],
   ['3.38.1','2026-11-09','Rincian detail: judul diganti jadi Rincian Kuitansi dan Rincian per Bulan (juga di hasil cetak).'],
   ['3.38.0','2026-11-09','Rekord Siswa: tab 📑 Rincian detail — per kuitansi (uangnya untuk bulan apa, lunas/kurang) dan per bulan (tagihan, dibayar, kuitansi, kurang), bisa dicetak 1 lembar.'],
   ['3.37.0','2026-11-06','Form Kwitansi: status SPP tampil di bawah nama masing-masing siswa (bukan satu kotak di kanan). Rekord Siswa: kolom Bulan SPP, urutan dari bulan SPP terbaru (SPP telat tetap di urutan bulannya).'],
@@ -14145,5 +14163,94 @@ body.hp-lihat #page-kwitansi .btn-primary[onclick*="buatKwitansi"]{opacity:.55}
 })();
 </script>
 
+<!-- ===================== v3.39: KUITANSI DIHAPUS TIDAK KEMBALI · CEK DOBEL · REKORD BERTAHAP ===================== -->
+<style>
+.kw-dob{display:inline-block;margin-left:4px;background:#fdeaea;color:#b33a3a;border:1px solid #f1c4c4;border-radius:8px;padding:0 6px;font-size:10.5px;font-weight:700;white-space:nowrap;cursor:help;vertical-align:middle}
+.ss-hapus{margin-top:8px;background:#eef6f1;border:1px solid #cfe5d7;border-radius:8px;padding:7px 10px;font-size:12.5px}
+.ss-dobel{margin-top:8px;background:#fdeaea;border:1px solid #f1c4c4;color:#8f2d2d;border-radius:8px;padding:7px 10px;font-size:12.5px}
+#dob-modal .dob-g{border:1px solid var(--border,#e5e7eb);border-radius:10px;padding:10px 12px;margin-top:10px}
+#dob-modal .dob-r{display:flex;gap:8px;align-items:center;padding:5px 0;border-top:1px dashed #eee;font-size:12.5px;flex-wrap:wrap}
+#dob-modal .dob-r:first-of-type{border-top:0}
+#dob-modal .dob-x{margin-left:auto;font-size:11.5px;padding:3px 10px;border:1px solid #f1c4c4;color:#b33a3a;background:#fff;border-radius:8px;cursor:pointer}
+.rk-more td{text-align:center;color:var(--text2,#6b7280);font-size:12px;padding:10px}
+</style>
+<script>
+(function(){
+  var KEY='ya_dihapus', HARI=60*864e5;
+  function kunci(r){ return r&&r.id!=null?'id:'+r.id:'x:'+(r&&r.no||'')+'|'+(r&&r.nama||'')+'|'+(r&&r.tanggal||''); }
+  function muat(){ var L=[]; try{ L=JSON.parse(localStorage.getItem(KEY))||[]; }catch(e){} var bt=Date.now()-HARI; return L.filter(function(x){ return x&&x.k&&x.w>bt; }); }
+  function simpan(L){ try{ localStorage.setItem(KEY,JSON.stringify(L.slice(-500))); }catch(e){} }
+  window.kwDihapus=function(){ return muat(); };
+  window.kwDihapusSet=function(){ var o={}; muat().forEach(function(x){ o[x.k]=x; }); return o; };
+  window.kwSaringHapus=function(list){ var H=window.kwDihapusSet(), out=[], ab=[]; (list||[]).forEach(function(r){ if(H[kunci(r)]) ab.push(r); else out.push(r); }); return {list:out, diabaikan:ab}; };
+  // ① catat kuitansi yang dihapus di perangkat ini (setiap setRiwayat yang membuang kuitansi)
+  var _set=window.setRiwayat;
+  if(typeof _set==='function') window.setRiwayat=function(v){
+    try{ var lama=getRiwayat()||[], baru=Array.isArray(v)?v:[], nk={}; baru.forEach(function(r){ nk[kunci(r)]=1; });
+      var L=muat(), ada={}, ubah=false; L.forEach(function(x){ ada[x.k]=1; });
+      lama.forEach(function(r){ var k=kunci(r); if(!nk[k]&&!ada[k]){ L.push({k:k,no:r.no||'',nama:r.nama||'',tgl:r.tanggal||'',nom:r.nominalBayar||0,w:Date.now()}); ubah=true; } });
+      var L2=L.filter(function(x){ return !nk[x.k]; }); if(L2.length!==L.length) ubah=true; // dibuat lagi dengan id sama → bukan dihapus
+      if(ubah) simpan(L2);
+    }catch(e){ console.warn('catat hapus',e); }
+    return _set.apply(this,arguments);
+  };
+
+  // ③ kuitansi dobel: nomor sama, atau siswa + bulan SPP + nominal sama
+  function grupDobel(rw){
+    var G={};
+    (rw||[]).forEach(function(r){ if(!r) return;
+      if(r.no){ var a='no:'+r.no; (G[a]=G[a]||{jenis:'no',label:'Nomor kuitansi sama: '+r.no,L:[]}).L.push(r); }
+      if(r.tipe==='SPP'&&typeof sppBulanRec==='function'){ var B=sppBulanRec(r); if(B.length){ var lb=sppBulanLabel(B), b='spp:'+String(r.nama||'').toLowerCase()+'|'+lb+'|'+(r.nominalBayar||0);
+        (G[b]=G[b]||{jenis:'spp',label:(r.nama||'')+' · SPP '+lb+' · Rp '+Number(r.nominalBayar||0).toLocaleString('id-ID')+' dibayar 2×',L:[]}).L.push(r); } }
+    });
+    var out=[], sudah={};
+    Object.keys(G).forEach(function(k){ var g=G[k]; if(g.L.length<2) return; var sig=g.L.map(kunci).sort().join(','); if(sudah[sig]) return; sudah[sig]=1; out.push(g); });
+    return out;
+  }
+  window.kwGrupDobel=grupDobel;
+  var IDX={t:0,n:-1,m:{}};
+  window.kwDobelTag=function(r){
+    try{ var rw=getRiwayat()||[];
+      if(Date.now()-IDX.t>1500||IDX.n!==rw.length){ var m={}; grupDobel(rw).forEach(function(g){ g.L.forEach(function(x){ (m[kunci(x)]=m[kunci(x)]||[]).push(g.jenis==='no'?'nomor kuitansi sama':'bulan SPP & nominal sama'); }); }); IDX={t:Date.now(),n:rw.length,m:m}; }
+      var a=IDX.m[kunci(r)]; return a?'<span class="kw-dob" title="Kemungkinan dobel: '+a.join(', ')+' — cek di Admin → Cek kuitansi dobel">⚠ dobel</span>':'';
+    }catch(e){ return ''; } };
+
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+  function tg(s){ try{ return new Date(s+'T00:00:00').toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'}); }catch(e){ return s||''; } }
+  function backup(alasan){ try{ var o={dibuat:new Date().toISOString(),alasan:alasan}; ['ya_siswa','ya_riwayat'].forEach(function(k){ o[k]=JSON.parse(localStorage.getItem(k)||'null'); });
+    var b=new Blob([JSON.stringify(o)],{type:'application/json'}), a=document.createElement('a'), d=new Date(); a.href=URL.createObjectURL(b); a.download='backup sebelum '+alasan+' '+d.toISOString().slice(0,16).replace(/[T:]/g,'-')+'.json'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function(){ URL.revokeObjectURL(a.href); },3000); }catch(e){} }
+  function mintaPw(judul,isi,ok){
+    var m=document.createElement('div'); m.className='rk-del-bg'; m.style.zIndex=100005;
+    m.innerHTML='<div class="rk-del-box"><div style="font-weight:700;font-size:16px">'+judul+'</div><div style="font-size:13px;margin:8px 0 12px;line-height:1.55">'+isi+'</div><input type="password" placeholder="Password admin" style="width:100%"><div class="dob-err" style="color:var(--danger,#c0392b);font-size:12.5px;min-height:18px;margin-top:4px"></div><div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn dob-no">Batal</button><button class="btn rk-del-go dob-ok">Hapus</button></div></div>';
+    document.body.appendChild(m); var inp=m.querySelector('input'); setTimeout(function(){ inp.focus(); },50);
+    var go=function(){ if(inp.value!==PASSWORD){ m.querySelector('.dob-err').textContent='Password salah — tidak ada yang dihapus.'; inp.select(); return; } m.remove(); ok(); };
+    m.querySelector('.dob-ok').onclick=go; m.querySelector('.dob-no').onclick=function(){ m.remove(); };
+    inp.addEventListener('keydown',function(e){ if(e.key==='Enter') go(); if(e.key==='Escape') m.remove(); }); }
+  function segar(){ ['filterAllRiwayat','filterRiwayat','renderRekordSiswa','renderTunggakan','renderSiswaRekordModal'].forEach(function(f){ try{ if(typeof window[f]==='function') window[f](); }catch(e){} }); }
+  function renderDob(m){
+    var G=grupDobel(getRiwayat()||[]);
+    var h='<div style="display:flex;align-items:center"><b style="font-size:17px">🧾 Cek kuitansi dobel</b><span class="btn" style="margin-left:auto;padding:3px 10px" data-a="tutup">✕</span></div>';
+    if(!G.length) h+='<div style="padding:18px 4px;color:var(--green,#1d7a3e);font-weight:600">✓ Tidak ada kuitansi dobel.</div>';
+    else { h+='<div style="font-size:12.5px;color:var(--text2,#6b7280);margin-top:4px">'+G.length+' kemungkinan dobel. Hapus yang salah — password admin diminta, backup diunduh dulu.</div>';
+      G.forEach(function(g){ h+='<div class="dob-g"><b style="font-size:13px">⚠ '+esc(g.label)+'</b>'+g.L.map(function(r){ return '<div class="dob-r"><span class="badge badge-blue" style="font-size:10px">'+esc(r.no||'—')+'</span><span>'+esc(tg(r.tanggal))+'</span><b>'+esc(r.nama)+'</b><span style="color:var(--text2)">'+esc(r.bayarLabel||r.tipe||'')+'</span><span>Rp '+Number(r.nominalBayar||0).toLocaleString('id-ID')+'</span><span style="color:var(--text2)">'+(r.metode==='Transfer'?'🏦 TF':'💵 Kas')+'</span><a href="javascript:void 0" data-lihat="'+r.id+'" style="font-size:11.5px">lihat</a><button class="dob-x" data-hapus="'+r.id+'">🗑 Hapus ini</button></div>'; }).join('')+'</div>'; }); }
+    m.querySelector('.rk-del-box').innerHTML=h; }
+  window.cekKuitansiDobel=function(){
+    var m=document.getElementById('dob-modal'); if(m) m.remove();
+    m=document.createElement('div'); m.id='dob-modal'; m.className='rk-del-bg'; m.innerHTML='<div class="rk-del-box" style="width:min(720px,100%);max-height:86vh;overflow:auto"></div>'; document.body.appendChild(m);
+    renderDob(m);
+    m.addEventListener('click',function(e){ if(e.target===m){ m.remove(); return; } var t=e.target.closest('[data-a],[data-hapus],[data-lihat]'); if(!t) return;
+      if(t.dataset.a==='tutup'){ m.remove(); return; }
+      if(t.dataset.lihat){ try{ openTrxModal(Number(t.dataset.lihat)); }catch(x){} return; }
+      if(t.dataset.hapus){ var id=Number(t.dataset.hapus), r=(getRiwayat()||[]).find(function(x){ return x.id===id; }); if(!r) return;
+        mintaPw('🗑 Hapus kuitansi '+esc(r.no||''),'<b>'+esc(r.nama)+'</b> · '+esc(tg(r.tanggal))+' · '+esc(r.bayarLabel||'')+' · Rp '+Number(r.nominalBayar||0).toLocaleString('id-ID')+'<br>Kuitansi lain di grup ini tetap. Backup diunduh dulu.',function(){
+          backup('hapus kuitansi dobel'); setRiwayat((getRiwayat()||[]).filter(function(x){ return x.id!==id; }));
+          try{ logKwitansi('hapus_kwitansi', r, 'Dihapus (kuitansi dobel): '+r.tipe+' · '+(r.bayarLabel||'')+' · Rp '+((r.nominalBayar||0).toLocaleString('id-ID'))); }catch(x){}
+          IDX.t=0; segar(); renderDob(m); }); } });
+  };
+  function pasang(){ var a=document.getElementById('btn-cek-nama'); if(!a||document.getElementById('btn-cek-dobel')) return;
+    var b=document.createElement('button'); b.id='btn-cek-dobel'; b.className='btn'; b.type='button'; b.innerHTML='🧾 Cek kuitansi dobel'; b.title='Cari kuitansi dengan nomor sama, atau bulan SPP & nominal sama'; b.onclick=function(){ cekKuitansiDobel(); }; a.parentNode.insertBefore(b,a.nextSibling); }
+  setInterval(pasang,1500); setTimeout(pasang,300);
+})();
+</script>
 </body>
 </html>
