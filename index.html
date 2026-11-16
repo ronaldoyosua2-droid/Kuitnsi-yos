@@ -11209,9 +11209,10 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
   function counts(){ var n={all:0,ok:0,warn:0,done:0}; Q.forEach(function(c){ var s=cardStatus(c); n.all++; if(s==='ok') n.ok++; else if(s==='done') n.done++; else n.warn++; }); return n; }
   function render(){
     simpanQ();
+    if(MODE==='log'){ var lw=$('bt-log-list'); if(lw) lw.innerHTML=logHtml(); return; } // v3.42: Log jadi tab sendiri
     var wrap=$('bt-list'); if(!wrap) return;
     var n=counts();
-    $('bt-tabs').innerHTML=[['all','Semua',n.all],['ok','Siap dibuat',n.ok],['warn','Perlu dicek',n.warn],['done','Selesai',n.done],['log','📋 Log',getBtLog().length],['last','🕘 Last Entry',LAST.length]].map(function(t){
+    $('bt-tabs').innerHTML=[['all','Semua',n.all],['ok','Siap dibuat',n.ok],['warn','Perlu dicek',n.warn],['done','Selesai',n.done],['last','🕘 Last Entry',LAST.length]].map(function(t){
       return '<span class="bt-tab'+(TAB===t[0]?' on':'')+'" onclick="btTab(\''+t[0]+'\')">'+t[1]+'<i>'+t[2]+'</i></span>';
     }).join('')+'<span class="bt-note">💾 Bukti yang belum dibuat kuitansinya tersimpan di browser ini (aman saat refresh).</span>';
     if(TAB==='log'){ wrap.innerHTML=logHtml(); return; }
@@ -12251,10 +12252,11 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
   document.addEventListener('visibilitychange',function(){ if(!document.hidden&&MODE==='bk'&&$('page-buktiTf')&&$('page-buktiTf').classList.contains('active')){ bkHitungUlang(); bkRender(); } });
   window.btMode=function(m){
     MODE=m; lsw('kwbt_mode',m);
-    var a=$('bt-mode-tf'), b=$('bt-mode-bk'); if(a) a.style.display=m==='bk'?'none':''; if(b) b.style.display=m==='bk'?'':'none';
+    var a=$('bt-mode-tf'), b=$('bt-mode-bk'), lg=$('bt-mode-log'); if(a) a.style.display=m==='tf'?'':'none'; if(b) b.style.display=m==='bk'?'':'none'; if(lg) lg.style.display=m==='log'?'':'none';
     document.querySelectorAll('#bt-modesw .bt-tab').forEach(function(t){ t.classList.toggle('on',t.dataset.m===m); });
     if(m==='bk'){ bkHitungUlang(); bkRender(); } else render();
   };
+  if(TAB==='log') TAB='all';
   window.bkFiles=bkAdd;
   window._bkDebug={BK:function(){return BK;},addFake:function(ai,jenjang,img){ var pg={id:'bk'+Date.now().toString(36)+(++seq),jenjang:jenjang||'SD',state:'ok',rows:[],ditambah:new Date(),ai:ai,img:img||''}; bkBangun(pg); BK.unshift(pg); bkRender(); return pg; }};
 
@@ -12799,7 +12801,8 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
           '<p style="margin:14px 0 6px"><b>📲 Pakai pengaturan ini di HP</b> — kirim link sekali klik (berisi API key, URL &amp; token Drive, rekening, wali kelas). Buka link itu di HP → pengaturan langsung terisi. <span style="color:#b4581a">Jangan bagikan link ke orang lain.</span></p>'+
           '<div class="bt-krow"><span class="bt-b pri" onclick="kwSetupKirim(\'wa\')">Kirim ke WA saya</span><span class="bt-b" onclick="kwSetupKirim(\'salin\')">Salin link</span></div>'+
         '</div></div>'+
-        '<div class="bt-tabs" id="bt-modesw" style="margin-bottom:12px"><span class="bt-tab" data-m="tf" onclick="btMode(\'tf\')">📷 Bukti Transfer</span><span class="bt-tab" data-m="bk" onclick="btMode(\'bk\')">📒 Buku Kas <i>baru</i></span></div>'+
+        '<div class="bt-tabs" id="bt-modesw" style="margin-bottom:12px"><span class="bt-tab" data-m="tf" onclick="btMode(\'tf\')">📷 Bukti Transfer</span><span class="bt-tab" data-m="bk" onclick="btMode(\'bk\')">📒 Buku Kas <i>baru</i></span><span class="bt-tab" data-m="log" onclick="btMode(\'log\')">📜 Log</span></div>'+
+        '<div id="bt-mode-log" style="display:none"><div id="bt-log-list"></div></div>'+
         '<div id="bt-mode-tf">'+
         '<div class="bt-drop" id="bt-drop"><div class="bt-ic"><svg width="24" height="24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v4h16v-4"/></svg></div>'+
           '<div style="flex:1"><b>Tempel screenshot bukti TF di sini</b><p>Di WA Web tekan <kbd>Win</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd>, kotakkan gelembung chat (foto + caption + nama siswa), lalu di halaman ini tekan <kbd>Ctrl</kbd>+<kbd>V</kbd>. Bisa juga seret banyak gambar sekaligus.</p></div>'+
@@ -13371,6 +13374,15 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
 .nn-ed input.nn-ti{font-size:21px;font-weight:800;border:0;background:transparent;outline:none;font-family:inherit;color:#111;width:100%}
 .nn-ed textarea{font-size:14px;line-height:1.6;color:#2d2f33;border:0;background:transparent;outline:none;font-family:inherit;resize:none;min-height:180px;width:100%}
 .nn-ed .nn-meta{font-size:11.5px;color:#8a8f98}
+.nn-tbar{display:flex;gap:2px;flex-wrap:wrap;align-items:center;background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:4px;margin:4px 0 2px;position:sticky;top:0;z-index:2}
+.nn-tbar button{border:0;background:transparent;border-radius:7px;padding:5px 8px;font-size:13px;cursor:pointer;color:#374151;font-family:inherit;line-height:1.2}
+.nn-tbar button:hover{background:#f3f4f6}.nn-tbar button.on{background:#e8f1ec;color:#1d5e3c}
+.nn-tbar .nn-sep{width:1px;height:18px;background:#e5e7eb;margin:0 3px;display:block}.nn-stb{background:#fff59d;border-radius:3px;padding:0 3px}
+.nn-tbar button[data-c=rapikan]{color:#1d5e3c;font-weight:700}
+.nn-rt{font-size:14px;line-height:1.6;color:#2d2f33;outline:none;min-height:180px;word-break:break-word;-webkit-user-select:text;user-select:text}
+.nn-rt:empty:before{content:attr(data-ph);color:#9ca3af}
+.nn-rich ol,.nn-rich ul{margin:2px 0 4px;padding-left:24px}.nn-rich li{margin:1px 0}.nn-rich mark{background:#fff59d;color:inherit;border-radius:2px}
+.nn-ed .nn-ro-body.nn-rich{white-space:normal}
 .nn-ed textarea,.nn-ed input.nn-ti{border:0!important;box-shadow:none!important;outline:none!important;padding:0!important;background:transparent!important;border-radius:0!important}
 .nn-ed .nn-ro-title{font-size:21px;font-weight:800;color:#111;word-break:break-word}
 .nn-ed .nn-ro-body{font-size:14px;line-height:1.6;color:#2d2f33;white-space:pre-wrap;word-break:break-word;min-height:120px;-webkit-user-select:text;user-select:text}
@@ -13442,6 +13454,87 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
     h+='<button type="button" class="nn-fab" title="Catatan baru" onclick="nnBaru()">+</button>';
     bd.innerHTML=h;
   }
+  // ===== v3.42: editor seperti Word (tebal, miring, garis bawah, coret, stabilo, nomor/poin otomatis, Rapikan) =====
+  // n.html = isi berformat (sudah dibersihkan), n.body = teks biasa (untuk kartu, catatan mini, cari)
+  var RT_TAG={B:'b',STRONG:'b',I:'i',EM:'i',U:'u',S:'s',STRIKE:'s',DEL:'s',MARK:'mark',OL:'ol',UL:'ul',LI:'li',BR:'br',DIV:'div',P:'div'};
+  function rtBersihNode(el){ var out='';
+    el.childNodes.forEach(function(c){
+      if(c.nodeType===3){ out+=esc(c.nodeValue); return; } if(c.nodeType!==1) return;
+      var tg=c.tagName, inner=rtBersihNode(c);
+      if(tg==='SPAN'||tg==='FONT'){ var st=(c.getAttribute('style')||'')+' '+(c.getAttribute('color')||'');
+        if(/font-weight\s*:\s*(bold|[6-9]00)/i.test(st)) inner='<b>'+inner+'</b>';
+        if(/font-style\s*:\s*italic/i.test(st)) inner='<i>'+inner+'</i>';
+        if(/underline/i.test(st)) inner='<u>'+inner+'</u>';
+        if(/line-through/i.test(st)) inner='<s>'+inner+'</s>';
+        if(/background(-color)?\s*:\s*(rgb\(\s*255,\s*245,\s*157\s*\)|#fff59d|yellow)/i.test(st)) inner='<mark>'+inner+'</mark>';
+        out+=inner; return; }
+      var m=RT_TAG[tg]; if(!m){ out+=inner; return; }
+      if(m==='br'){ out+='<br>'; return; }
+      out+='<'+m+'>'+inner+'</'+m+'>';
+    }); return out; }
+  function rtBersih(html){ var t=document.createElement('div'); t.innerHTML=String(html||''); return rtBersihNode(t); }
+  function rtHtml(n){ if(n.html) return rtBersih(n.html); return String(n.body||'').split('\n').map(function(l){ return '<div>'+(l?esc(l):'<br>')+'</div>'; }).join(''); }
+  function rtPolos(root){ var s=''; function nl(){ if(s&&!/\n$/.test(s)) s+='\n'; }
+    (function w(n){ n.childNodes.forEach(function(c){
+      if(c.nodeType===3){ s+=c.nodeValue.replace(/ /g,' '); return; } if(c.nodeType!==1) return; var tg=c.tagName;
+      if(tg==='BR'){ s+='\n'; return; }
+      if(tg==='OL'||tg==='UL'){ nl(); var k=0; c.childNodes.forEach(function(li){ if(li.nodeType===1&&li.tagName==='LI'){ k++; nl(); s+=(tg==='OL'?k+'. ':'• '); w(li); } }); nl(); return; }
+      if(tg==='DIV'||tg==='P'||tg==='LI'){ nl(); w(c); nl(); return; }
+      w(c); }); })(root);
+    return s.replace(/\n+$/,''); }
+  function rtSimpan(ed){ var id=+ed.dataset.id, i=cari(id); if(i<0||!npEdit) return; npNotes[i].html=rtBersih(ed.innerHTML); nnUbah(id,'body',rtPolos(ed)); }
+  function rtBlok(ed,node){ var b=node.nodeType===3?node.parentNode:node; while(b&&b!==ed&&!/^(DIV|LI|P)$/.test(b.tagName)) b=b.parentNode; return b||ed; }
+  function rtPotong(el,n){ var w=document.createTreeWalker(el,NodeFilter.SHOW_TEXT), t; while(n>0&&(t=w.nextNode())){ var k=Math.min(n,t.nodeValue.length); t.nodeValue=t.nodeValue.slice(k); n-=k; } }
+  function rtRapikan(ed){
+    [].slice.call(ed.childNodes).forEach(function(c){ if(c.nodeType===3){ if(!c.nodeValue.trim()){ ed.removeChild(c); return; } var d=document.createElement('div'); ed.insertBefore(d,c); d.appendChild(c); } });
+    var grup=null, kosong=false;
+    [].slice.call(ed.childNodes).forEach(function(c){ if(c.nodeType!==1) return;
+      if(c.tagName==='OL'||c.tagName==='UL'){ if(grup&&grup.tagName===c.tagName){ while(c.firstChild) grup.appendChild(c.firstChild); ed.removeChild(c); } else grup=c; kosong=false; return; }
+      var t=(c.textContent||'').replace(/ /g,' ');
+      if(!t.trim()){ if(kosong||!c.previousSibling){ ed.removeChild(c); return; } kosong=true; grup=null; return; }
+      kosong=false;
+      [].slice.call(c.querySelectorAll('*')).forEach(function(x){ if(x.tagName!=='BR'&&!x.textContent&&!x.querySelector('br')) x.remove(); });
+      var m=t.match(/^\s*(\d+\s*[.)]|[-•*])\s+/);
+      if(!m){ grup=null; return; }
+      var jenis=/\d/.test(m[1])?'OL':'UL';
+      if(!grup||grup.tagName!==jenis){ grup=document.createElement(jenis); ed.insertBefore(grup,c); }
+      rtPotong(c,m[0].length); var li=document.createElement('li'); while(c.firstChild) li.appendChild(c.firstChild); grup.appendChild(li); ed.removeChild(c);
+    });
+    while(ed.lastChild&&ed.lastChild.nodeType===1&&ed.lastChild.tagName==='DIV'&&!(ed.lastChild.textContent||'').trim()) ed.removeChild(ed.lastChild);
+    // spasi berlebih di dalam teks
+    var w=document.createTreeWalker(ed,NodeFilter.SHOW_TEXT), t; while((t=w.nextNode())) t.nodeValue=t.nodeValue.replace(/[  ]{2,}/g,' ');
+  }
+  window.nnRt=function(cmd,ev){ if(ev) ev.preventDefault(); var ed=document.querySelector('.nn-rt'); if(!ed||!npEdit) return; ed.focus();
+    if(cmd==='rapikan'){ var lama=ed.innerHTML; rtRapikan(ed); rtSimpan(ed);
+      var m=document.getElementById('nn-meta'); if(m){ m.innerHTML='✨ Dirapikan · <a href="javascript:void 0" id="nn-undo">↶ Batalkan</a>'; var u=document.getElementById('nn-undo'); if(u) u.onclick=function(){ ed.innerHTML=lama; rtSimpan(ed); m.textContent='Rapikan dibatalkan'; }; }
+      return; }
+    try{ document.execCommand('styleWithCSS',false,cmd==='hilite'); }catch(e){}
+    if(cmd==='hilite'){ var sel=window.getSelection(), sudah=false; try{ var nd=sel.anchorNode; while(nd&&nd!==ed){ if(nd.nodeType===1&&(nd.tagName==='MARK'||/background/i.test(nd.getAttribute('style')||''))){ sudah=true; break; } nd=nd.parentNode; } }catch(e){}
+      document.execCommand('hiliteColor',false,sudah?'transparent':'#fff59d'); }
+    else document.execCommand(cmd,false,null);
+    try{ document.execCommand('styleWithCSS',false,false); }catch(e){}
+    rtSimpan(ed); rtState(); };
+  function rtState(){ var tb=document.querySelector('.nn-tbar'); if(!tb) return; ['bold','italic','underline','strikeThrough','insertOrderedList','insertUnorderedList'].forEach(function(c){ var b=tb.querySelector('[data-c="'+c+'"]'); if(b){ var on=false; try{ on=document.queryCommandState(c); }catch(e){} b.classList.toggle('on',on); } }); }
+  function rtPasang(ed){
+    ed.addEventListener('input',function(e){
+      if(e.inputType==='insertText'&&(e.data===' '||e.data===' ')){
+        var sel=window.getSelection(); if(sel.rangeCount){ var r=sel.getRangeAt(0), b=rtBlok(ed,r.startContainer);
+          if(b.tagName!=='LI'){ var pre=document.createRange(); pre.setStart(b,0); pre.setEnd(r.startContainer,r.startOffset);
+            var m=pre.toString().replace(/ /g,' ').match(/^\s*(\d+[.)]|[-•*])\s$/);
+            if(m){ if(b===ed){ var dv=document.createElement('div'); while(ed.firstChild&&ed.firstChild!==null&&ed.firstChild.nodeType===3) dv.appendChild(ed.firstChild); ed.insertBefore(dv,ed.firstChild); b=dv; }
+              rtPotong(b,m[0].length); if(!(b.textContent||'').length&&!b.querySelector('br')) b.appendChild(document.createElement('br'));
+              var cr=document.createRange(); cr.setStart(b,0); cr.collapse(true); sel.removeAllRanges(); sel.addRange(cr);
+              document.execCommand(/\d/.test(m[1])?'insertOrderedList':'insertUnorderedList',false,null); } } } }
+      rtSimpan(ed); rtState(); });
+    ed.addEventListener('keydown',function(e){ if(e.key!=='Enter'||e.shiftKey) return; var sel=window.getSelection(); if(!sel.rangeCount) return;
+      var li=rtBlok(ed,sel.getRangeAt(0).startContainer); if(!li||li.tagName!=='LI') return;
+      if((li.textContent||'').replace(/\u00a0/g,'').trim()) return;
+      e.preventDefault(); var L=li.parentNode; document.execCommand(L&&L.tagName==='UL'?'insertUnorderedList':'insertOrderedList',false,null); rtSimpan(ed); rtState(); });
+    ed.addEventListener('paste',function(e){ var t=(e.clipboardData||window.clipboardData); if(!t) return; e.preventDefault(); document.execCommand('insertText',false,t.getData('text/plain')); });
+    ed.addEventListener('keyup',rtState); ed.addEventListener('mouseup',rtState);
+  }
+  var RT_TB=[['bold','<b>B</b>','Tebal (Ctrl+B)'],['italic','<i>I</i>','Miring (Ctrl+I)'],['underline','<u>U</u>','Garis bawah (Ctrl+U)'],['strikeThrough','<s>S</s>','Coret'],['hilite','<span class="nn-stb">Stabilo</span>','Stabilo kuning'],['|'],['insertOrderedList','1. Nomor','Daftar bernomor (atau ketik "1. ")'],['insertUnorderedList','• Poin','Daftar poin (atau ketik "- ")'],['|'],['removeFormat','↺ Hapus format','Hapus format tulisan yang dipilih'],['rapikan','✨ Rapikan','Rapikan: nomor manual jadi daftar, baris kosong dobel dihapus']];
+  function rtToolbar(){ return '<div class="nn-tbar">'+RT_TB.map(function(b){ return b[0]==='|'?'<i class="nn-sep"></i>':'<button type="button" data-c="'+b[0]+'" title="'+b[2]+'" onmousedown="nnRt(\''+b[0]+'\',event)">'+b[1]+'</button>'; }).join('')+'</div>'; }
   function renderEditor(){
     var bd=document.getElementById('np-body'); if(!bd) return; var i=cari(VIEW); if(i<0){ VIEW=null; return renderList(); }
     var n=npNotes[i], bg=C[n.color]||C.w;
@@ -13450,14 +13543,14 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
     var h;
     if(npEdit){
       h='<div class="nn-ed" style="background:'+bg+'">'+top+'<input class="nn-ti" placeholder="Judul" value="'+esc(n.title)+'" oninput="nnUbah('+n.id+',\'title\',this.value)"><div class="nn-meta" id="nn-meta">'+meta+'</div>'+
-        '<textarea class="nn-tx" placeholder="Tulis catatan…" oninput="nnUbah('+n.id+',\'body\',this.value);this.style.height=\'auto\';this.style.height=this.scrollHeight+\'px\'">'+esc(n.body)+'</textarea>'+
+        rtToolbar()+'<div class="nn-rt nn-rich" contenteditable="true" data-id="'+n.id+'" data-ph="Tulis catatan…">'+rtHtml(n)+'</div>'+
         '<div class="nn-cols">'+URUT.map(function(k){ return '<i class="'+(n.color===k||(!C[n.color]&&k==='w')?'on':'')+'" style="background:'+C[k]+'" onclick="nnWarna('+n.id+',\''+k+'\')"></i>'; }).join('')+'<button type="button" class="nn-sv" onclick="nnKembali()">Simpan</button></div></div>';
     } else {
-      h='<div class="nn-ed" style="background:'+bg+'">'+top+'<div class="nn-ro-title">'+(n.title?esc(n.title):'<span style="color:#9ca3af">(tanpa judul)</span>')+'</div><div class="nn-meta">'+meta+'</div><div class="nn-ro-body">'+esc(n.body)+'</div>'+
+      h='<div class="nn-ed" style="background:'+bg+'">'+top+'<div class="nn-ro-title">'+(n.title?esc(n.title):'<span style="color:#9ca3af">(tanpa judul)</span>')+'</div><div class="nn-meta">'+meta+'</div><div class="nn-ro-body nn-rich">'+rtHtml(n)+'</div>'+
         '<div class="nn-lockhint">🔒 Terkunci — <a href="javascript:void 0" onclick="nnEdit('+n.id+')">buka edit</a> untuk mengubah.</div></div>';
     }
     bd.innerHTML=h;
-    var tx=bd.querySelector('.nn-tx'); if(tx){ tx.style.height='auto'; tx.style.height=Math.max(180,tx.scrollHeight)+'px'; }
+    var ed=bd.querySelector('.nn-rt'); if(ed){ rtPasang(ed); try{ document.execCommand('defaultParagraphSeparator',false,'div'); }catch(e){} }
   }
   window.npRender=function(){ header(); lockIkon(); tabs(); if(VIEW!=null) renderEditor(); else renderList(); };
   window.npAddNote=window.nnBaru;
@@ -13593,11 +13686,12 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
 <!-- ===================== VERSI APLIKASI ===================== -->
 <script>
 // Ubah setiap kali ada update: x.y.z  (z = perbaikan kecil, y = fitur baru, x = perubahan besar)
-window.APP_VERSION='3.41.0';
-window.APP_BUILD='2026-11-11';
-window.APP_NOTES='Ketik AI Pendaftaran: banyak siswa dalam 1 pesan + siswa pindahan (Mulai Pendidikan otomatis).';
+window.APP_VERSION='3.42.0';
+window.APP_BUILD='2026-11-16';
+window.APP_NOTES='Catatan seperti Word: tebal, miring, garis bawah, coret, stabilo, nomor otomatis & Rapikan; Log Kuitansi Otomatis jadi tab sendiri.';
 // riwayat singkat (terbaru di atas) — tampil terlipat di halaman Admin
 window.APP_RIWAYAT=[
+  ['3.42.0','2026-11-16','Catatan: toolbar seperti Word (tebal, miring, garis bawah, coret, stabilo, hapus format), ketik "1. " / "- " jadi daftar nomor/poin otomatis (Enter = nomor berikutnya, urut sendiri), tombol ✨ Rapikan untuk catatan lama. Kuitansi Otomatis: 📜 Log jadi tab sendiri di samping Bukti Transfer & Buku Kas.'],
   ['3.41.0','2026-11-11','Ketik AI — Pendaftaran: beberapa siswa dalam 1 pesan (kartu per siswa, Lewati, ✓ Buat N Kuitansi); siswa pindahan dikenali — Mulai Pendidikan terisi otomatis (SPP sebelum bulan itu tidak ditagih), diskon pindahan selalu ditanyakan bila tidak disebut.'],
   ['3.40.0','2026-11-09','Rekord Siswa: Rincian per Bulan menampilkan tanggal bayar tiap kuitansi; tombol ＋ Buat kuitansi di atas popup dan Bayar di bulan kurang/belum → form Kwitansi langsung terisi siswa & bulan SPP.'],
   ['3.39.0','2026-11-09','Kuitansi yang dihapus tidak muncul lagi saat sync / Gabungkan / Muat; tanda ⚠ dobel di Riwayat & Rekord, peringatan dobel di notif cloud, tombol Cek kuitansi dobel di Kelola Siswa; Rekord Siswa tampil bertahap (lebih cepat); log tidak lagi mencatat jendela cetak sebagai macet.'],
