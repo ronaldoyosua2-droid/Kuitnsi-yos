@@ -13516,20 +13516,33 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
     rtSimpan(ed); rtState(); };
   function rtState(){ var tb=document.querySelector('.nn-tbar'); if(!tb) return; ['bold','italic','underline','strikeThrough','insertOrderedList','insertUnorderedList'].forEach(function(c){ var b=tb.querySelector('[data-c="'+c+'"]'); if(b){ var on=false; try{ on=document.queryCommandState(c); }catch(e){} b.classList.toggle('on',on); } }); }
   function rtPasang(ed){
+    function jadiDaftar(b,m,sel){ // baris biasa berawalan '1. ' / '- ' → daftar
+      if(b===ed){ var dv=document.createElement('div'); while(ed.firstChild&&ed.firstChild.nodeType===3) dv.appendChild(ed.firstChild); ed.insertBefore(dv,ed.firstChild); b=dv; }
+      rtPotong(b,m[0].length); if(!(b.textContent||'').length&&!b.querySelector('br')) b.appendChild(document.createElement('br'));
+      return b; }
+    function caretDi(b,akhir){ var sel=window.getSelection(), cr=document.createRange(); cr.selectNodeContents(b); cr.collapse(!akhir); sel.removeAllRanges(); sel.addRange(cr); }
     ed.addEventListener('input',function(e){
-      if(e.inputType==='insertText'&&(e.data===' '||e.data===' ')){
-        var sel=window.getSelection(); if(sel.rangeCount){ var r=sel.getRangeAt(0), b=rtBlok(ed,r.startContainer);
-          if(b.tagName!=='LI'){ var pre=document.createRange(); pre.setStart(b,0); pre.setEnd(r.startContainer,r.startOffset);
-            var m=pre.toString().replace(/ /g,' ').match(/^\s*(\d+[.)]|[-•*])\s$/);
-            if(m){ if(b===ed){ var dv=document.createElement('div'); while(ed.firstChild&&ed.firstChild!==null&&ed.firstChild.nodeType===3) dv.appendChild(ed.firstChild); ed.insertBefore(dv,ed.firstChild); b=dv; }
-              rtPotong(b,m[0].length); if(!(b.textContent||'').length&&!b.querySelector('br')) b.appendChild(document.createElement('br'));
-              var cr=document.createRange(); cr.setStart(b,0); cr.collapse(true); sel.removeAllRanges(); sel.addRange(cr);
-              document.execCommand(/\d/.test(m[1])?'insertOrderedList':'insertUnorderedList',false,null); } } } }
+      // v3.42.1: deteksi '1. ' / '- ' dari teks sebelum kursor (bekerja juga di keyboard HP)
+      var sel=window.getSelection(); if(sel.rangeCount&&sel.isCollapsed){ var r=sel.getRangeAt(0), b=rtBlok(ed,r.startContainer);
+        if(b.tagName!=='LI'){ var pre=document.createRange(); pre.setStart(b,0); pre.setEnd(r.startContainer,r.startOffset);
+          var m=pre.toString().replace(/\u00a0/g,' ').match(/^\s*(\d+[.)]|[-•*])\s$/);
+          if(m){ b=jadiDaftar(b,m,sel); caretDi(b,false); document.execCommand(/\d/.test(m[1])?'insertOrderedList':'insertUnorderedList',false,null); } } }
       rtSimpan(ed); rtState(); });
-    ed.addEventListener('keydown',function(e){ if(e.key!=='Enter'||e.shiftKey) return; var sel=window.getSelection(); if(!sel.rangeCount) return;
-      var li=rtBlok(ed,sel.getRangeAt(0).startContainer); if(!li||li.tagName!=='LI') return;
-      if((li.textContent||'').replace(/\u00a0/g,'').trim()) return;
-      e.preventDefault(); var L=li.parentNode; document.execCommand(L&&L.tagName==='UL'?'insertUnorderedList':'insertOrderedList',false,null); rtSimpan(ed); rtState(); });
+    // Enter (keyboard laptop & HP): item kosong → keluar daftar; baris '1. teks' yang belum jadi daftar → dijadikan daftar lalu nomor berikutnya
+    ed.addEventListener('beforeinput',function(e){ if(e.inputType!=='insertParagraph') return; var sel=window.getSelection(); if(!sel.rangeCount) return;
+      var b=rtBlok(ed,sel.getRangeAt(0).startContainer); if(!b) return;
+      if(b.tagName==='LI'){ if((b.textContent||'').replace(/\u00a0/g,'').trim()) return;
+        e.preventDefault(); var L=b.parentNode; document.execCommand(L&&L.tagName==='UL'?'insertUnorderedList':'insertOrderedList',false,null); rtSimpan(ed); rtState(); return; }
+      var t=(b.textContent||'').replace(/\u00a0/g,' '), m=t.match(/^\s*(\d+\s*[.)]|[-•*])\s+(?=\S)/); if(!m) return;
+      e.preventDefault(); b=jadiDaftar(b,m,sel); caretDi(b,true);
+      document.execCommand(/\d/.test(m[1])?'insertOrderedList':'insertUnorderedList',false,null);
+      try{ var li0=rtBlok(ed,window.getSelection().getRangeAt(0).startContainer); if(li0&&li0.tagName==='LI') caretDi(li0,true); }catch(x){}
+      // gabung dengan daftar tepat di atasnya supaya nomor lanjut (mis. 3 setelah 2)
+      try{ var li=rtBlok(ed,window.getSelection().getRangeAt(0).startContainer), Lb=li&&li.parentNode, wrap=Lb&&Lb.parentNode!==ed&&Lb.parentNode.childNodes.length===1?Lb.parentNode:Lb, prv=wrap&&wrap.previousSibling;
+        while(prv&&prv.nodeType===3&&!prv.nodeValue.trim()) prv=prv.previousSibling;
+        var pL=prv&&prv.nodeType===1?(prv.tagName===Lb.tagName?prv:(prv.lastElementChild&&prv.lastElementChild.tagName===Lb.tagName?prv.lastElementChild:null)):null;
+        if(pL){ while(Lb.firstChild) pL.appendChild(Lb.firstChild); wrap.remove(); caretDi(li,true); } }catch(x){}
+      document.execCommand('insertParagraph',false,null); rtSimpan(ed); rtState(); });
     ed.addEventListener('paste',function(e){ var t=(e.clipboardData||window.clipboardData); if(!t) return; e.preventDefault(); document.execCommand('insertText',false,t.getData('text/plain')); });
     ed.addEventListener('keyup',rtState); ed.addEventListener('mouseup',rtState);
   }
@@ -13686,11 +13699,12 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
 <!-- ===================== VERSI APLIKASI ===================== -->
 <script>
 // Ubah setiap kali ada update: x.y.z  (z = perbaikan kecil, y = fitur baru, x = perubahan besar)
-window.APP_VERSION='3.42.0';
+window.APP_VERSION='3.42.1';
 window.APP_BUILD='2026-11-16';
-window.APP_NOTES='Catatan seperti Word: tebal, miring, garis bawah, coret, stabilo, nomor otomatis & Rapikan; Log Kuitansi Otomatis jadi tab sendiri.';
+window.APP_NOTES='Catatan: Enter di baris "1. …" yang diketik sebelumnya kini lanjut ke nomor 2; nomor otomatis juga jalan di keyboard HP.';
 // riwayat singkat (terbaru di atas) — tampil terlipat di halaman Admin
 window.APP_RIWAYAT=[
+  ['3.42.1','2026-11-16','Catatan: Enter di baris "1. …" yang sudah ada (diketik sebelum update) kini langsung lanjut ke nomor berikutnya; nomor/poin otomatis juga jalan di keyboard HP.'],
   ['3.42.0','2026-11-16','Catatan: toolbar seperti Word (tebal, miring, garis bawah, coret, stabilo, hapus format), ketik "1. " / "- " jadi daftar nomor/poin otomatis (Enter = nomor berikutnya, urut sendiri), tombol ✨ Rapikan untuk catatan lama. Kuitansi Otomatis: 📜 Log jadi tab sendiri di samping Bukti Transfer & Buku Kas.'],
   ['3.41.0','2026-11-11','Ketik AI — Pendaftaran: beberapa siswa dalam 1 pesan (kartu per siswa, Lewati, ✓ Buat N Kuitansi); siswa pindahan dikenali — Mulai Pendidikan terisi otomatis (SPP sebelum bulan itu tidak ditagih), diskon pindahan selalu ditanyakan bila tidak disebut.'],
   ['3.40.0','2026-11-09','Rekord Siswa: Rincian per Bulan menampilkan tanggal bayar tiap kuitansi; tombol ＋ Buat kuitansi di atas popup dan Bayar di bulan kurang/belum → form Kwitansi langsung terisi siswa & bulan SPP.'],
