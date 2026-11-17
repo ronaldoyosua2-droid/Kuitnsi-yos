@@ -11258,7 +11258,7 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
       h+='Dikirim oleh <b>'+esc(P.self?'Anda sendiri':(P.nama||'?'))+'</b>'+(P.no?' · '+esc(nomorFmt(P.no)):'')+(P.terdaftar?(P.kelas?' · <span class="bt-st ok">wali '+esc(P.kelas)+'</span>':' · <span class="bt-st ok">terdaftar</span>'):(!P.self&&c.state==='ok'?' · <span class="bt-b sm" onclick="btSimpanWali(\''+c.id+'\')" title="Simpan sebagai wali kelas / pengirim">+ Daftarkan</span>':''))+' · '; }
     h+='ditempel '+c.ditambah.toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'})+'</div>';
     if(c.state==='antri'){ return h+antriHtml(c,'btUlang','btHapus')+'</div></div>'; }
-    if(c.state==='reading'){ return h+'<div style="font-size:13px;color:#4b55a0"><span class="bt-spin"></span> '+esc(c.statusTxt||'AI sedang membaca bukti...')+' '+fbWaktuHtml(c,'btUlang','btBatal1','btHapus')+'</div>'+fotoHilangHtml(c,'btHapus')+'</div></div>'; }
+    if(c.state==='reading'){ return h+'<div style="font-size:13px;color:#4b55a0"><span class="bt-spin"></span> <span class="fb-stx" data-id="'+c.id+'">'+esc(c.statusTxt||'AI sedang membaca bukti...')+'</span> '+fbWaktuHtml(c,'btUlang','btBatal1','btHapus')+'</div>'+fotoHilangHtml(c,'btHapus')+'</div></div>'; }
     if(c.state==='error'){ return h+'<ul class="bt-reasons"><li class="b">✗ '+esc(c.err)+'</li></ul><div class="bt-acts"><span class="bt-b pri" onclick="btUlang(\''+c.id+'\')">Baca ulang</span><span class="bt-b red" onclick="btHapus(\''+c.id+'\')">Hapus</span></div></div></div>'; }
     function f(l,v){ return '<div class="bt-f"><label>'+l+'</label><div class="v">'+(v?esc(v):'<span class="miss">tidak ada</span>')+'</div></div>'; }
     h+='<div class="bt-fields">';
@@ -11869,7 +11869,7 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
     h+='<div class="bk-head">'+(pg.img?'<span class="bk-tw"><img class="bk-thumb" data-th="'+pg.id+'" src="'+kwThumb(pg)+'" onclick="bkZoom(\''+pg.id+'\',0)" title="Klik untuk memperbesar">'+(pg.imgs&&pg.imgs.length>1?'<span class="bk-nf">1/'+pg.imgs.length+'</span>':'')+'</span>':'<div class="bk-thumb"></div>')+
       '<div style="font-size:12.5px;color:var(--muted,#6b7280)">'+fbAsal(pg)+'📒 Buku <b style="color:var(--ink,#1f2a24)">'+esc(pg.jenjang)+'</b>'+(pg.fotoKe&&pg.fotoDari>1?' · <b>Foto '+pg.fotoKe+'/'+pg.fotoDari+'</b>':'')+(pg.lanjutDari?' <span class="bk-ljt">lanjutan</span>':'')+(pg.state==='ok'&&!pg.rows.some(function(r){return r.doneNo;})?' <select class="bk-jsel" onchange="bkGantiJenjang(\''+pg.id+'\',this.value)" title="Ganti jenjang buku">'+['TK','SD','SMP','SMK'].map(function(j){return '<option'+(j===pg.jenjang?' selected':'')+'>'+j+'</option>';}).join('')+'</select>':'')+' · ditambah '+pg.ditambah.toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'})+'<br><span style="font-size:11.5px">Klik foto untuk memperbesar & mencocokkan dengan tabel.</span></div></div><div>';
     if(pg.state==='antri') return h+antriHtml(pg,'bkUlang','bkHapus')+'</div></div>';
-    if(pg.state==='reading') return h+'<div style="font-size:13px;color:#4b55a0"><span class="bt-spin"></span> '+esc(pg.statusTxt||'AI sedang membaca halaman buku...')+' '+fbWaktuHtml(pg,'bkUlang','bkBatal1','bkHapus')+'</div>'+fotoHilangHtml(pg,'bkHapus')+'</div></div>';
+    if(pg.state==='reading') return h+'<div style="font-size:13px;color:#4b55a0"><span class="bt-spin"></span> <span class="fb-stx" data-id="'+pg.id+'">'+esc(pg.statusTxt||'AI sedang membaca halaman buku...')+'</span> '+fbWaktuHtml(pg,'bkUlang','bkBatal1','bkHapus')+'</div>'+fotoHilangHtml(pg,'bkHapus')+'</div></div>';
     if(pg.state==='error') return h+'<ul class="bt-reasons"><li class="b">✗ '+esc(pg.err)+'</li></ul><div class="bt-acts"><span class="bt-b pri" onclick="bkUlang(\''+pg.id+'\')">Baca ulang</span><span class="bt-b red" onclick="bkHapus(\''+pg.id+'\')">Hapus</span></div></div></div>';
     var n={siap:0,cek:0,coret:0,ada:0,manual:0,done:0,err:0}, pil=0, tot=0;
     pg.rows.forEach(function(r){ n[r.status]=(n[r.status]||0)+1; if(r.pilih&&r.status!=='done'&&r.status!=='manual'){ pil++; tot+=Number(r.bayar)||0; } });
@@ -12640,8 +12640,11 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
     var pasang=function(imgs){
       o.ditambah=new Date(o.ditambah||Date.now()); o._fb={dn:d.dn,dev:d.dev,t:d.t,n:d.n}; if(lok&&lok._baca&&o.state!=='ok') o._baca=lok._baca;
       if(imgs&&imgs.length){ o.imgs=imgs; o.img=imgs[0].url; } else if(lok){ o.imgs=lok.imgs; o.img=lok.img; }
+      // v3.44: hanya teks status / waktu yang berubah → perbarui teksnya saja (kartu tidak digambar ulang → tombol tidak kedip)
+      var kecil=false; if(lok&&!imgs){ kecil=true; Object.keys(o).concat(Object.keys(lok)).forEach(function(k){ if(!kecil||k==='statusTxt'||k==='_fb'||k==='imgs'||k==='img'||k==='ditambah'||k.charAt(0)==='_') return; if(JSON.stringify(o[k])!==JSON.stringify(lok[k])) kecil=false; }); }
       if(lok){ for(var k in lok) if(!(k in o)) delete lok[k]; for(var k2 in o) lok[k2]=o[k2]; }
       else { arr.unshift(o); arr.sort(function(a,b){ return b.ditambah-a.ditambah; }); }
+      if(kecil){ var se=document.querySelector('.fb-stx[data-id="'+id+'"]'); if(se){ se.textContent=lok.statusTxt||(d.k==='bk'?'AI sedang membaca halaman buku...':'AI sedang membaca bukti...'); if(d.k==='bk') simpanBK(); else simpanQ(); return; } }
       if(d.k==='bk'){ simpanBK(); bkRender(); } else { simpanQ(); render(); }
     };
     if(d.k!=='last') FB.nfoto[id]=Math.max(FB.nfoto[id]||0,d.n||0);
@@ -12674,22 +12677,41 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
   setTimeout(function(){ if(fbCfg()) fbMulai(); },1800);
 
   function fbWaktuHtml(o,fn,fnBatal,fnHapus){
-    var m=o.mulaiBaca||'', lain=!!(o.pembaca?o.pembaca!==FB.dev:(o._fb&&o._fb.dev&&o._fb.dev!==FB.dev));
-    return '<span class="fb-wkt" data-m="'+m+'"></span>'+(lain?' <span class="bt-b sm fb-alih" data-m="'+m+'" style="display:none" onclick="'+fn+'(\''+o.id+'\')" title="Perangkat lain lama membaca — baca ulang di perangkat ini">↻ Baca di '+(FB.nama==='HP'?'HP':'laptop')+' ini</span>':'')+
-      (fnBatal?' <span class="bt-b sm fb-btl" data-m="'+m+'" style="display:none" onclick="'+fnBatal+'(\''+o.id+'\')">✕ Batalkan</span> <span class="bt-b sm red fb-btl" data-m="'+m+'" style="display:none" onclick="'+fnHapus+'(\''+o.id+'\')">Hapus</span>':'');
+    var m=o.mulaiBaca||'', lain=!!(o.pembaca?o.pembaca!==FB.dev:(o._fb&&o._fb.dev&&o._fb.dev!==FB.dev)), now=Date.now();
+    // v3.44: tampil/sembunyi dihitung saat digambar (dulu selalu disembunyikan dulu → tombol kedip tiap ada kabar dari laptop)
+    var hp=!pembacaOn(), tAlih=(!m||hp||now-m>60000)?'':'display:none', tBtl=(!m||now-m>120000)?'':'display:none';
+    var keHP=(o._baca&&o._fb&&o._fb.dn==='HP'&&pembacaOn())?' <span class="bt-b sm pri" onclick="'+(fn==='bkUlang'?'bkKeHP':'btKeHP')+'(\''+o.id+'\')" title="Laptop berhenti membaca, HP yang membaca (aplikasi di HP harus terbuka)">📱 Baca di HP saja</span>':'';
+    return '<span class="fb-wkt" data-m="'+m+'"></span>'+keHP+(lain?' <span class="bt-b sm fb-alih'+(hp?' fb-alih-hp':'')+'" data-m="'+m+'" style="'+tAlih+'" onclick="'+fn+'(\''+o.id+'\')" title="Baca di perangkat ini">'+(hp?'📱 Ambil alih, baca di HP':'↻ Baca di laptop ini')+'</span>':'')+
+      (fnBatal?' <span class="bt-b sm fb-btl" data-m="'+m+'" style="'+tBtl+'" onclick="'+fnBatal+'(\''+o.id+'\')">✕ Batalkan</span> <span class="bt-b sm red fb-btl" data-m="'+m+'" style="'+tBtl+'" onclick="'+fnHapus+'(\''+o.id+'\')">Hapus</span>':'');
   }
+  // v3.44: alihkan baca ke HP (manual dari laptop, atau otomatis bila laptop lambat / AI sibuk)
+  function hpAktif(dev){ var d=DEVS[dev]; return !!(d&&Date.now()-(d.t||0)<150000); }
+  function mintaHP(o,k,otomatis){ var lama=o.mulaiBaca?Math.round((Date.now()-o.mulaiBaca)/1000):0;
+    delete o._baca; o.state='antri'; o.mintaHP=Date.now(); o.statusTxt=''; o.antriSejak=Date.now();
+    try{ kwBug('ai',otomatis?'Dialihkan ke HP (otomatis)':'Dialihkan ke HP',(lama?'laptop '+lama+' dtk':'')+(o._ulang?' · '+o._ulang+'× sibuk':'')); }catch(e){}
+    delete o._ulang; if(k==='bk'){ simpanBK(); bkRender(); } else { simpanQ(); render(); } }
+  window.btKeHP=function(id){ var c=C(id); if(c) mintaHP(c,'tf'); };
+  window.bkKeHP=function(id){ var p=bkP(id); if(p) mintaHP(p,'bk'); };
   function fotoHilangHtml(o,fnHapus){ return o.fotoHilang?'<div class="fb-hilang">📷 Foto belum terkirim dari '+esc((o._fb&&o._fb.dn)||'perangkat lain')+' — buka aplikasi di '+esc((o._fb&&o._fb.dn)||'perangkat itu')+'. <span class="bt-b sm red" onclick="'+fnHapus+'(\''+o.id+'\')">Hapus kartu</span></div>':''; }
   function antriHtml(o,fnBaca,fnHapus){
     var dariSini=!(o._fb&&o._fb.dev&&o._fb.dev!==FB.dev), lap=laptopAktif();
+    if(o.mintaHP) return '<div class="fb-antri">📱 <b>Dialihkan — dibaca di HP</b><div class="bt-sub" style="margin-top:3px">'+(pembacaOn()?'Menunggu HP membaca (aplikasi di HP harus terbuka). Hasilnya muncul otomatis di sini.':'HP ini akan membaca sebentar lagi…')+'</div>'+
+      '<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap"><span class="bt-b sm" onclick="'+fnBaca+'(\''+o.id+'\')">'+(pembacaOn()?'💻 Baca di laptop saja':'📱 Baca sekarang')+'</span><span class="bt-b sm red" onclick="'+fnHapus+'(\''+o.id+'\')">Hapus</span></div></div>';
     return '<div class="fb-antri">⏳ <b>Menunggu dibaca laptop</b>'+(o.imgs&&o.imgs.length?' · <span style="color:#2f7a55">✓ Foto terkirim'+(dariSini?' — boleh tutup aplikasi':'')+'</span>':'')+
       '<div class="bt-sub" style="margin-top:3px">'+(lap?'💻 '+esc(lap)+' aktif — segera dibaca':'💻 Laptop tidak aktif — foto menunggu, dibaca saat laptop dibuka')+'</div>'+
       '<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap"><span class="bt-b sm" onclick="'+fnBaca+'(\''+o.id+'\')">📱 Baca di '+(FB.nama==='HP'?'HP':'perangkat')+' ini saja</span><span class="bt-b sm red" onclick="'+fnHapus+'(\''+o.id+'\')">Hapus</span></div></div>';
   }
+  setInterval(function(){ if(!FB.on) return; var now=Date.now();
+    Q.concat(BK).forEach(function(o){ var bk=BK.indexOf(o)>=0;
+      if(!pembacaOn()){ // HP: kartu yang diminta laptop untuk dibaca di HP
+        if(o.mintaHP&&o.state==='antri'&&o.imgs&&o.imgs.length&&!o._baca&&!o._klaimHP){ o._klaimHP=1; delete o.mintaHP; o._paksa=true; setTimeout(function(){ delete o._klaimHP; bk?bkProses(o):proses(o); },200); }
+      } else if(o.state==='reading'&&o._baca&&!o._autoHP&&o._fb&&o._fb.dn==='HP'&&hpAktif(o._fb.dev)&&o.mulaiBaca&&(now-o.mulaiBaca>40000||(o._ulang||0)>=2)){ o._autoHP=1; mintaHP(o,bk?'bk':'tf',true); }
+    }); },2000);
   function fbDurasi(ms){ var d=Math.max(0,Math.round(ms/1000)); return d<60?d+' dtk':Math.floor(d/60)+' mnt '+(d%60)+' dtk'; }
   setInterval(function(){
     var now=Date.now();
     document.querySelectorAll('.fb-wkt').forEach(function(e){ var m=+e.dataset.m; e.textContent=m?'· ⏱ '+fbDurasi(now-m):''; });
-    document.querySelectorAll('.fb-alih').forEach(function(e){ var m=+e.dataset.m; e.style.display=(!m||now-m>60000)?'':'none'; });
+    document.querySelectorAll('.fb-alih').forEach(function(e){ var m=+e.dataset.m; e.style.display=(!m||e.classList.contains('fb-alih-hp')||now-m>60000)?'':'none'; });
     document.querySelectorAll('.fb-btl').forEach(function(e){ var m=+e.dataset.m; e.style.display=(!m||now-m>120000)?'':'none'; });
     // kartu perangkat lain yang 'membaca' > 10 menit → terputus
     var ub=false; Q.concat(BK).forEach(function(o){ if(o.state==='reading'&&!o._baca&&o.mulaiBaca&&now-o.mulaiBaca>600000){ o.state='error'; o.err='Terputus — perangkat lain tidak memberi kabar 10 menit. Klik Baca ulang.'; o.statusTxt=''; ub=true; } });
@@ -12714,14 +12736,14 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
   function hpTunda(){ return !!(FB.on&&hpModeOn()&&!pembacaOn()); }
   window.hpTunda=hpTunda;
   function laptopAktif(){ var now=Date.now(), n=''; Object.keys(DEVS).forEach(function(k){ var d=DEVS[k]; if(k!==FB.dev&&d.pembaca&&now-(d.t||0)<150000) n=d.dn||'Laptop'; }); return n; }
-  function detak(){ if(!FB.on||!pembacaOn()) return; fbCol('perangkat').doc(FB.dev).set({dn:FB.nama,t:Date.now(),pembaca:true}).catch(function(){}); }
+  function detak(){ if(!FB.on) return; fbCol('perangkat').doc(FB.dev).set({dn:FB.nama,t:Date.now(),pembaca:pembacaOn()}).catch(function(){}); }   // v3.44: HP juga memberi kabar (untuk alih otomatis)
   setInterval(detak,60000);
   function dengarPerangkat(){ if(FB._devUnsub||!FB.db) return; FB._devUnsub=fbCol('perangkat').onSnapshot(function(snap){ snap.docChanges().forEach(function(ch){ if(ch.type==='removed') delete DEVS[ch.doc.id]; else DEVS[ch.doc.id]=ch.doc.data()||{}; }); var la=laptopAktif(); if(la!==FB._lap){ FB._lap=la; render(); bkRender(); } },function(){}); }
   // laptop: ambil kartu 'antri' yang fotonya sudah ada lalu baca
   function ambilAntri(){
     if(!FB.on||!pembacaOn()) return;
     Q.concat(BK).forEach(function(o){
-      if(o.state!=='antri'||!o.imgs||!o.imgs.length||o._klaim) return;
+      if(o.state!=='antri'||!o.imgs||!o.imgs.length||o._klaim||o.mintaHP) return;
       o._klaim=1; setTimeout(function(){ delete o._klaim; if(o.state!=='antri') return; o._paksa=true; if(BK.indexOf(o)>=0) bkProses(o); else proses(o); },300+Math.random()*1500);
     });
   }
@@ -13724,11 +13746,12 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
 <!-- ===================== VERSI APLIKASI ===================== -->
 <script>
 // Ubah setiap kali ada update: x.y.z  (z = perbaikan kecil, y = fitur baru, x = perubahan besar)
-window.APP_VERSION='3.43.0';
+window.APP_VERSION='3.44.0';
 window.APP_BUILD='2026-11-17';
-window.APP_NOTES='Bukti TF: 1 bukti = 1 file di Drive, nama file pakai no kuitansi; log sync lebih jelas; sinkron catatan tidak dicoba terus saat gagal.';
+window.APP_NOTES='Kuitansi Otomatis: tombol 📱 Baca di HP saja di laptop + alih otomatis bila laptop lambat; tombol di HP tidak kedip lagi.';
 // riwayat singkat (terbaru di atas) — tampil terlipat di halaman Admin
 window.APP_RIWAYAT=[
+  ['3.44.0','2026-11-17','Kuitansi Otomatis: di laptop ada tombol 📱 Baca di HP saja untuk foto dari HP (sejak mulai dibaca); laptop otomatis mengalihkan ke HP bila AI sibuk 2× atau lebih dari 40 detik dan HP sedang terbuka; di HP tombol Baca/Ambil alih tidak kedip lagi.'],
   ['3.43.0','2026-11-17','Bukti Transfer: bukti yang sama tidak di-upload 2× ke Drive (pakai file yang sudah ada), peringatan dobel dengan tombol Lihat kuitansi / Buka di Drive / Hapus kartu, nama file di Drive diganti berisi no kuitansi (Apps Script v7). Log Bug menulis proses sync/Drive yang gagal; sinkron catatan berhenti 15 menit setelah gagal 3×.'],
   ['3.42.2','2026-11-16','Catatan: Enter di baris yang hanya berisi "1." (belum ada tulisannya) kini juga lanjut ke nomor 2.'],
   ['3.42.1','2026-11-16','Catatan: Enter di baris "1. …" yang sudah ada (diketik sebelum update) kini langsung lanjut ke nomor berikutnya; nomor/poin otomatis juga jalan di keyboard HP.'],
