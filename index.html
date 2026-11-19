@@ -12543,9 +12543,10 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
     if(!LE_SIAP) return; var ubah=false;
     BK.forEach(function(p){ if(p.state!=='ok') return;
       var done=p.rows.filter(function(r){return r.doneNo;}); if(!done.length) return;
-      var sig=done.map(function(r){return r.doneNo;}).join(',')+'|'+((p.drive&&p.drive[0]&&p.drive[0].url)||'');
+      var sig=bkLeSig(p);
       var e=LASTBK.filter(function(x){return x.id===p.id;})[0];
       if(e&&e.sig===sig) return;
+      if(!e&&LE_KELUAR[p.id]===sig) return; // v3.47.1: sudah keluar dari 2 terakhir & tidak ada kuitansi baru → jangan dibuat lagi (dulu: 3+ kartu selesai → Last Entry berputar terus → sync bolak-balik HP↔laptop → kartu kedip)
       if(!e){ e={id:p.id,kind:'bk'}; LASTBK.unshift(e); } else if(e.nDone!==done.length){ LASTBK=[e].concat(LASTBK.filter(function(x){return x!==e;})); }
       var tgl=[]; p.rows.forEach(function(r){ if(r.tgl&&tgl.indexOf(r.tgl)<0) tgl.push(r.tgl); });
       e.sig=sig; e.waktu=new Date().toISOString(); e.jenjang=p.jenjang; e.tgl=tgl; e.nBaris=p.rows.length; e.nDone=done.length;
@@ -12555,8 +12556,11 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
       e.rows=p.rows.map(function(r){ return {n:r.aiNama||'',k:r.aiKelas||'',s:r.nama||'',ket:r.ket||'',b:Number(r.bayar)||0,m:r.metode||'',no:r.doneNo||'',st:r.status}; });
       e.driveUrl=(p.drive&&p.drive[0]&&p.drive[0].url)||e.driveUrl||'';
       ubah=true; });
-    if(ubah){ LASTBK=LASTBK.slice(0,2); leSimpanDB(); }
+    if(ubah){ LASTBK.slice(2).forEach(function(x){ LE_KELUAR[x.id]=x.sig; }); LASTBK=LASTBK.slice(0,2); leSimpanDB(); }
   }
+  var LE_KELUAR={};
+  function bkLeSig(p){ var done=p.rows.filter(function(r){return r.doneNo;}); return done.map(function(r){return r.doneNo;}).join(',')+'|'+((p.drive&&p.drive[0]&&p.drive[0].url)||''); }
+  window._leKeluar=function(id){ var p=BK.filter(function(x){ return x.id===id; })[0]; if(p) LE_KELUAR[id]=bkLeSig(p); };
   window._leBkDebug={L:function(){return LASTBK;}};
   function lastBkHtml(){
     if(!LASTBK.length) return '<div class="bt-empty">Belum ada. Setelah kuitansi dibuat dari halaman buku kas, 2 halaman terakhir muncul di sini.</div>';
@@ -12626,7 +12630,16 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
   document.addEventListener('change',function(){ _dlmUbah=0; },false);
   function pilihAktif(wrapId){ var a=document.activeElement, w=$(wrapId); return a&&a.tagName==='SELECT'&&w&&w.contains(a)?a:null; }
   // daftar pilihan (bulan, jenis) sedang dibuka → gambar ulang dari luar (sinkron/HP/timer) ditunda sampai selesai memilih (maks 20 dtk)
-  function tundaGambar(k,wrapId,jalankan){ var sl=pilihAktif(wrapId); if(!sl||_dlmUbah) return false;
+  // v3.47.1: tombol ditekan di kartu → gambar ulang ditunda sampai klik selesai (dulu kartu diganti di antara tekan & lepas → klik hilang, harus klik 2×)
+  var _tekan=0, _tekanQ={};
+  function lepasTekan(){ if(!_tekan) return; _tekan=0; var Q=_tekanQ; _tekanQ={}; Object.keys(Q).forEach(function(k){ setTimeout(function(){ Q[k](); },0); }); }
+  document.addEventListener('pointerdown',function(e){ var t=e.target; if(e.button===0&&t&&t.closest&&(t.closest('#bt-list')||t.closest('#bk-list'))&&!/^(INPUT|TEXTAREA|SELECT|OPTION)$/.test(t.tagName)){ _tekan=Date.now(); } },true);
+  document.addEventListener('click',function(){ if(_tekan) lepasTekan(); },true);
+  document.addEventListener('pointerup',function(){ var t0=_tekan; if(t0) setTimeout(function(){ if(_tekan===t0) lepasTekan(); },350); },true);
+  document.addEventListener('pointercancel',function(){ lepasTekan(); },true);
+  function tundaGambar(k,wrapId,jalankan){
+    if(_tekan&&Date.now()-_tekan<3000){ _tekanQ[k]=jalankan; return true; }
+    var sl=pilihAktif(wrapId); if(!sl||_dlmUbah) return false;
     var t=_tunda[k]; if(t){ t.fn=jalankan; return true; }
     t=_tunda[k]={fn:jalankan}; var lepas=function(){ sl.removeEventListener('blur',lepas); var x=_tunda[k]; if(!x) return; clearTimeout(x.bt); _tunda[k]=null; setTimeout(function(){ x.fn(); },0); };
     sl.addEventListener('blur',lepas); t.bt=setTimeout(function(){ var x=_tunda[k]; if(!x) return; _tunda[k]=null; x.fn(); },20000);
@@ -12743,7 +12756,7 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
       delete FB.sent[id];
       var nq=Q.length, nb=BK.length, nl=LAST.length+LASTBK.length;
       Q=Q.filter(function(c){ return c.id!==id||c.state==='reading'&&!c._fb; }); BK=BK.filter(function(p){ return p.id!==id; });
-      LAST=LAST.filter(function(e){ return 'last_'+e.id!==id; }); LASTBK=LASTBK.filter(function(e){ return 'last_'+e.id!==id; });
+      LAST=LAST.filter(function(e){ return 'last_'+e.id!==id; }); LASTBK=LASTBK.filter(function(e){ if('last_'+e.id!==id) return true; try{ window._leKeluar(e.id); }catch(x){} return false; });
       if(nq!==Q.length||nb!==BK.length||nl!==LAST.length+LASTBK.length){ simpanQ(); render(); bkRender(); leSimpanDB(); } return; }
     if(FB.sent[id]===d.j) return;
     if(d.dev===FB.dev&&!(d.k==='last'&&!LAST.concat(LASTBK).some(function(e){ return 'last_'+e.id===id; }))) return;
@@ -12753,7 +12766,7 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
       var pakai=function(img){ if(o.kind==='bk') o.img=img||o.img||''; else o.imgs=img?[img]:(e&&e.imgs)||[];
         if(e){ for(var k in o) e[k]=o[k]; } else L.push(o);
         L.sort(function(a,b){ return (b.waktu||'').localeCompare(a.waktu||''); });
-        if(o.kind==='bk') LASTBK=L.slice(0,2); else LAST=L.slice(0,2); leSimpanDB(); render(); bkRender(); };
+        if(o.kind==='bk'){ L.slice(2).forEach(function(x){ try{ window._leKeluar(x.id); }catch(y){} }); LASTBK=L.slice(0,2); } else LAST=L.slice(0,2); leSimpanDB(); render(); bkRender(); };
       if(e&&((e.imgs&&e.imgs[0])||e.img)) pakai(''); else if(d.n) fbFoto(id,1).then(function(a){ pakai(a[0]?a[0].url:''); }); else pakai('');
       return; }
     var arr=d.k==='bk'?BK:Q, lok=arr.filter(function(x){return x.id===id;})[0];
@@ -13871,11 +13884,12 @@ body.pg-bt .kw-sidebar{display:none!important}body.pg-bt #page-buktiTf{padding-r
 <!-- ===================== VERSI APLIKASI ===================== -->
 <script>
 // Ubah setiap kali ada update: x.y.z  (z = perbaikan kecil, y = fitur baru, x = perubahan besar)
-window.APP_VERSION='3.47.0';
+window.APP_VERSION='3.47.1';
 window.APP_BUILD='2026-11-18';
-window.APP_NOTES='Bukti TF: tabel rincian cicilan per bulan di kartu dan tombol Buat Kuitansi langsung dari kartu.';
+window.APP_NOTES='Perbaikan: tombol kartu cukup sekali klik; kartu tidak kedip lagi (Last Entry Buku Kas tidak bolak-balik sync HP dan laptop).';
 // riwayat singkat (terbaru di atas) — tampil terlipat di halaman Admin
 window.APP_RIWAYAT=[
+  ['3.47.1','2026-11-19','Perbaikan: tombol di kartu Kuitansi Otomatis harus diklik 2× (kartu digambar ulang di antara tekan & lepas tombol) — sekarang cukup sekali. Kartu kedip & tidak bisa diketik: 3+ halaman Buku Kas selesai membuat Last Entry berputar terus → sync HP↔laptop bolak-balik tanpa henti — sekarang berhenti.'],
   ['3.47.0','2026-11-18','Bukti Transfer: tabel Rincian cicilan per bulan di kartu (bulan terlama dulu, lunas / kurang); tombol ✓ Buat Kuitansi langsung dari kartu (popup konfirmasi, Transfer, tanggal transfer) — Isi ke Kuitansi tetap ada untuk cek di form.'],
   ['3.46.0','2026-11-18','Kuitansi Otomatis: daftar bulan tidak tertutup sendiri saat kartu diperbarui; transfer lebih dari tagihan (bulan tidak disebut) → bulan diperpanjang otomatis, bulan terakhir Cicil (↺ Jangan perpanjang); Log Bug mencatat tombol error / tombol nonaktif diklik / pilihan tidak tersimpan / ketikan terputus; progres masa tes dihitung 14 hari terakhir; Salin untuk Claude = sejak salinan terakhir + Salin semua.'],
   ['3.45.0','2026-11-18','Kuitansi Otomatis: tombol besar 🖼 Pilih dari galeri di HP; sebelum hapus kartu dicek dulu ke Drive (kartu yang belum di Drive tidak hilang sendiri); ↻ Coba lagi muncul setelah 30 detik / 2× sibuk; tombol di kartu tidak bergeser; kursor tidak terlempar saat mengetik nama siswa.'],
