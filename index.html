@@ -13959,12 +13959,13 @@ body.pg-bt:not(.bt-sb-on) .kw-sidebar{display:none!important}body.pg-bt:not(.bt-
 <!-- ===================== VERSI APLIKASI ===================== -->
 <script>
 // Ubah setiap kali ada update: x.y.z  (z = perbaikan kecil, y = fitur baru, x = perubahan besar)
-window.APP_VERSION='3.49.0';
+window.APP_VERSION='3.50.0';
 window.APP_BUILD='2026-11-23';
-window.APP_NOTES='Buku Kas tidak macet lagi, Ketik AI tidak berputar terus, Daftar Siswa di Kuitansi Otomatis, pop-up update.';
-window.APP_WN={"v": "3.49.0", "new": ["\"Update available\" pop-up with Update now and Later (minimizes to a small 🔔 button)", "What's new is now in English, grouped by New and Fixed"], "fixed": ["Buku Kas no longer freezes: clicking, typing names and amounts respond right away", "Opening Kuitansi Otomatis is faster", "Ketik AI no longer spins forever: after 30 seconds it shows AI busy with ↻ Try again, and switches to the lighter AI model when the main one is busy", "Ketik AI finds the payment amount better, even when it is not written as DP or bayar", "📋 Daftar Siswa button works on Kuitansi Otomatis: clicking a name fills the active row"]};
+window.APP_NOTES='Program bantuan: Pak Kim (tarif per kelas) dan Edu (dana per siswa), buat kuitansi semua siswanya sekaligus.';
+window.APP_WN={"v": "3.50.0", "new": ["🤝 Program bantuan — Pak Kim with its own monthly fee per class (3 SD 120.000 … 6 SD 150.000), adjustable any time with a start month", "Receive bantuan payment — choose the months, and receipts for all students in the program are created at once, marked Dibayar oleh: Bantuan Pak Kim", "Bantuan Edu — normal SPP; type the fund per student and it is split over the unpaid months like Mode Cicilan", "Add or remove students from a program from a chosen month; class promotion follows the new class fee automatically"], "fixed": []};
 // riwayat singkat (terbaru di atas) — tampil terlipat di halaman Admin
 window.APP_RIWAYAT=[
+  ['3.50.0','2026-11-23','🤝 Program bantuan: Pak Kim memakai tarif SPP khusus per kelas (bisa diubah, berlaku mulai bulan tertentu) — tombol Terima bantuan membuat kuitansi semua siswanya sekaligus (Dibayar oleh: Bantuan Pak Kim); Bantuan Edu: SPP normal, dana per siswa dibagi ke bulan yang belum lunas; siswa bisa ditambah / dikeluarkan mulai bulan tertentu; atur di Kelola Siswa → Program bantuan'],
   ['3.49.0','2026-11-23','Buku Kas tidak macet lagi (klik, ketik nama & nominal langsung); buka Kuitansi Otomatis lebih cepat; Ketik AI tidak berputar terus (30 detik → ↻ Coba lagi, pindah ke model ringan bila sibuk) dan lebih teliti membaca jumlah bayar; tombol 📋 Daftar Siswa berfungsi di Kuitansi Otomatis (klik nama → mengisi baris aktif); pop-up Update tersedia yang bisa diminimize; What’s new dalam bahasa Inggris (New / Fixed)'],
   ['3.48.0','2026-11-23','🧮 Kalkulator SPP (menu baru): hitung pembagian uang SPP per bulan — lunas atau kurang berapa; bisa membaca pembayaran dari rekord siswa; hanya menghitung, tidak menyimpan apa pun; 🚪 Buku Kas: baris siswa keluar / pindah dapat tombol Kuitansi Pindah — form Siswa Pindah langsung terisi, setelah dibuat baris jadi ✓; ✨ Ketik AI lebih teliti: ketikan pakai Enter tetap terbaca, nama / kelas / DP / formulir yang sudah ditulis tidak ditanya lagi, memakai model AI yang lebih pintar; 🎉 Pop-up What’s new seperti ini muncul setiap kali aplikasi diperbarui'],
   ['3.47.1','2026-11-19','Perbaikan: tombol di kartu Kuitansi Otomatis harus diklik 2× (kartu digambar ulang di antara tekan & lepas tombol) — sekarang cukup sekali. Kartu kedip & tidak bisa diketik: 3+ halaman Buku Kas selesai membuat Last Entry berputar terus → sync HP↔laptop bolak-balik tanpa henti — sekarang berhenti.'],
@@ -14874,6 +14875,216 @@ body.hp-lihat #page-kwitansi .btn-primary[onclick*="buatKwitansi"]{opacity:.55}
   if(typeof _sp==='function') window.showPage=function(pg){ var r=_sp.apply(this,arguments);
     if(pg!=='buktiTf'&&document.body.classList.contains('bt-sb-on')){ document.body.classList.remove('bt-sb-on'); var sb=document.querySelector('.kw-sidebar'), m=''; try{ m=localStorage.getItem('ya_sidebar_min')||''; }catch(e){} if(sb&&m==='1') sb.classList.add('sb-minimized'); }
     return r; };
+})();
+</script>
+<!-- ===================== v3.50: PROGRAM BANTUAN (Pak Kim: tarif per kelas · Edu: dana per siswa) ===================== -->
+<style>
+#bn-modal .bn-box{width:min(900px,100%);max-height:90vh;overflow:auto}
+#bn-modal .bn-tabs{display:flex;gap:6px;margin:10px 0}
+#bn-modal .bn-tab{padding:6px 14px;border-radius:18px;border:1px solid var(--border,#d1d5db);cursor:pointer;font-size:13px;font-weight:600}
+#bn-modal .bn-tab.on{background:#1f2a24;color:#fff;border-color:#1f2a24}
+#bn-modal table{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}
+#bn-modal th,#bn-modal td{padding:6px 8px;border-bottom:1px solid #eee;text-align:left;vertical-align:middle}
+#bn-modal th{background:#f9fafb;font-size:12px}
+#bn-modal input,#bn-modal select{padding:6px 9px;border:1px solid var(--border,#d1d5db);border-radius:8px;font:inherit;font-size:13px;background:var(--surface,#fff);color:inherit}
+#bn-modal .mut{color:var(--text2,#6b7280);font-size:12px}#bn-modal .g{color:#1d7a3e}#bn-modal .r{color:#b91c1c}
+#bn-modal .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:8px}
+#bn-modal .row select,#bn-modal .row input,#bn-modal td input,#bn-modal td select{width:auto!important;min-width:0}#bn-modal #bn-prog{width:auto!important;flex:1;min-width:0}#bn-modal b{white-space:nowrap}
+.bn-tag{display:inline-block;background:#fff4d6;color:#8a5a00;border-radius:8px;padding:0 7px;font-size:11.5px;font-weight:700}
+</style>
+<script>
+(function(){
+  var DANA_LS='ya_bantuan_dana';
+  function $(i){ return document.getElementById(i); }
+  function esc(v){ return String(v==null?'':v).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+  function rp(n){ return 'Rp '+Number(n||0).toLocaleString('id-ID'); }
+  function angka(v){ return parseInt(String(v||'').replace(/\D/g,''),10)||0; }
+  function mi2k(mi){ return Math.floor(mi/12)+'-'+String(mi%12+1).padStart(2,'0'); }
+  function k2mi(k){ var a=String(k||'').split('-'); return a.length<2?null:(+a[0])*12+(+a[1]-1); }
+  function lbl(mi){ return BULAN[mi%12]+' '+Math.floor(mi/12); }
+  function tglMi(mi){ return mi2k(mi)+'-01'; }
+  function taY(){ try{ return parseInt(getTAAktif().split('/')[0])||new Date().getFullYear(); }catch(e){ return new Date().getFullYear(); } }
+  function nowMi(){ var d=new Date(); return d.getFullYear()*12+d.getMonth(); }
+  function opsi(sel,a,n){ var h=''; for(var i=a;i<a+n;i++) h+='<option value="'+i+'"'+(i===sel?' selected':'')+'>'+lbl(i)+'</option>'; return h; }
+  function sis(){ return getSiswa()||[]; }
+  function cari(nama){ return sis().find(function(s){ return s.nama===nama; }); }
+  // ---------- tarif bantuan (per kelas, berlaku mulai bulan) ----------
+  function kelasKey(map,kelas){ if(!map) return null; if(map[kelas]!=null) return map[kelas]; var b=String(kelas||'').replace(/\s*plus$/i,'').trim(); return map[b]!=null?map[b]:null; }
+  function aktif(s,mi){ var b=s&&s.bantuan; if(!b||b.jenis!=='kelas') return false; var m=k2mi(b.mulai); if(m!=null&&mi<m) return false; var k=k2mi(b.keluar); if(k!=null&&mi>=k) return false; return true; }
+  function tarifBantuan(s,kelasEf,mi){ if(!aktif(s,mi)) return null; var T=(s.bantuan.tarif||[]).filter(function(t){ return k2mi(t.mulai)<=mi; }).sort(function(a,b){ return k2mi(b.mulai)-k2mi(a.mulai); })[0]; if(!T) return null; var v=kelasKey(T.map,kelasEf); return v>0?v:null; }
+  var _g=window.getSppNominalSiswa;
+  if(typeof _g==='function') window.getSppNominalSiswa=function(nama,kelas,spp,tgl){
+    try{ var s=cari(nama); if(s&&s.bantuan&&s.bantuan.jenis==='kelas'){ var d=tgl?String(tgl).slice(0,7):''; var mi=d?k2mi(d):nowMi(); var t=tarifBantuan(s,kelas,mi); if(t) return t; } }catch(e){}
+    return _g.apply(this,arguments); };
+  window.kwBantuanSiswa=function(nama,mi){ var s=cari(nama); return s&&aktif(s,mi==null?nowMi():mi)?s.bantuan.p:''; };
+  // ---------- daftar program ----------
+  function progKelas(){ var P={}; sis().forEach(function(s){ var b=s.bantuan; if(b&&b.jenis==='kelas'&&b.p){ (P[b.p]=P[b.p]||{p:b.p,jenis:'kelas',tarif:b.tarif||[],siswa:[]}).siswa.push(s); } }); return P; }
+  function progDana(){ var L=['Bantuan Edu']; try{ var x=JSON.parse(localStorage.getItem(DANA_LS)||'[]'); x.forEach(function(n){ if(L.indexOf(n)<0) L.push(n); }); }catch(e){} return L; }
+  var B={tab:'terima',prog:'',draft:null,dana:[{nama:'',nom:''}]};
+  function semuaProg(){ var K=Object.keys(progKelas()); if(B.baru&&B.baru.jenis==='kelas'&&K.indexOf(B.baru.p)<0) K.push(B.baru.p); return K.map(function(p){ return {p:p,jenis:'kelas'}; }).concat(progDana().map(function(p){ return {p:p,jenis:'dana'}; })); }
+  function jenisProg(p){ var x=semuaProg().find(function(o){ return o.p===p; }); return x?x.jenis:'kelas'; }
+  // ---------- password ----------
+  function mintaPw(judul,ok){ var m=document.createElement('div'); m.className='rk-del-bg'; m.style.zIndex=100008;
+    m.innerHTML='<div class="rk-del-box" style="width:min(400px,100%)"><b style="font-size:15px">'+esc(judul)+'</b><input type="password" placeholder="Password admin" style="width:100%;margin-top:10px;padding:8px 10px;border:1px solid #d1d5db;border-radius:8px"><div class="bn-err" style="color:#b91c1c;font-size:12.5px;min-height:18px;margin-top:4px"></div><div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn bn-no">Batal</button><button class="btn btn-primary bn-ok">Lanjut</button></div></div>';
+    document.body.appendChild(m); var inp=m.querySelector('input'); setTimeout(function(){ inp.focus(); },50);
+    var go=function(){ if(inp.value!==PASSWORD){ m.querySelector('.bn-err').textContent='Password salah.'; inp.select(); return; } m.remove(); ok(); };
+    m.querySelector('.bn-ok').onclick=go; m.querySelector('.bn-no').onclick=function(){ m.remove(); }; inp.addEventListener('keydown',function(e){ if(e.key==='Enter') go(); if(e.key==='Escape') m.remove(); }); }
+  function diHP(){ var v=''; try{ v=localStorage.getItem('kw_peran')||''; }catch(e){} return v?v==='hp':/Android|iPhone|iPad|Mobile/i.test(navigator.userAgent); }
+  // ---------- buat 1 kuitansi SPP lewat form (sama seperti dibuat manual) ----------
+  function buatSPP(o){ // o: {nama,kelas,tanggal,dari,sampai,cicil,nominal,metode,catatan}
+    var before=window._lastNewRecs, warn=[], _c=window.confirm, _a=window.alert;
+    window.confirm=function(m){ warn.push(String(m||'').split('\n').filter(Boolean).slice(0,2).join(' ')); return true; }; window.alert=function(m){ warn.push(String(m||'')); };
+    try{
+      showPage('kwitansi'); resetForm();
+      var tg=$('inp-tanggal'); if(tg){ tg.value=o.tanggal; tg.dispatchEvent(new Event('input',{bubbles:true})); tg.dispatchEvent(new Event('change',{bubbles:true})); }
+      siswaList=[{nama:o.nama,kelas:o.kelas}]; renderSiswaForms(); itemList=[]; tambahItemForm(); onItemTipeChange(0,'SPP');
+      itemList[0].sppTahun=Math.floor(o.dari/12); itemList[0].sppTahunSampai=Math.floor((o.sampai!=null?o.sampai:o.dari)/12);
+      onSppBulanDari(0,String(o.dari%12)); if(o.sampai!=null&&o.sampai!==o.dari) onSppBulanSampai(0,String(o.sampai%12));
+      if(o.cicil){ onSppCicilanToggle(0,true); itemList[0].sppCicilanNominal=o.nominal; hitungCicilanSPP(0); }
+      itemList[0].catatan=o.catatan; renderItemForms(); if(typeof updateKwTotalBar==='function') updateKwTotalBar();
+      buatKwitansi();
+      if(window._lastNewRecs===before){ var mm=$('metode-modal'); if(mm&&mm.style.display!=='none') _metodePilih(o.metode||'Transfer'); }
+    }catch(e){ warn.push(e.message); } finally{ window.confirm=_c; window.alert=_a; }
+    var ok=window._lastNewRecs&&window._lastNewRecs!==before; var rec=ok?window._lastNewRecs[0]:null;
+    if(rec){ try{ var rw=getRiwayat(); rw.forEach(function(r){ if(r.id===rec.id){ r.bantuan=o.prog; if(!r.catatan) r.catatan=o.catatan; } }); setRiwayat(rw); }catch(e){} }
+    return {ok:!!rec,rec:rec,warn:warn}; }
+  // ---------- TERIMA: program per kelas ----------
+  function pilihBulan(){ var a=+$('bn-dari').value, z=+$('bn-sampai').value; return {a:Math.min(a,z),z:Math.max(a,z)}; }
+  function barisKelas(p){ var P=progKelas()[p]; if(!P) return []; var r=pilihBulan(), out=[];
+    P.siswa.forEach(function(s){ var bln=[], tot=0, lunas=[]; var hist=null; try{ hist=getSppHistory(s.nama); }catch(e){}
+      for(var mi=r.a;mi<=r.z;mi++){ if(!aktif(s,mi)) continue; var kel=getKelasEfektif(s.kelas,tglMi(mi),s)||s.kelas, t=tarifBantuan(s,kel,mi)||0; if(hist&&hist.paid&&hist.paid.has(lbl(mi))){ lunas.push(lbl(mi)); continue; } bln.push(mi); tot+=t; }
+      if(!bln.length&&!lunas.length) return;
+      var kel0=bln.length?(getKelasEfektif(s.kelas,tglMi(bln[0]),s)||s.kelas):s.kelas;
+      out.push({s:s,kelas:kel0,bln:bln,tot:tot,per:bln.length?tarifBantuan(s,kel0,bln[0]):0,lunas:lunas,urut:bln.length&&bln[bln.length-1]-bln[0]+1===bln.length}); });
+    return out.sort(function(x,y){ return String(x.kelas).localeCompare(String(y.kelas),'id',{numeric:true})||x.s.nama.localeCompare(y.s.nama); }); }
+  function htmlTerimaKelas(p){ var P=progKelas()[p];
+    if(!P) return '<div class="mut" style="margin-top:10px">Program ini belum punya siswa. Buka tab <b>Atur program</b> dulu.</div>';
+    var T=(P.tarif||[]).slice().sort(function(a,b){ return k2mi(b.mulai)-k2mi(a.mulai); })[0]||{map:{}};
+    var y=taY(), a0=(y-1)*12+6, n=36, d=B.dari!=null?B.dari:nowMi(), z=B.sampai!=null?B.sampai:d;
+    var h='<div class="mut">'+P.siswa.length+' siswa · '+Object.keys(T.map).map(function(k){ return esc(k)+' = '+Number(T.map[k]).toLocaleString('id-ID'); }).join(' · ')+'</div>';
+    h+='<div class="row"><b>Terima pembayaran '+esc(p.replace(/^Bantuan\s+/i,''))+'</b> Bulan <select id="bn-dari">'+opsi(d,a0,n)+'</select> – <select id="bn-sampai">'+opsi(z,a0,n)+'</select> Tanggal <input type="date" id="bn-tgl" value="'+(B.tgl||today())+'"> <select id="bn-met"><option'+(B.met==='Kas'?'':' selected')+'>Transfer</option><option'+(B.met==='Kas'?' selected':'')+'>Kas</option></select></div>';
+    h+='<div id="bn-tabel"></div>'; return h; }
+  function isiTabelKelas(p){ var L=barisKelas(p), w=$('bn-tabel'); if(!w) return; B.L=L;
+    if(!L.length){ w.innerHTML='<div class="mut" style="margin-top:8px">Tidak ada siswa program ini yang aktif di bulan tersebut.</div>'; return; }
+    var r=pilihBulan(), nb=r.z-r.a+1, sel=L.filter(function(x){ return x.bln.length&&!x._off; });
+    w.innerHTML='<table><thead><tr><th style="width:26px"></th><th>Siswa</th><th>Kelas</th><th>Per bulan</th><th>'+nb+' bulan</th><th></th></tr></thead><tbody>'+L.map(function(x,i){
+      return '<tr><td><input type="checkbox" data-i="'+i+'"'+(x.bln.length&&!x._off?' checked':'')+(x.bln.length?'':' disabled')+'></td><td>'+esc(x.s.nama)+'</td><td>'+esc(x.kelas)+'</td><td>'+rp(x.per)+'</td><td>'+rp(x.tot)+'</td><td class="mut">'+(x.lunas.length?'<span class="r">sudah lunas: '+esc(x.lunas.join(', '))+'</span>':'')+(x.bln.length&&!x.urut?' bulan tidak berurutan — dibuat per rentang':'')+'</td></tr>'; }).join('')+
+      '<tr><td></td><td colspan="3"><b>Total dari '+esc(p.replace(/^Bantuan\s+/i,''))+' ('+sel.length+' siswa)</b></td><td><b>'+rp(sel.reduce(function(a,x){ return a+x.tot; },0))+'</b></td><td></td></tr></tbody></table>'+
+      '<div class="row"><button class="btn btn-primary" id="bn-buat"'+(sel.length?'':' disabled')+'>Buat '+sel.length+' kuitansi</button><span class="mut">satu per siswa · password admin · di kuitansi tertulis “Dibayar oleh: 🤝 '+esc(p)+'”</span></div>';
+    w.querySelectorAll('input[type=checkbox]').forEach(function(c){ c.onchange=function(){ L[+c.dataset.i]._off=!c.checked; var keep={}; L.forEach(function(x){ if(x._off) keep[x.s.nama]=1; }); B.off=keep; isiTabelKelas(p); }; });
+    if(B.off) L.forEach(function(x){ if(B.off[x.s.nama]) x._off=true; });
+    var bt=$('bn-buat'); if(bt) bt.onclick=function(){ buatKelas(p); }; }
+  function rentang(bln){ var R=[], a=bln[0], b=bln[0]; for(var i=1;i<bln.length;i++){ if(bln[i]===b+1) b=bln[i]; else { R.push([a,b]); a=b=bln[i]; } } R.push([a,b]); return R; }
+  function buatKelas(p){ if(diHP()){ alert('Buat kuitansi bantuan di laptop (HP mode lihat saja).'); return; }
+    var L=(B.L||[]).filter(function(x){ return x.bln.length&&!x._off; }); if(!L.length) return;
+    var tgl=$('bn-tgl').value||today(), met=$('bn-met').value, tot=L.reduce(function(a,x){ return a+x.tot; },0);
+    if(!confirm('Buat '+L.length+' kuitansi SPP dari '+p+'?\nTotal '+rp(tot)+' · tanggal '+tglFmt(tgl)+' · '+met)) return;
+    mintaPw('🤝 Buat '+L.length+' kuitansi '+p,function(){ var ok=0, gagal=[], no=[];
+      L.forEach(function(x){ rentang(x.bln).forEach(function(rg){ var r=buatSPP({prog:p,nama:x.s.nama,kelas:x.s.kelas,tanggal:tgl,dari:rg[0],sampai:rg[1],cicil:false,metode:met,catatan:'Dibayar oleh: 🤝 '+p});
+        if(r.ok){ ok++; no.push(r.rec.no); } else gagal.push(x.s.nama+(r.warn.length?' ('+r.warn[0].slice(0,80)+')':'')); }); });
+      try{ addLog('tambah',p,'Terima bantuan: '+ok+' kuitansi · '+rp(tot)+(gagal.length?' · gagal '+gagal.length:'')); }catch(e){}
+      kwBantuan('terima',p); alert('✓ '+ok+' kuitansi dibuat ('+(no[0]||'')+(no.length>1?' … '+no[no.length-1]:'')+')'+(gagal.length?'\n\nGagal:\n'+gagal.join('\n'):'')); }); }
+  // ---------- TERIMA: dana per siswa (SPP normal) ----------
+  function bagiDana(nama,dana){ var s=cari(nama); if(!s||!dana) return null; var nx=null; try{ nx=sppBulanBerikutnya(nama); }catch(e){} if(!nx) return null;
+    var mi=nx.tahun*12+nx.bulan, sisa=dana, out=[], sm={}; try{ sm=getSppSisaPerBulan(nama)||{}; }catch(e){} var hist=null; try{ hist=getSppHistory(nama); }catch(e){}
+    for(var k=0;k<24&&sisa>0;k++,mi++){ var key=lbl(mi); if(hist&&hist.paid&&hist.paid.has(key)&&!(sm[key]>0)) continue; var kel=getKelasEfektif(s.kelas,tglMi(mi),s)||s.kelas, t=sm[key]>0?sm[key]:(getSppNominalSiswa(s.nama,kel,getSPP(),tglMi(mi))||0); if(!t) break; var by=Math.min(t,sisa); sisa-=by; out.push({mi:mi,t:t,by:by}); }
+    return {dari:nx.tahun*12+nx.bulan,L:out,lebih:sisa}; }
+  function htmlTerimaDana(p){ var h='<div class="mut">SPP normal. Dana dibagi ke SPP mulai bulan pertama yang belum lunas (seperti Mode Cicilan). Kekurangan tetap jadi tunggakan orang tua.</div>';
+    h+='<div class="row"><b>Terima dana '+esc(p.replace(/^Bantuan\s+/i,''))+'</b> Tanggal <input type="date" id="bn-tgl" value="'+(B.tgl||today())+'"> <select id="bn-met"><option'+(B.met==='Kas'?'':' selected')+'>Transfer</option><option'+(B.met==='Kas'?' selected':'')+'>Kas</option></select></div>';
+    h+='<datalist id="bn-dl">'+sis().filter(function(s){ return s.kelas&&s.kelas!=='LULUS'; }).map(function(s){ return '<option value="'+esc(s.nama)+'">'+esc(s.kelas)+'</option>'; }).join('')+'</datalist><div id="bn-tabel"></div>'; return h; }
+  function isiTabelDana(p){ var w=$('bn-tabel'); if(!w) return; var tot=0, n=0;
+    var rows=B.dana.map(function(d,i){ var s=cari(d.nama), nom=angka(d.nom), pr=s&&nom?bagiDana(s.nama,nom):null; if(s&&nom&&pr&&pr.L.length){ tot+=nom; n++; }
+      var info=!d.nama?'':!s?'<span class="r">siswa tidak ditemukan</span>':!nom?'':!pr||!pr.L.length?'<span class="r">tidak ada bulan yang belum lunas</span>':pr.L.map(function(x){ return x.by>=x.t?'<span class="g">'+BULAN[x.mi%12].slice(0,3)+' ✓</span>':'<span class="r">'+BULAN[x.mi%12].slice(0,3)+' kurang '+Number(x.t-x.by).toLocaleString('id-ID')+'</span>'; }).join(' · ')+(pr.lebih>0?' · <span class="r">lebih '+rp(pr.lebih)+'</span>':'');
+      return '<tr><td><input list="bn-dl" data-i="'+i+'" data-f="nama" value="'+esc(d.nama)+'" placeholder="Ketik nama siswa…" style="width:220px">'+(s?' <span class="mut">'+esc(s.kelas)+'</span>':'')+'</td><td><input data-i="'+i+'" data-f="nom" inputmode="numeric" value="'+esc(d.nom)+'" placeholder="Dana" style="width:120px"></td><td>'+info+'</td><td><a href="javascript:void 0" data-hapus="'+i+'" class="mut">✕</a></td></tr>'; }).join('');
+    w.innerHTML='<table><thead><tr><th>Siswa</th><th>Dana '+esc(p.replace(/^Bantuan\s+/i,''))+'</th><th>Dibagi ke</th><th></th></tr></thead><tbody>'+rows+'<tr><td colspan="4"><button class="btn" id="bn-tambah">+ Siswa</button></td></tr><tr><td><b>Total dari '+esc(p.replace(/^Bantuan\s+/i,''))+'</b></td><td><b>'+rp(tot)+'</b></td><td colspan="2"></td></tr></tbody></table>'+
+      '<div class="row"><button class="btn btn-primary" id="bn-buat"'+(n?'':' disabled')+'>Buat '+n+' kuitansi</button><span class="mut">password admin · di kuitansi tertulis “Dibayar oleh: 🤝 '+esc(p)+'”</span></div>';
+    w.querySelectorAll('input[data-f]').forEach(function(inp){ inp.onchange=function(){ var d=B.dana[+inp.dataset.i]; if(inp.dataset.f==='nama'){ var s=sis().find(function(x){ return x.nama.toLowerCase()===inp.value.trim().toLowerCase(); }); d.nama=s?s.nama:inp.value.trim(); } else { var v=angka(inp.value); d.nom=v?v.toLocaleString('id-ID'):''; } isiTabelDana(p); }; });
+    w.querySelectorAll('[data-hapus]').forEach(function(a){ a.onclick=function(){ B.dana.splice(+a.dataset.hapus,1); if(!B.dana.length) B.dana=[{nama:'',nom:''}]; isiTabelDana(p); }; });
+    $('bn-tambah').onclick=function(){ B.dana.push({nama:'',nom:''}); isiTabelDana(p); };
+    var bt=$('bn-buat'); if(bt) bt.onclick=function(){ buatDana(p); }; }
+  function buatDana(p){ if(diHP()){ alert('Buat kuitansi bantuan di laptop (HP mode lihat saja).'); return; }
+    var L=B.dana.map(function(d){ var s=cari(d.nama), nom=angka(d.nom), pr=s&&nom?bagiDana(s.nama,nom):null; return s&&pr&&pr.L.length?{s:s,nom:nom,pr:pr}:null; }).filter(Boolean); if(!L.length) return;
+    var tgl=$('bn-tgl').value||today(), met=$('bn-met').value, tot=L.reduce(function(a,x){ return a+x.nom; },0);
+    if(!confirm('Buat '+L.length+' kuitansi SPP dari '+p+'?\nTotal '+rp(tot)+' · tanggal '+tglFmt(tgl)+' · '+met)) return;
+    mintaPw('🤝 Buat '+L.length+' kuitansi '+p,function(){ var ok=0, gagal=[], no=[];
+      L.forEach(function(x){ var r=buatSPP({prog:p,nama:x.s.nama,kelas:x.s.kelas,tanggal:tgl,dari:x.pr.dari,sampai:null,cicil:true,nominal:x.nom,metode:met,catatan:'Dibayar oleh: 🤝 '+p});
+        if(r.ok){ ok++; no.push(r.rec.no); } else gagal.push(x.s.nama+(r.warn.length?' ('+r.warn[0].slice(0,80)+')':'')); });
+      try{ addLog('tambah',p,'Terima dana: '+ok+' kuitansi · '+rp(tot)+(gagal.length?' · gagal '+gagal.length:'')); }catch(e){}
+      B.dana=[{nama:'',nom:''}]; kwBantuan('terima',p); alert('✓ '+ok+' kuitansi dibuat ('+(no[0]||'')+(no.length>1?' … '+no[no.length-1]:'')+')'+(gagal.length?'\n\nGagal:\n'+gagal.join('\n'):'')); }); }
+  // ---------- ATUR program per kelas ----------
+  function draft(p){ if(B.draft&&B.draft.p===p) return B.draft; var P=progKelas()[p]||{p:p,tarif:[],siswa:[]};
+    var T=(P.tarif||[]).slice().sort(function(a,b){ return k2mi(b.mulai)-k2mi(a.mulai); })[0]; var mulai0=P.siswa.length?P.siswa.map(function(s){ return s.bantuan.mulai; }).sort()[0]:mi2k(nowMi());
+    var map=T?JSON.parse(JSON.stringify(T.map)):{'3 SD':'','4 SD':'','5 SD':'','6 SD':''};
+    B.draft={p:p,map:map,mapAwal:JSON.stringify(T?T.map:{}),berlaku:k2mi(mulai0)!=null&&k2mi(mulai0)>nowMi()?k2mi(mulai0):nowMi(),mulai0:mulai0,
+      anggota:P.siswa.filter(function(s){ return !s.bantuan.keluar||k2mi(s.bantuan.keluar)>nowMi(); }).map(function(s){ return {nama:s.nama,mulai:s.bantuan.mulai,ada:true}; }),keluar:{},tambahBulan:nowMi()};
+    return B.draft; }
+  function htmlAtur(p){ var D=draft(p), y=taY(), a0=(y-1)*12+6;
+    var h='<div class="row"><b>Tarif per kelas</b> <span class="mut">— yang dibayar per bulan untuk siswa program ini</span></div><table><thead><tr><th>Kelas</th><th>Tarif normal</th><th>Tarif '+esc(p)+'</th><th></th></tr></thead><tbody>'+
+      Object.keys(D.map).map(function(k){ var norm=0; try{ norm=getSppNominal(k,getSPP())||0; }catch(e){} return '<tr><td>'+esc(k)+'</td><td class="mut">'+(norm?rp(norm):'—')+'</td><td><input data-k="'+esc(k)+'" inputmode="numeric" value="'+(D.map[k]?Number(D.map[k]).toLocaleString('id-ID'):'')+'" style="width:120px"></td><td><a href="javascript:void 0" data-hk="'+esc(k)+'" class="mut">✕</a></td></tr>'; }).join('')+
+      '<tr><td colspan="4"><input id="bn-kls-baru" placeholder="mis. 2 SD / 7 SMP" style="width:150px"> <button class="btn" id="bn-kls-add">+ Kelas</button></td></tr></tbody></table>';
+    h+='<div class="row">Tarif berlaku mulai <select id="bn-berlaku">'+opsi(D.berlaku,a0,36)+'</select><span class="mut">bulan sebelumnya tetap memakai tarif lama · naik kelas otomatis ikut tarif kelas baru</span></div>';
+    h+='<div class="row" style="margin-top:14px"><b>Siswa ('+D.anggota.length+')</b></div><table><thead><tr><th>Siswa</th><th>Kelas</th><th>Mulai</th><th></th></tr></thead><tbody>'+
+      D.anggota.map(function(a,i){ var s=cari(a.nama); return '<tr><td>'+esc(a.nama)+'</td><td>'+esc(s?s.kelas:'?')+'</td><td>'+esc(lbl(k2mi(a.mulai)))+(a.ada?'':' <span class="bn-tag">baru</span>')+'</td><td>'+(D.keluar[a.nama]!=null?'<span class="r">keluar mulai '+esc(lbl(D.keluar[a.nama]))+'</span> <a href="javascript:void 0" data-batal="'+esc(a.nama)+'">batal</a>':'<a href="javascript:void 0" data-out="'+i+'" class="mut">Keluarkan</a>')+'</td></tr>'; }).join('')+
+      '<tr><td colspan="4"><input list="bn-dl2" id="bn-sis-baru" placeholder="Ketik nama siswa…" style="width:220px"> mulai <select id="bn-sis-mulai">'+opsi(D.tambahBulan,a0,36)+'</select> <button class="btn" id="bn-sis-add">+ Tambah</button><datalist id="bn-dl2">'+sis().filter(function(s){ return s.kelas&&s.kelas!=='LULUS'&&!(s.bantuan&&s.bantuan.p&&s.bantuan.p!==p&&(!s.bantuan.keluar||k2mi(s.bantuan.keluar)>nowMi())); }).map(function(s){ return '<option value="'+esc(s.nama)+'">'+esc(s.kelas)+'</option>'; }).join('')+'</datalist></td></tr></tbody></table>';
+    h+='<div class="row" style="margin-top:12px"><button class="btn btn-primary" id="bn-simpan">Simpan program</button><span class="mut">password admin · tercatat di Log Aktivitas</span></div>'; return h; }
+  function pasangAtur(p){ var D=draft(p);
+    document.querySelectorAll('#bn-isi input[data-k]').forEach(function(i){ i.onchange=function(){ var v=angka(i.value); D.map[i.dataset.k]=v||''; i.value=v?v.toLocaleString('id-ID'):''; }; });
+    document.querySelectorAll('#bn-isi [data-hk]').forEach(function(a){ a.onclick=function(){ delete D.map[a.dataset.hk]; isi(); }; });
+    $('bn-kls-add').onclick=function(){ var k=$('bn-kls-baru').value.trim(); if(!k) return; k=k.replace(/\s+/g,' ').replace(/\b(sd|smp|smk|tk)\b/gi,function(x){ return x.toUpperCase(); }); if(!(k in D.map)) D.map[k]=''; isi(); };
+    $('bn-berlaku').onchange=function(){ D.berlaku=+this.value; };
+    $('bn-sis-mulai').onchange=function(){ D.tambahBulan=+this.value; };
+    $('bn-sis-add').onclick=function(){ var v=$('bn-sis-baru').value.trim(), s=sis().find(function(x){ return x.nama.toLowerCase()===v.toLowerCase(); }); if(!s){ alert('Pilih siswa dari daftar.'); return; }
+      if(D.anggota.some(function(a){ return a.nama===s.nama; })) return; var b=s.bantuan; if(b&&b.p&&b.p!==p&&(!b.keluar||k2mi(b.keluar)>nowMi())){ alert(s.nama+' sudah ikut '+b.p+'. Setiap siswa hanya 1 program.'); return; }
+      D.anggota.push({nama:s.nama,mulai:mi2k(D.tambahBulan),ada:false}); isi(); };
+    document.querySelectorAll('#bn-isi [data-out]').forEach(function(a){ a.onclick=function(){ var an=D.anggota[+a.dataset.out]; if(!an.ada){ D.anggota.splice(+a.dataset.out,1); isi(); return; }
+      var x=prompt('Keluarkan '+an.nama+' dari '+p+'.\nKembali ke tarif normal mulai bulan (format: YYYY-MM):',mi2k(nowMi()+1)); if(!x||k2mi(x)==null) return; D.keluar[an.nama]=k2mi(x); isi(); }; });
+    document.querySelectorAll('#bn-isi [data-batal]').forEach(function(a){ a.onclick=function(){ delete D.keluar[a.dataset.batal]; isi(); }; });
+    $('bn-simpan').onclick=function(){ var kosong=Object.keys(D.map).filter(function(k){ return !(D.map[k]>0); }); if(kosong.length){ alert('Isi tarif untuk: '+kosong.join(', ')+' (atau hapus barisnya).'); return; }
+      if(!D.anggota.length){ alert('Tambahkan siswa dulu.'); return; }
+      mintaPw('🤝 Simpan program '+p,function(){ simpanProg(p,D); }); }; }
+  function simpanProg(p,D){ var S=getSiswa()||[], P=progKelas()[p], T=P&&P.tarif?JSON.parse(JSON.stringify(P.tarif)):[], ubahTarif=JSON.stringify(D.map)!==D.mapAwal, log=[];
+    var mapBaru={}; Object.keys(D.map).forEach(function(k){ mapBaru[k]=Number(D.map[k]); });
+    if(!T.length) T=[{mulai:D.anggota.map(function(a){ return a.mulai; }).sort()[0]||mi2k(D.berlaku),map:mapBaru}];
+    else if(ubahTarif){ var mk=mi2k(D.berlaku); T=T.filter(function(t){ return t.mulai!==mk; }); T.push({mulai:mk,map:mapBaru}); log.push('tarif baru mulai '+lbl(D.berlaku)+': '+Object.keys(mapBaru).map(function(k){ return k+' '+mapBaru[k].toLocaleString('id-ID'); }).join(', ')); }
+    var nb=0, nk=0;
+    S.forEach(function(s){ var a=D.anggota.find(function(x){ return x.nama===s.nama; }), b=s.bantuan;
+      if(a){ if(!b||b.p!==p){ s.bantuan={p:p,jenis:'kelas',mulai:a.mulai,keluar:null,tarif:T}; nb++; } else { b.tarif=T; if(D.keluar[s.nama]!=null){ b.keluar=mi2k(D.keluar[s.nama]); nk++; } } s.updatedAt=new Date().toISOString(); }
+      else if(b&&b.p===p){ b.tarif=T; } });
+    if(nb) log.push(nb+' siswa ditambahkan'); if(nk) log.push(nk+' siswa dikeluarkan');
+    setSiswa(S); try{ addLog('edit',p,'Program bantuan diperbarui: '+(log.join(' · ')||'tidak ada perubahan')); }catch(e){}
+    B.draft=null; B.baru=null; B.tab='terima'; kwBantuan('terima',p); }
+  // ---------- modal ----------
+  function isi(){ var w=$('bn-isi'); if(!w) return; var p=B.prog, j=jenisProg(p);
+    document.querySelectorAll('#bn-modal .bn-tab').forEach(function(t){ t.classList.toggle('on',t.dataset.t===B.tab); });
+    var at=document.querySelector('#bn-modal .bn-tab[data-t=atur]'); if(at) at.style.display=j==='kelas'?'':'none';
+    if(B.tab==='atur'&&j==='kelas'){ w.innerHTML=htmlAtur(p); pasangAtur(p); return; }
+    if(j==='kelas'){ w.innerHTML=htmlTerimaKelas(p); if(progKelas()[p]){ ['bn-dari','bn-sampai'].forEach(function(id){ $(id).onchange=function(){ B.dari=+$('bn-dari').value; B.sampai=+$('bn-sampai').value; B.off=null; isiTabelKelas(p); }; }); isiTabelKelas(p); } }
+    else { w.innerHTML=htmlTerimaDana(p); isiTabelDana(p); }
+    var tg=$('bn-tgl'), me=$('bn-met'); if(tg) tg.onchange=function(){ B.tgl=tg.value; }; if(me) me.onchange=function(){ B.met=me.value; }; }
+  window.kwBantuan=function(tab,prog){
+    var L=semuaProg(); B.tab=tab||B.tab||'terima'; if(prog) B.prog=prog; if(!B.prog||!L.some(function(o){ return o.p===B.prog; })) B.prog=(L[0]||{p:''}).p;
+    var m=$('bn-modal'); if(m) m.remove(); m=document.createElement('div'); m.id='bn-modal'; m.className='rk-del-bg'; m.style.zIndex=100004;
+    m.innerHTML='<div class="rk-del-box bn-box"><div style="display:flex;align-items:center;gap:8px"><b style="font-size:17px">🤝 Bantuan</b><select id="bn-prog">'+L.map(function(o){ return '<option value="'+esc(o.p)+'"'+(o.p===B.prog?' selected':'')+'>'+esc(o.p)+(o.jenis==='kelas'?' · tarif per kelas':' · dana per siswa')+'</option>'; }).join('')+'</select><button class="btn" id="bn-baru" style="padding:4px 10px">+ Program baru</button><span class="btn" style="margin-left:auto;padding:3px 10px" id="bn-x">✕</span></div>'+
+      '<div class="bn-tabs"><span class="bn-tab" data-t="terima">Terima pembayaran</span><span class="bn-tab" data-t="atur">Atur program</span></div><div id="bn-isi"></div></div>';
+    document.body.appendChild(m);
+    $('bn-x').onclick=function(){ m.remove(); }; m.addEventListener('click',function(e){ if(e.target===m) m.remove(); });
+    $('bn-prog').onchange=function(){ B.prog=this.value; B.draft=null; B.dari=B.sampai=null; B.off=null; isi(); };
+    m.querySelectorAll('.bn-tab').forEach(function(t){ t.onclick=function(){ B.tab=t.dataset.t; isi(); }; });
+    $('bn-baru').onclick=function(){ var n=prompt('Nama program bantuan (mis. Bantuan Yayasan X):'); if(!n) return; n=n.trim(); if(!/^bantuan\b/i.test(n)) n='Bantuan '+n;
+      var per=confirm('“'+n+'” memakai TARIF KHUSUS PER KELAS (seperti Pak Kim)?\n\nOK = tarif per kelas\nBatal = dana per siswa, SPP normal (seperti Edu)');
+      if(per){ B.baru={p:n,jenis:'kelas'}; B.prog=n; B.tab='atur'; B.draft=null; } else { var L2=progDana(); if(L2.indexOf(n)<0){ L2.push(n); try{ localStorage.setItem(DANA_LS,JSON.stringify(L2.filter(function(x){ return x!=='Bantuan Edu'; }))); }catch(e){} } B.prog=n; B.tab='terima'; }
+      kwBantuan(B.tab,B.prog); };
+    if(!L.length){ $('bn-isi').innerHTML='<div class="mut">Belum ada program.</div>'; return; }
+    if(!Object.keys(progKelas()).length&&!B.baru&&jenisProg(B.prog)==='dana'&&B.tab==='atur') B.tab='terima';
+    isi(); };
+  // Pak Kim bawaan bila belum ada program per kelas sama sekali
+  var _sp=semuaProg; semuaProg=function(){ var L=_sp(); if(!L.some(function(o){ return o.jenis==='kelas'; })) L.unshift({p:'Bantuan Pak Kim',jenis:'kelas'}); return L; };
+  // ---------- tombol ----------
+  function pasang(){
+    var km=document.querySelector('#page-kwitansi .kw-main'); if(km&&!$('bn-btn-kw')){ var b=document.createElement('div'); b.id='bn-btn-kw'; b.style.cssText='display:flex;justify-content:flex-end;margin:0 0 8px';
+      b.innerHTML='<button type="button" class="btn" style="font-size:13px">🤝 Terima bantuan</button>'; b.firstChild.onclick=function(){ kwBantuan('terima'); }; km.insertBefore(b,km.firstChild); }
+    var a=$('btn-cek-nama'); if(a&&!$('bn-btn-ks')){ var c=document.createElement('button'); c.id='bn-btn-ks'; c.className='btn'; c.type='button'; c.innerHTML='🤝 Program bantuan'; c.title='Atur siswa & tarif program bantuan (mis. Pak Kim)'; c.onclick=function(){ kwBantuan('atur'); }; a.parentNode.insertBefore(c,a); } }
+  setTimeout(pasang,500); setInterval(pasang,2500);
 })();
 </script>
 </body>
